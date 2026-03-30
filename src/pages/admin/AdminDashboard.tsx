@@ -2,7 +2,7 @@ import { Header } from '../../components/layout/Header';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import {
-  FileText, Users, Shield, CreditCard, MessageSquare, Star,
+  FileText, Users, Shield, CreditCard, Star,
   Clock, CheckCircle, ArrowRight, TrendingUp
 } from 'lucide-react';
 import { Link } from 'react-router-dom';

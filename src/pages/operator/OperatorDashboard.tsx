@@ -16,7 +16,6 @@ export function OperatorDashboard() {
   const driver = storage.getDriverByUserId(user.id);
 
   const pendingApps = applications.filter(a => a.status === 'pending' || a.status === 'under_review').length;
-  const approvedApps = applications.filter(a => a.status === 'approved').length;
   const activeFranchises = franchises.filter(f => f.status === 'active').length;
   const totalPaid = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0);
 

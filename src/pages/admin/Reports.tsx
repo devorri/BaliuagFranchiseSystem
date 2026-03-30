@@ -4,7 +4,6 @@ import * as storage from '../../services/storageService';
 
 export function Reports() {
   const stats = storage.getAdminStats();
-  const payments = storage.getPayments().filter(p => p.status === 'completed');
   const feedback = storage.getFeedback();
   const franchises = storage.getFranchises();
 

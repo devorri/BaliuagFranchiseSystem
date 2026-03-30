@@ -4,7 +4,6 @@
 
 import type { User, Application, Franchise, Payment, Receipt, DriverProfile, Feedback, FeeConfig, Notification } from '../types';
 
-const now = new Date().toISOString();
 const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
 const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
 const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
@@ -12,7 +11,6 @@ const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(
 const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 const oneYearFromNow = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 const sixMonthsFromNow = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString();
-const expired30DaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
 export const seedUsers: User[] = [
   {
