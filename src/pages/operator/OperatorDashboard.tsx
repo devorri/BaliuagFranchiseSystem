@@ -38,7 +38,10 @@ export function OperatorDashboard() {
           <div className="alert alert--warning">
             <AlertTriangle size={18} />
             <div>
-              <strong>Renewal Reminder:</strong> You have {expiringFranchises.length} franchise(s) expiring within 90 days. Please prepare your renewal documents.
+              <strong>Renewal Reminder:</strong> You have {expiringFranchises.length} franchise(s) expiring within 90 days. 
+              <Link to="/dashboard/apply" state={{ type: 'renewal' }} className="btn btn--white btn--xs" style={{ marginLeft: 'var(--space-md)' }}>
+                Renew Now
+              </Link>
             </div>
           </div>
         )}
@@ -147,7 +150,14 @@ export function OperatorDashboard() {
                         <span className="mini-list__title">{f.plateNumber} — {f.vehicleMake} {f.vehicleModel}</span>
                         <span className="mini-list__sub">Expires: {new Date(f.expiresAt).toLocaleDateString()}</span>
                       </div>
-                      <StatusBadge status={f.status} size="sm" />
+                      <div className="mini-list__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+                        <StatusBadge status={f.status} size="sm" />
+                        {f.status === 'active' && (
+                          <Link to="/dashboard/apply" state={{ type: 'renewal', franchiseId: f.id }} className="btn btn--outline btn--xs">
+                            Renew
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

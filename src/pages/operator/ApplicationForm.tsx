@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Header } from '../../components/layout/Header';
 import { useToast } from '../../components/ui/Toast';
@@ -11,20 +11,25 @@ import type { ApplicationType, ResidencyType, Document } from '../../types';
 export function ApplicationForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+  
+  const state = location.state as { type?: ApplicationType; franchiseId?: string } | null;
+  const existingFranchise = state?.franchiseId ? storage.getFranchiseById(state.franchiseId) : null;
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
-    type: 'new' as ApplicationType,
-    residency: 'resident' as ResidencyType,
-    vehicleMake: '',
-    vehicleModel: '',
-    plateNumber: '',
-    motorNumber: '',
-    chassisNumber: '',
-    vehicleColor: '',
-    todaIndex: 0,
+    type: (state?.type || 'new') as ApplicationType,
+    residency: (existingFranchise?.residency || 'resident') as ResidencyType,
+    vehicleMake: existingFranchise?.vehicleMake || '',
+    vehicleModel: existingFranchise?.vehicleModel || '',
+    plateNumber: existingFranchise?.plateNumber || '',
+    motorNumber: existingFranchise?.motorNumber || '',
+    chassisNumber: existingFranchise?.chassisNumber || '',
+    vehicleColor: existingFranchise?.vehicleColor || '',
+    todaIndex: existingFranchise ? todaRoutes.findIndex(r => r.name === existingFranchise.todaName) : 0,
   });
 
   const [docs, setDocs] = useState<{ name: string; type: Document['type']; fileName: string }[]>([]);

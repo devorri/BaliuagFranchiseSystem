@@ -106,7 +106,7 @@ export function LoginPage() {
         <div className="auth-card__demo">
           <p className="auth-card__demo-title">Demo Credentials</p>
           <div className="auth-card__demo-grid">
-            <button type="button" className="auth-card__demo-btn" onClick={() => { setUsername('admin'); setPassword('password123'); }}>
+            <button type="button" className="auth-card__demo-btn" onClick={() => { setUsername('admin'); setPassword('admin123'); }}>
               <strong>Admin</strong>
               <span>admin</span>
             </button>

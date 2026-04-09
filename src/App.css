@@ -789,3 +789,75 @@
   .stepper__line { display: none; }
   .report-summary { grid-template-columns: 1fr; }
 }
+/* ============================================
+   GCASH BRANDING (SIMULATION)
+   ============================================ */
+.gcash-modal {
+  border-top: 8px solid #0055BA;
+}
+
+.gcash-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-lg) 0;
+  background: linear-gradient(to bottom, #E6F0FF, #ffffff);
+}
+
+.gcash-logo {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #0055BA;
+  letter-spacing: -1px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gcash-logo span {
+  color: #2ecc71; /* The GCash G is often blue, but they have some green accents/icons in newer UI */
+}
+
+.gcash-qr-container {
+  background: white;
+  padding: var(--space-xl);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 85, 186, 0.1);
+  margin: var(--space-md) auto;
+  display: inline-block;
+  border: 1px solid #E6F0FF;
+}
+
+.gcash-btn {
+  background: #0055BA;
+  color: white;
+  border: none;
+  font-weight: 700;
+}
+
+.gcash-btn:hover {
+  background: #004494;
+  color: white;
+}
+
+.gcash-amount-banner {
+  background: #E6F0FF;
+  padding: var(--space-md);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  margin-bottom: var(--space-lg);
+}
+
+.gcash-amount-label {
+  font-size: 0.8rem;
+  color: #0055BA;
+  text-transform: uppercase;
+  font-weight: 600;
+  display: block;
+}
+
+.gcash-amount-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0055BA;
+}

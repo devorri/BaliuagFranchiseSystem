@@ -87,44 +87,53 @@ export function PaymentPage() {
           </div>
         )}
 
-        {/* QR Payment Modal */}
+        {/* GCash QR Payment Modal */}
         {payingAppId && (() => {
           const app = applications.find(a => a.id === payingAppId);
           if (!app) return null;
           return (
             <div className="modal-overlay" onClick={() => !processing && setPayingAppId(null)}>
-              <div className="modal modal--sm" onClick={e => e.stopPropagation()}>
-                <div className="modal__header">
-                  <h3 className="modal__title">QR Code Payment</h3>
+              <div className="modal modal--sm gcash-modal" onClick={e => e.stopPropagation()}>
+                <div className="gcash-header">
+                  <div className="gcash-logo">
+                    GCash<span>●</span>
+                  </div>
+                  <p className="qr-payment__instruction">Scan QR code to pay with GCash</p>
                 </div>
-                <div className="modal__body">
-                  <div className="qr-payment">
-                    <div className="qr-payment__code">
-                      <QRCodeSVG
-                        value={`BALIUAG-TRIKE-PAY|${app.id}|${app.totalFee}|${user.id}`}
-                        size={200}
-                        bgColor="#ffffff"
-                        fgColor="#1E3A5F"
-                        level="H"
-                      />
+                <div className="modal__body" style={{ textAlign: 'center' }}>
+                  <div className="gcash-amount-banner">
+                    <span className="gcash-amount-label">Amount to Pay</span>
+                    <span className="gcash-amount-value">₱{app.totalFee.toLocaleString()}.00</span>
+                  </div>
+                  
+                  <div className="gcash-qr-container">
+                    <QRCodeSVG
+                      value={`GCASH-PAY|${app.id}|${app.totalFee}|${user.id}`}
+                      size={180}
+                      bgColor="#ffffff"
+                      fgColor="#0055BA"
+                      level="H"
+                    />
+                  </div>
+                  
+                  <div className="qr-payment__details" style={{ margin: 'var(--space-md) 0' }}>
+                    <div className="qr-payment__row">
+                      <span style={{ color: 'var(--text-muted)' }}>Pay to</span>
+                      <span style={{ fontWeight: 600 }}>LGU Baliuag - Franchising</span>
                     </div>
-                    <p className="qr-payment__instruction">Scan QR code with your payment app</p>
-                    <div className="qr-payment__details">
-                      <div className="qr-payment__row">
-                        <span>Application</span>
-                        <span>{app.plateNumber}</span>
-                      </div>
-                      <div className="qr-payment__row">
-                        <span>Amount</span>
-                        <span className="qr-payment__amount">₱{app.totalFee.toLocaleString()}.00</span>
-                      </div>
+                    <div className="qr-payment__row">
+                      <span style={{ color: 'var(--text-muted)' }}>Application</span>
+                      <span style={{ fontWeight: 600 }}>{app.plateNumber} ({app.type === 'new' ? 'New' : 'Renewal'})</span>
                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
                     <button
-                      className="btn btn--primary btn--full"
+                      className="btn gcash-btn btn--full"
                       onClick={() => handleSimulatePayment(app.id)}
                       disabled={processing}
                     >
-                      {processing ? <span className="btn__spinner"></span> : <><CheckCircle size={16} /> Simulate Payment</>}
+                      {processing ? <span className="btn__spinner"></span> : <><CheckCircle size={16} /> Confirm GCash Payment</>}
                     </button>
                     {!processing && (
                       <button className="btn btn--ghost btn--full" onClick={() => setPayingAppId(null)}>Cancel</button>
