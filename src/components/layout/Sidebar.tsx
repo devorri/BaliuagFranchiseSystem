@@ -1,14 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  LayoutDashboard, FileText, FilePlus, CreditCard, User, Receipt,
-  ClipboardList, Users, Settings, MessageSquare, BarChart3, Shield,
-  ChevronLeft, ChevronRight, LogOut, Bike, QrCode, Star
+  LayoutDashboard, FileText, FilePlus, CreditCard, Shield,
+  ChevronLeft, ChevronRight, LogOut, QrCode, AlertTriangle,
+  CheckCircle2, BellRing, RefreshCw, BarChart3, Wrench
 } from 'lucide-react';
 import { useState } from 'react';
 
 export function Sidebar() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isTodaPresident, isAdmin, isOperator, logout } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -17,48 +17,57 @@ export function Sidebar() {
     navigate('/login');
   };
 
-  const operatorLinks = [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/dashboard/apply', icon: FilePlus, label: 'New Application' },
-    { to: '/dashboard/applications', icon: FileText, label: 'My Applications' },
-    { to: '/dashboard/status', icon: ClipboardList, label: 'Track Status' },
-    { to: '/dashboard/payments', icon: CreditCard, label: 'Payments' },
-    { to: '/dashboard/receipts', icon: Receipt, label: 'Receipts' },
-    { to: '/dashboard/profile', icon: User, label: 'My Profile & QR' },
+  const driverLinks = [
+    { to: '/driver', icon: LayoutDashboard, label: 'Dashboard & QR' },
+    { to: '/driver/requirements', icon: FilePlus, label: 'Submit Requirements' },
+    { to: '/driver/inspection', icon: Wrench, label: 'Inspection & Stenciling' },
+    { to: '/driver/payment', icon: CreditCard, label: 'Payment of Fees (GCash/Cash)' },
+    { to: '/driver/toda-status', icon: CheckCircle2, label: 'TODA Line Status' },
+  ];
+
+  const todaLinks = [
+    { to: '/toda', icon: LayoutDashboard, label: 'TODA Overview' },
+    { to: '/toda/approvals', icon: CheckCircle2, label: 'Driver Approvals' },
   ];
 
   const adminLinks = [
-    { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/admin/applications', icon: FileText, label: 'Applications' },
-    { to: '/admin/franchises', icon: Shield, label: 'Franchises' },
-    { to: '/admin/drivers', icon: Users, label: 'Drivers' },
-    { to: '/admin/fees', icon: Settings, label: 'Fee Management' },
-    { to: '/admin/feedback', icon: MessageSquare, label: 'Feedback' },
-    { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
+    { to: '/admin', icon: LayoutDashboard, label: 'Admin Overview' },
+    { to: '/admin/applications', icon: FileText, label: 'Review Applications' },
+    { to: '/admin/franchises', icon: Shield, label: 'Franchise Registry' },
+    { to: '/admin/penalties', icon: AlertTriangle, label: 'Penalty Management' },
+    { to: '/admin/reports', icon: BarChart3, label: 'Reports & Analytics' },
   ];
 
-  const passengerLinks = [
-    { to: '/passenger', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/passenger/scan', icon: QrCode, label: 'Scan / Verify' },
-    { to: '/passenger/feedback', icon: MessageSquare, label: 'Give Feedback' },
-    { to: '/passenger/history', icon: Star, label: 'My Reviews' },
-    { to: '/passenger/profile', icon: User, label: 'My Profile' },
+  const operatorLinks = [
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Operator Dashboard' },
+    { to: '/dashboard/requirements', icon: FilePlus, label: 'Franchise Application' },
+    { to: '/dashboard/gcash-payment', icon: QrCode, label: 'GCash QR Payment' },
+    { to: '/dashboard/renewal', icon: RefreshCw, label: 'Franchise Renewal' },
+    { to: '/dashboard/sms-notifications', icon: BellRing, label: 'SMS Notifications' },
   ];
 
-  const links = isAdmin ? adminLinks : user?.role === 'passenger' ? passengerLinks : operatorLinks;
+  let links = driverLinks;
+  let roleTitle = 'Tricycle Driver';
 
-  const roleLabel = isAdmin ? 'Administrator' : user?.role === 'passenger' ? 'Passenger' : 'Operator';
+  if (isAdmin) {
+    links = adminLinks;
+    roleTitle = 'City Administrator';
+  } else if (isTodaPresident) {
+    links = todaLinks;
+    roleTitle = 'TODA President';
+  } else if (isOperator) {
+    links = operatorLinks;
+    roleTitle = 'Franchise Operator';
+  }
 
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <div className="sidebar__brand">
-        <div className="sidebar__logo">
-          <Bike size={28} />
-        </div>
+        <img src="/baliuag-logo.png" alt="Baliuag Seal" className="sidebar__logo-img" />
         {!collapsed && (
-          <div className="sidebar__brand-text">
-            <span className="sidebar__brand-name">Baliuag City</span>
-            <span className="sidebar__brand-sub">Tricycle System</span>
+          <div>
+            <span className="sidebar__brand-name">Lungsod ng Baliwag</span>
+            <span className="sidebar__brand-sub">Franchise & MTOP</span>
           </div>
         )}
       </div>
@@ -67,6 +76,15 @@ export function Sidebar() {
         className="sidebar__toggle"
         onClick={() => setCollapsed(!collapsed)}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        style={{
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: '#94a3b8',
+          margin: '0.5rem 1rem',
+          padding: '0.25rem',
+          borderRadius: '8px',
+          cursor: 'pointer',
+        }}
       >
         {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
@@ -76,7 +94,7 @@ export function Sidebar() {
           <NavLink
             key={link.to}
             to={link.to}
-            end={link.to === '/dashboard' || link.to === '/admin' || link.to === '/passenger'}
+            end={link.to === '/driver' || link.to === '/toda' || link.to === '/admin' || link.to === '/dashboard'}
             className={({ isActive }) =>
               `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
             }
@@ -94,15 +112,15 @@ export function Sidebar() {
             <div className="sidebar__avatar">
               {user.firstName[0]}{user.lastName[0]}
             </div>
-            <div className="sidebar__user-info">
+            <div>
               <span className="sidebar__user-name">{user.firstName} {user.lastName}</span>
-              <span className="sidebar__user-role">{roleLabel}</span>
+              <span className="sidebar__user-role">{roleTitle}</span>
             </div>
           </div>
         )}
         <button className="sidebar__logout" onClick={handleLogout} title="Logout">
-          <LogOut size={20} />
-          {!collapsed && <span>Logout</span>}
+          <LogOut size={18} />
+          {!collapsed && <span>Sign Out</span>}
         </button>
       </div>
     </aside>

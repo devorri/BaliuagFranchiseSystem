@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { User } from '../types';
+import type { User, UserRole } from '../types';
 import * as storage from '../services/storageService';
 
 interface AuthContextType {
@@ -8,7 +8,11 @@ interface AuthContextType {
   logout: () => void;
   updateProfile: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
+  role: UserRole | null;
+  isDriver: boolean;
+  isTodaPresident: boolean;
   isAdmin: boolean;
+  isOperator: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -51,7 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       updateProfile,
       isAuthenticated: !!user,
+      role: user?.role || null,
+      isDriver: user?.role === 'driver',
+      isTodaPresident: user?.role === 'toda_president',
       isAdmin: user?.role === 'admin',
+      isOperator: user?.role === 'operator',
     }}>
       {children}
     </AuthContext.Provider>

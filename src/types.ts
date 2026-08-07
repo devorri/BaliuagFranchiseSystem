@@ -1,11 +1,20 @@
 // ============================================
-// Baliuag City Tricycle Registration System
+// Baliuag City Tricycle Franchise & MTOP System
 // Type Definitions
 // ============================================
 
-export type UserRole = 'operator' | 'admin' | 'passenger';
+export type UserRole = 'driver' | 'toda_president' | 'admin' | 'operator';
 
-export type ApplicationStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 'requires_revision';
+export type ApplicationStatus = 
+  | 'draft' 
+  | 'pending_inspection' 
+  | 'inspection_passed' 
+  | 'pending_treasurer_payment' 
+  | 'pending_toda_approval' 
+  | 'pending_admin_approval' 
+  | 'approved' 
+  | 'rejected' 
+  | 'requires_revision';
 
 export type FranchiseStatus = 'active' | 'expired' | 'suspended' | 'pending';
 
@@ -15,7 +24,13 @@ export type PaymentStatus = 'pending' | 'completed' | 'failed';
 
 export type ApplicationType = 'new' | 'renewal';
 
-export type ResidencyType = 'resident' | 'non_resident';
+export type DocumentType = 
+  | 'or_cr' 
+  | 'barangay_clearance' 
+  | 'drivers_license' 
+  | 'toda_cert' 
+  | 'id_photo' 
+  | 'other';
 
 export interface User {
   id: string;
@@ -28,6 +43,7 @@ export interface User {
   email: string;
   phone: string;
   address: string;
+  todaName?: string;
   profilePhoto?: string;
   createdAt: string;
 }
@@ -35,21 +51,58 @@ export interface User {
 export interface Document {
   id: string;
   name: string;
-  type: 'drivers_license' | 'community_tax_cert' | 'deed_of_sale' | 'barangay_clearance' | 'vehicle_registration' | 'other';
+  type: DocumentType;
   fileName: string;
   uploadedAt: string;
   status: 'uploaded' | 'verified' | 'rejected';
+  fileUrl?: string;
+}
+
+export interface InspectionRecord {
+  id: string;
+  applicationId: string;
+  engineNumber: string;
+  chassisNumber: string;
+  engineVerified: boolean;
+  chassisVerified: boolean;
+  inspectorName: string;
+  inspectedAt: string;
+  status: 'pending' | 'passed' | 'failed';
+  notes?: string;
+}
+
+export interface TodaApproval {
+  approvedBy: string;
+  approvedByName: string;
+  todaName: string;
+  approvedAt: string;
+  routeFeePaid: boolean;
+  membershipFeePaid: boolean;
+  routeFeeAmount: number;
+  membershipFeeAmount: number;
+  orNumber?: string;
+  remarks?: string;
+}
+
+export interface TreasurerPayment {
+  paid: boolean;
+  amount: number;
+  orNumber: string;
+  paidAt?: string;
+  paymentMethod: 'cash' | 'gcash';
 }
 
 export interface Application {
   id: string;
   applicantId: string;
   applicantName: string;
+  applicantRole: 'driver' | 'operator';
   type: ApplicationType;
   status: ApplicationStatus;
-  residency: ResidencyType;
   
-  // Vehicle Info
+  // Driver / Vehicle Info
+  driverName?: string;
+  licenseNumber?: string;
   vehicleMake: string;
   vehicleModel: string;
   plateNumber: string;
@@ -57,22 +110,30 @@ export interface Application {
   chassisNumber: string;
   vehicleColor: string;
   
-  // Route Info
+  // Route / TODA Info
   todaName: string;
   routeArea: string;
   
   // Documents
   documents: Document[];
   
+  // Workflow Steps Data
+  inspection?: InspectionRecord;
+  treasurerPayment?: TreasurerPayment;
+  todaApproval?: TodaApproval;
+  
   // Fee Info
   baseFee: number;
+  todaFee: number;
   latePenalty: number;
   totalFee: number;
   
-  // Admin Notes
+  // Admin Notes & Approval
   adminNotes?: string;
   reviewedBy?: string;
   reviewedAt?: string;
+  mtopNumber?: string;
+  qrCodeUrl?: string;
   
   submittedAt: string;
   updatedAt: string;
@@ -80,11 +141,14 @@ export interface Application {
 
 export interface Franchise {
   id: string;
+  mtopNumber: string;
   applicationId: string;
   operatorId: string;
   operatorName: string;
+  driverId: string;
+  driverName: string;
   
-  // Vehicle
+  // Vehicle Info
   vehicleMake: string;
   vehicleModel: string;
   plateNumber: string;
@@ -96,12 +160,38 @@ export interface Franchise {
   todaName: string;
   routeArea: string;
   
-  residency: ResidencyType;
   status: FranchiseStatus;
-  
   issuedAt: string;
   expiresAt: string;
   renewalDate: string;
+  qrCodeData: string;
+}
+
+export interface Penalty {
+  id: string;
+  driverId: string;
+  driverName: string;
+  plateNumber: string;
+  todaName: string;
+  violationType: 'Expired MTOP' | 'Out of Route Operation' | 'Overcharging' | 'Illegal Parking' | 'No License' | 'No TODA Cert';
+  amount: number;
+  status: 'unpaid' | 'paid';
+  issuedDate: string;
+  dueDate: string;
+  paidAt?: string;
+  remarks: string;
+  issuedBy: string;
+}
+
+export interface SMSNotification {
+  id: string;
+  userId: string;
+  recipientPhone: string;
+  title: string;
+  message: string;
+  type: 'renewal_reminder' | 'expiration' | 'penalty_alert' | 'status_update' | 'toda_approval';
+  sentAt: string;
+  read: boolean;
 }
 
 export interface Payment {
@@ -110,10 +200,9 @@ export interface Payment {
   payerId: string;
   payerName: string;
   amount: number;
-  baseFee: number;
-  latePenalty: number;
+  description: string;
   status: PaymentStatus;
-  paymentMethod: 'qr_code' | 'cash';
+  paymentMethod: 'gcash' | 'cash' | 'treasurer_office';
   referenceNumber: string;
   qrCodeData?: string;
   paidAt?: string;
@@ -132,61 +221,10 @@ export interface Receipt {
   issuedBy: string;
 }
 
-export interface DriverProfile {
-  id: string;
-  userId: string;
-  franchiseId?: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  licenseNumber: string;
-  licenseExpiry: string;
-  address: string;
-  phone: string;
-  email: string;
-  todaName: string;
-  routeArea: string;
-  plateNumber: string;
-  status: DriverStatus;
-  authorizedAt?: string;
-  suspendedAt?: string;
-  suspensionReason?: string;
-  profilePhoto?: string;
-  averageRating: number;
-  totalTrips: number;
-  registeredAt: string;
-}
-
-export interface Feedback {
-  id: string;
-  driverId: string;
-  driverName: string;
-  passengerName: string;
-  passengerContact?: string;
-  rating: number; // 1-5
-  comment: string;
-  category: 'service' | 'safety' | 'cleanliness' | 'punctuality' | 'general';
-  status: 'pending' | 'reviewed' | 'resolved';
-  adminResponse?: string;
-  createdAt: string;
-  reviewedAt?: string;
-}
-
 export interface FeeConfig {
-  newRegistrationResident: number;
-  newRegistrationNonResident: number;
-  renewalResident: number;
-  renewalNonResident: number;
+  mtopBaseFee: number;
+  todaRouteFee: number;
+  todaMembershipFee: number;
+  stencilingFee: number;
   latePenaltyPerMonth: number;
-  maxLatePenaltyMonths: number;
-}
-
-export interface Notification {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  read: boolean;
-  createdAt: string;
 }

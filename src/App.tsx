@@ -9,29 +9,30 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { FeedbackPage } from './pages/FeedbackPage';
 
-// Operator pages
-import { OperatorDashboard } from './pages/operator/OperatorDashboard';
-import { ApplicationForm } from './pages/operator/ApplicationForm';
-import { MyApplications } from './pages/operator/MyApplications';
-import { PaymentPage } from './pages/operator/PaymentPage';
-import { ProfilePage } from './pages/operator/ProfilePage';
-import { ReceiptsPage } from './pages/operator/ReceiptsPage';
-import { StatusTracker } from './pages/operator/StatusTracker';
+// Driver pages
+import { DriverDashboard } from './pages/driver/DriverDashboard';
+import { DriverRequirements } from './pages/driver/DriverRequirements';
+import { DriverInspection } from './pages/driver/DriverInspection';
+import { DriverPayment } from './pages/driver/DriverPayment';
+import { DriverTodaStatus } from './pages/driver/DriverTodaStatus';
+
+// TODA President pages
+import { TodaDashboard } from './pages/toda/TodaDashboard';
+import { TodaApprovals } from './pages/toda/TodaApprovals';
 
 // Admin pages
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { ApplicationReview } from './pages/admin/ApplicationReview';
 import { FranchiseRegistry } from './pages/admin/FranchiseRegistry';
-import { DriverMonitoring } from './pages/admin/DriverMonitoring';
-import { FeeManagement } from './pages/admin/FeeManagement';
-import { FeedbackReview } from './pages/admin/FeedbackReview';
+import { PenaltyManagement } from './pages/admin/PenaltyManagement';
 import { Reports } from './pages/admin/Reports';
 
-// Passenger pages
-import { PassengerDashboard } from './pages/passenger/PassengerDashboard';
-import { PassengerFeedback } from './pages/passenger/PassengerFeedback';
-import { PassengerProfile } from './pages/passenger/PassengerProfile';
-import { DriverPublicProfile } from './pages/DriverPublicProfile';
+// Operator pages
+import { OperatorDashboard } from './pages/operator/OperatorDashboard';
+import { SubmitRequirements } from './pages/operator/SubmitRequirements';
+import { GCashPaymentModal } from './pages/operator/GCashPaymentModal';
+import { FranchiseRenewal } from './pages/operator/FranchiseRenewal';
+import { SMSNotifications } from './pages/operator/SMSNotifications';
 
 function App() {
   return (
@@ -44,27 +45,20 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/feedback" element={<FeedbackPage />} />
-            <Route path="/driver/:driverId" element={<DriverPublicProfile />} />
 
-            {/* Operator Routes */}
-            <Route path="/dashboard" element={<DashboardLayout requiredRole="operator" />}>
-              <Route index element={<OperatorDashboard />} />
-              <Route path="apply" element={<ApplicationForm />} />
-              <Route path="applications" element={<MyApplications />} />
-              <Route path="payments" element={<PaymentPage />} />
-              <Route path="profile" element={<ProfilePage />} />
-              <Route path="receipts" element={<ReceiptsPage />} />
-              <Route path="status" element={<StatusTracker />} />
+            {/* Driver Routes */}
+            <Route path="/driver" element={<DashboardLayout requiredRole="driver" />}>
+              <Route index element={<DriverDashboard />} />
+              <Route path="requirements" element={<DriverRequirements />} />
+              <Route path="inspection" element={<DriverInspection />} />
+              <Route path="payment" element={<DriverPayment />} />
+              <Route path="toda-status" element={<DriverTodaStatus />} />
             </Route>
 
-            {/* Passenger Routes */}
-            <Route path="/passenger" element={<DashboardLayout requiredRole="passenger" />}>
-              <Route index element={<PassengerDashboard />} />
-              <Route path="scan" element={<PassengerDashboard />} />
-              <Route path="feedback" element={<PassengerFeedback />} />
-              <Route path="feedback/:driverId" element={<PassengerFeedback />} />
-              <Route path="history" element={<PassengerDashboard />} />
-              <Route path="profile" element={<PassengerProfile />} />
+            {/* TODA President Routes */}
+            <Route path="/toda" element={<DashboardLayout requiredRole="toda_president" />}>
+              <Route index element={<TodaDashboard />} />
+              <Route path="approvals" element={<TodaApprovals />} />
             </Route>
 
             {/* Admin Routes */}
@@ -72,10 +66,17 @@ function App() {
               <Route index element={<AdminDashboard />} />
               <Route path="applications" element={<ApplicationReview />} />
               <Route path="franchises" element={<FranchiseRegistry />} />
-              <Route path="drivers" element={<DriverMonitoring />} />
-              <Route path="fees" element={<FeeManagement />} />
-              <Route path="feedback" element={<FeedbackReview />} />
+              <Route path="penalties" element={<PenaltyManagement />} />
               <Route path="reports" element={<Reports />} />
+            </Route>
+
+            {/* Operator Routes */}
+            <Route path="/dashboard" element={<DashboardLayout requiredRole="operator" />}>
+              <Route index element={<OperatorDashboard />} />
+              <Route path="requirements" element={<SubmitRequirements />} />
+              <Route path="gcash-payment" element={<GCashPaymentModal />} />
+              <Route path="renewal" element={<FranchiseRenewal />} />
+              <Route path="sms-notifications" element={<SMSNotifications />} />
             </Route>
 
             {/* Catch all */}

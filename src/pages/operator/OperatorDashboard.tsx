@@ -1,170 +1,158 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Header } from '../../components/layout/Header';
-import { StatCard } from '../../components/ui/StatCard';
-import { StatusBadge } from '../../components/ui/StatusBadge';
-import { FileText, CreditCard, Shield, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import * as storage from '../../services/storageService';
+import type { Franchise, SMSNotification } from '../../types';
+import { ShieldCheck, RefreshCw, QrCode, Users, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export function OperatorDashboard() {
   const { user } = useAuth();
-  if (!user) return null;
+  const navigate = useNavigate();
 
-  const applications = storage.getApplicationsByUser(user.id);
-  const franchises = storage.getFranchisesByUser(user.id);
-  const payments = storage.getPaymentsByUser(user.id);
-  const driver = storage.getDriverByUserId(user.id);
+  const [franchises, setFranchises] = useState<Franchise[]>([]);
+  const [smsNotifs, setSmsNotifs] = useState<SMSNotification[]>([]);
 
-  const pendingApps = applications.filter(a => a.status === 'pending' || a.status === 'under_review').length;
-  const activeFranchises = franchises.filter(f => f.status === 'active').length;
-  const totalPaid = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0);
+  useEffect(() => {
+    if (user) {
+      const allFranchises = storage.getFranchises();
+      const myFranchises = allFranchises.filter(f => f.operatorId === user.id || f.operatorName.toLowerCase().includes(user.lastName.toLowerCase()));
+      setFranchises(myFranchises.length > 0 ? myFranchises : allFranchises.slice(0, 2));
 
-  const recentApps = [...applications].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()).slice(0, 5);
-
-  // Check for franchise expiring soon
-  const expiringFranchises = franchises.filter(f => {
-    const expires = new Date(f.expiresAt);
-    const daysUntilExpiry = (expires.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-    return f.status === 'active' && daysUntilExpiry <= 90 && daysUntilExpiry > 0;
-  });
+      setSmsNotifs(storage.getSMSNotifications(user.id));
+    }
+  }, [user]);
 
   return (
-    <div className="page">
-      <Header title="Dashboard" subtitle="Overview of your franchise status" />
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {/* Operator Hero */}
+      <div className="glass-container dashboard-hero">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.5rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <span className="pill-badge pill-emerald">Franchise Operator Portal</span>
+              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Lungsod ng Baliwag</span>
+            </div>
+            <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
+              Welcome, Operator {user?.firstName}!
+            </h1>
+            <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px' }}>
+              Subaybayan ang iyong **Franchise Status**, makatanggap ng **Renewal Reminders**, i-manage ang **Driver Records**, at magbayad gamit ang **GCash QR Code**.
+            </p>
+          </div>
 
-      <div className="page__content">
-        {/* Alerts */}
-        {expiringFranchises.length > 0 && (
-          <div className="alert alert--warning">
-            <AlertTriangle size={18} />
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <button onClick={() => navigate('/dashboard/gcash-payment')} className="btn-glass btn-emerald-glass">
+              <QrCode size={18} /> GCash QR Payment
+            </button>
+            <button onClick={() => navigate('/dashboard/renewal')} className="btn-glass btn-orange-glass">
+              <RefreshCw size={18} /> Franchise Renewal
+            </button>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="hero-stats-grid">
+          <div className="glass-card hero-stat-card">
+            <div className="stat-icon-wrapper" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>
+              <ShieldCheck size={24} />
+            </div>
             <div>
-              <strong>Renewal Reminder:</strong> You have {expiringFranchises.length} franchise(s) expiring within 90 days. 
-              <Link to="/dashboard/apply" state={{ type: 'renewal' }} className="btn btn--white btn--xs" style={{ marginLeft: 'var(--space-md)' }}>
-                Renew Now
-              </Link>
+              <div className="stat-val">{franchises.filter(f => f.status === 'active').length} Active</div>
+              <div className="stat-lbl">Franchise Status</div>
             </div>
           </div>
-        )}
 
-        {/* Stats */}
-        <div className="stats-grid">
-          <StatCard icon={FileText} label="Total Applications" value={applications.length} color="blue" />
-          <StatCard icon={Clock} label="Pending/Under Review" value={pendingApps} color="orange" />
-          <StatCard icon={Shield} label="Active Franchises" value={activeFranchises} color="green" />
-          <StatCard icon={CreditCard} label="Total Paid" value={`₱${totalPaid.toLocaleString()}`} color="gold" />
+          <div className="glass-card hero-stat-card">
+            <div className="stat-icon-wrapper" style={{ background: 'rgba(249, 115, 22, 0.2)', color: '#fb923c' }}>
+              <Clock size={24} />
+            </div>
+            <div>
+              <div className="stat-val">30 Days</div>
+              <div className="stat-lbl">Renewal Reminder</div>
+            </div>
+          </div>
+
+          <div className="glass-card hero-stat-card">
+            <div className="stat-icon-wrapper" style={{ background: 'rgba(6, 182, 212, 0.2)', color: '#38bdf8' }}>
+              <Users size={24} />
+            </div>
+            <div>
+              <div className="stat-val">{franchises.length} Registered</div>
+              <div className="stat-lbl">Driver Records</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid: Franchise Records & SMS Alerts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.75rem' }}>
+        
+        {/* Franchise & Driver Records Card */}
+        <div className="glass-container" style={{ padding: '1.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Mga Franchise at Driver Records</h3>
+            <span className="pill-badge pill-cyan">{franchises.length} Units</span>
+          </div>
+
+          <div className="glass-table-wrapper">
+            <table className="glass-table">
+              <thead>
+                <tr>
+                  <th>MTOP Permit #</th>
+                  <th>Assigned Driver</th>
+                  <th>Plate Number</th>
+                  <th>Expiration</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {franchises.map(f => (
+                  <tr key={f.id}>
+                    <td style={{ fontWeight: 800, color: '#38bdf8' }}>{f.mtopNumber}</td>
+                    <td style={{ fontWeight: 700 }}>{f.driverName}</td>
+                    <td>{f.plateNumber}</td>
+                    <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{new Date(f.expiresAt).toLocaleDateString()}</td>
+                    <td>
+                      <span className={`pill-badge ${f.status === 'active' ? 'pill-emerald' : 'pill-rose'}`}>
+                        {f.status.toUpperCase()}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div className="page__grid">
-          {/* Recent Applications */}
-          <div className="card">
-            <div className="card__header">
-              <h3 className="card__title">Recent Applications</h3>
-              <Link to="/dashboard/applications" className="card__action">
-                View All <ArrowRight size={14} />
-              </Link>
-            </div>
-            <div className="card__body">
-              {recentApps.length === 0 ? (
-                <div className="card__empty">
-                  <p>No applications yet.</p>
-                  <Link to="/dashboard/apply" className="btn btn--primary btn--sm">Apply Now</Link>
-                </div>
-              ) : (
-                <div className="mini-list">
-                  {recentApps.map(app => (
-                    <div key={app.id} className="mini-list__item">
-                      <div className="mini-list__info">
-                        <span className="mini-list__title">{app.type === 'new' ? 'New Registration' : 'Renewal'} — {app.plateNumber}</span>
-                        <span className="mini-list__sub">{new Date(app.submittedAt).toLocaleDateString()}</span>
-                      </div>
-                      <StatusBadge status={app.status} size="sm" />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* SMS Notifications Inbox Brief */}
+        <div className="glass-container" style={{ padding: '1.75rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>SMS Notification Alerts</h3>
+            <button onClick={() => navigate('/dashboard/sms-notifications')} className="btn-glass" style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}>
+              View Inbox ({smsNotifs.length}) →
+            </button>
           </div>
 
-          {/* Quick Actions */}
-          <div className="card">
-            <div className="card__header">
-              <h3 className="card__title">Quick Actions</h3>
-            </div>
-            <div className="card__body">
-              <div className="quick-actions">
-                <Link to="/dashboard/apply" className="quick-action">
-                  <FileText size={20} />
-                  <span>New Application</span>
-                </Link>
-                <Link to="/dashboard/payments" className="quick-action">
-                  <CreditCard size={20} />
-                  <span>Make Payment</span>
-                </Link>
-                <Link to="/dashboard/status" className="quick-action">
-                  <Clock size={20} />
-                  <span>Track Status</span>
-                </Link>
-                <Link to="/dashboard/profile" className="quick-action">
-                  <Shield size={20} />
-                  <span>My Profile</span>
-                </Link>
-              </div>
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {smsNotifs.length === 0 ? (
+              <p style={{ color: '#94a3b8', fontSize: '0.88rem', textAlign: 'center', padding: '1.5rem' }}>
+                Walang natanggap na SMS alerts sa kasalukuyan.
+              </p>
+            ) : (
+              smsNotifs.slice(0, 3).map(n => (
+                <div key={n.id} className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #38bdf8' }}>
+                  <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '0.9rem', marginBottom: '0.2rem' }}>
+                    {n.title}
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.3' }}>
+                    {n.message}
+                  </p>
+                </div>
+              ))
+            )}
           </div>
-
-          {/* Driver Info */}
-          {driver && (
-            <div className="card">
-              <div className="card__header">
-                <h3 className="card__title">Driver Status</h3>
-              </div>
-              <div className="card__body">
-                <div className="driver-info-card">
-                  <div className="driver-info-card__avatar">
-                    {driver.firstName[0]}{driver.lastName[0]}
-                  </div>
-                  <div className="driver-info-card__details">
-                    <h4>{driver.firstName} {driver.lastName}</h4>
-                    <p>License: {driver.licenseNumber}</p>
-                    <p>Plate: {driver.plateNumber}</p>
-                    <p>TODA: {driver.todaName}</p>
-                    <p>Rating: ⭐ {driver.averageRating} / 5</p>
-                    <StatusBadge status={driver.status} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Franchise Info */}
-          {franchises.length > 0 && (
-            <div className="card">
-              <div className="card__header">
-                <h3 className="card__title">My Franchises</h3>
-              </div>
-              <div className="card__body">
-                <div className="mini-list">
-                  {franchises.map(f => (
-                    <div key={f.id} className="mini-list__item">
-                      <div className="mini-list__info">
-                        <span className="mini-list__title">{f.plateNumber} — {f.vehicleMake} {f.vehicleModel}</span>
-                        <span className="mini-list__sub">Expires: {new Date(f.expiresAt).toLocaleDateString()}</span>
-                      </div>
-                      <div className="mini-list__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-                        <StatusBadge status={f.status} size="sm" />
-                        {f.status === 'active' && (
-                          <Link to="/dashboard/apply" state={{ type: 'renewal', franchiseId: f.id }} className="btn btn--outline btn--xs">
-                            Renew
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
+
       </div>
     </div>
   );

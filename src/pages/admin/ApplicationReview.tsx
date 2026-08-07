@@ -1,219 +1,177 @@
-import { useState } from 'react';
-import { Header } from '../../components/layout/Header';
-import { StatusBadge } from '../../components/ui/StatusBadge';
-import { Modal } from '../../components/ui/Modal';
-import { useToast } from '../../components/ui/Toast';
-import { DataTable } from '../../components/ui/DataTable';
-import { CheckCircle, XCircle, Eye, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import * as storage from '../../services/storageService';
 import type { Application } from '../../types';
+import { CheckCircle2, ShieldCheck, XCircle } from 'lucide-react';
 
 export function ApplicationReview() {
-  const { showToast } = useToast();
+  const { user } = useAuth();
+  const [applications, setApplications] = useState<Application[]>([]);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-  const [adminNotes, setAdminNotes] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [adminNotes, setAdminNotes] = useState('Kumpleto ang requirements, stenciling inspection, at mga bayarin sa Treasurer at TODA. Inaprubahan ang MTOP permit.');
 
-  const allApps = storage.getApplications();
-  const apps = filter === 'all' ? allApps : allApps.filter(a => a.status === filter);
+  useEffect(() => {
+    loadApplications();
+  }, []);
 
-  const handleAction = (appId: string, action: 'approved' | 'rejected' | 'under_review' | 'requires_revision') => {
-    const app = storage.updateApplication(appId, {
-      status: action,
-      adminNotes: adminNotes || undefined,
-      reviewedBy: 'admin-001',
-      reviewedAt: new Date().toISOString(),
-    });
-
-    if (app && action === 'approved') {
-      // Create franchise
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-      const renewalDate = new Date(now.getTime() + 275 * 24 * 60 * 60 * 1000);
-
-      storage.createFranchise({
-        applicationId: appId,
-        operatorId: app.applicantId,
-        operatorName: app.applicantName,
-        vehicleMake: app.vehicleMake,
-        vehicleModel: app.vehicleModel,
-        plateNumber: app.plateNumber,
-        motorNumber: app.motorNumber,
-        chassisNumber: app.chassisNumber,
-        vehicleColor: app.vehicleColor,
-        todaName: app.todaName,
-        routeArea: app.routeArea,
-        residency: app.residency,
-        status: 'active',
-        issuedAt: now.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        renewalDate: renewalDate.toISOString(),
-      });
-
-      // Create driver profile
-      const user = storage.getUserById(app.applicantId);
-      if (user) {
-        const existing = storage.getDriverByUserId(user.id);
-        if (!existing) {
-          storage.createDriver({
-            userId: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            middleName: user.middleName,
-            licenseNumber: `N-${Math.random().toString().substring(2, 12)}`,
-            licenseExpiry: expiresAt.toISOString(),
-            address: user.address,
-            phone: user.phone,
-            email: user.email,
-            todaName: app.todaName,
-            routeArea: app.routeArea,
-            plateNumber: app.plateNumber,
-            status: 'active',
-            authorizedAt: now.toISOString(),
-            averageRating: 0,
-            totalTrips: 0,
-          });
-        }
-      }
-    }
-
-    const labels = { approved: 'approved', rejected: 'rejected', under_review: 'marked for review', requires_revision: 'sent back for revision' };
-    showToast(`Application ${labels[action]}.`, action === 'approved' ? 'success' : action === 'rejected' ? 'error' : 'info');
-    setSelectedApp(null);
-    setAdminNotes('');
-    setRefreshKey(k => k + 1);
+  const loadApplications = () => {
+    setApplications(storage.getApplications());
   };
 
-  const columns = [
-    { key: 'applicantName', label: 'Applicant' },
-    { key: 'plateNumber', label: 'Plate #' },
-    { key: 'type', label: 'Type', render: (item: Application) => item.type === 'new' ? 'New' : 'Renewal' },
-    { key: 'todaName', label: 'TODA' },
-    { key: 'residency', label: 'Residency', render: (item: Application) => item.residency === 'resident' ? 'Resident' : 'Non-Resident' },
-    { key: 'totalFee', label: 'Fee', render: (item: Application) => `₱${item.totalFee.toLocaleString()}` },
-    { key: 'status', label: 'Status', render: (item: Application) => <StatusBadge status={item.status} size="sm" /> },
-    { key: 'submittedAt', label: 'Submitted', render: (item: Application) => new Date(item.submittedAt).toLocaleDateString() },
-    {
-      key: 'actions', label: 'Actions', sortable: false,
-      render: (item: Application) => (
-        <button className="btn btn--ghost btn--sm" onClick={(e) => { e.stopPropagation(); setSelectedApp(item); setAdminNotes(item.adminNotes || ''); }}>
-          <Eye size={14} /> Review
-        </button>
-      ),
-    },
-  ];
+  const handleGrantMtop = (appId: string) => {
+    if (!user) return;
+    const updated = storage.updateApplicationStatus(
+      appId,
+      'approved',
+      adminNotes,
+      `${user.firstName} ${user.lastName} (Municipal Admin)`
+    );
+    if (updated) {
+      setSelectedApp(null);
+      loadApplications();
+    }
+  };
+
+  const handleReject = (appId: string) => {
+    if (!user) return;
+    storage.updateApplicationStatus(appId, 'rejected', adminNotes, `${user.firstName} ${user.lastName}`);
+    setSelectedApp(null);
+    loadApplications();
+  };
 
   return (
-    <div className="page" key={refreshKey}>
-      <Header title="Application Review" subtitle="Review and process franchise applications" />
-
-      <div className="page__content">
-        {/* Filter */}
-        <div className="filter-bar">
-          {['all', 'pending', 'under_review', 'approved', 'rejected', 'requires_revision'].map(f => (
-            <button
-              key={f}
-              className={`filter-btn ${filter === f ? 'filter-btn--active' : ''}`}
-              onClick={() => setFilter(f)}
-            >
-              {f === 'all' ? 'All' : f === 'under_review' ? 'Under Review' : f === 'requires_revision' ? 'Needs Revision' : f.charAt(0).toUpperCase() + f.slice(1)}
-              {f !== 'all' && <span className="filter-btn__count">{allApps.filter(a => a.status === f).length}</span>}
-            </button>
-          ))}
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div className="glass-container" style={{ padding: '2.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+          <span className="pill-badge pill-orange">Admin Review & Approval</span>
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>MTOP Issuance Portal</span>
         </div>
+        <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+          Review Application & MTOP Approval
+        </h2>
+        <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
+          Tinitingnan kung kumpleto ang mga **requirements** (OR/CR, Clearance, License), naipasa ang **stenciling**, nabayaran ang **Treasurer's Office Fee**, at aprubado ng **TODA President**.
+        </p>
+      </div>
 
-        <div className="card">
-          <div className="card__body">
-            <DataTable
-              columns={columns}
-              data={apps}
-              keyField="id"
-              searchPlaceholder="Search by name, plate, TODA..."
-              onRowClick={(item: Application) => { setSelectedApp(item); setAdminNotes(item.adminNotes || ''); }}
-              emptyMessage="No applications found"
-            />
-          </div>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.75rem' }}>
+        {applications.map(app => {
+          const isApproved = app.status === 'approved';
+          const isRequirementsComplete = app.documents && app.documents.length >= 3;
+          const isStenciled = app.inspection?.status === 'passed';
+          const isTreasurerPaid = app.treasurerPayment?.paid;
+          const isTodaApproved = app.todaApproval?.routeFeePaid;
 
-        {/* Detail Modal */}
-        <Modal isOpen={!!selectedApp} onClose={() => setSelectedApp(null)} title="Application Review" size="lg">
-          {selectedApp && (
-            <div className="app-detail">
-              <div className="app-detail__header">
+          return (
+            <div key={app.id} className="glass-container" style={{ padding: '1.75rem', border: isApproved ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                 <div>
-                  <h3>{selectedApp.applicantName}</h3>
-                  <p>ID: {selectedApp.id} • Submitted: {new Date(selectedApp.submittedAt).toLocaleDateString()}</p>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>{app.driverName || app.applicantName}</h3>
+                  <span style={{ fontSize: '0.8rem', color: '#38bdf8' }}>Ref #: {app.id} | Plate: {app.plateNumber}</span>
                 </div>
-                <StatusBadge status={selectedApp.status} />
+                {isApproved ? (
+                  <span className="pill-badge pill-emerald"><CheckCircle2 size={14} /> MTOP GRANTED</span>
+                ) : (
+                  <span className="pill-badge pill-orange">Needs Approval</span>
+                )}
               </div>
 
-              <div className="app-detail__grid">
-                <div className="app-detail__section">
-                  <h4>Application</h4>
-                  <p><strong>Type:</strong> {selectedApp.type === 'new' ? 'New Registration' : 'Renewal'}</p>
-                  <p><strong>Residency:</strong> {selectedApp.residency === 'resident' ? 'Resident' : 'Non-Resident'}</p>
+              {/* Verification Checklist Matrix */}
+              <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#cbd5e1' }}>1. Requirements Upload</span>
+                  <span style={{ color: isRequirementsComplete ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
+                    {isRequirementsComplete ? '✓ Complete' : 'Incomplete'}
+                  </span>
                 </div>
-                <div className="app-detail__section">
-                  <h4>Vehicle</h4>
-                  <p><strong>Vehicle:</strong> {selectedApp.vehicleMake} {selectedApp.vehicleModel}</p>
-                  <p><strong>Plate:</strong> {selectedApp.plateNumber}</p>
-                  <p><strong>Color:</strong> {selectedApp.vehicleColor}</p>
-                  <p><strong>Motor #:</strong> {selectedApp.motorNumber}</p>
-                  <p><strong>Chassis #:</strong> {selectedApp.chassisNumber}</p>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#cbd5e1' }}>2. Stenciling & Inspection</span>
+                  <span style={{ color: isStenciled ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
+                    {isStenciled ? '✓ Stenciled' : 'Pending'}
+                  </span>
                 </div>
-                <div className="app-detail__section">
-                  <h4>Route</h4>
-                  <p><strong>TODA:</strong> {selectedApp.todaName}</p>
-                  <p><strong>Route:</strong> {selectedApp.routeArea}</p>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#cbd5e1' }}>3. Treasurer Fee Payment</span>
+                  <span style={{ color: isTreasurerPaid ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
+                    {isTreasurerPaid ? `✓ Paid (OR #${app.treasurerPayment?.orNumber})` : 'Unpaid'}
+                  </span>
                 </div>
-                <div className="app-detail__section">
-                  <h4>Documents ({selectedApp.documents.length})</h4>
-                  {selectedApp.documents.map(doc => (
-                    <div key={doc.id} className="app-detail__doc">
-                      <span>{doc.name}</span>
-                      <StatusBadge status={doc.status} size="sm" />
-                    </div>
-                  ))}
-                </div>
-                <div className="app-detail__section">
-                  <h4>Fee</h4>
-                  <p><strong>Base Fee:</strong> ₱{selectedApp.baseFee.toLocaleString()}</p>
-                  <p><strong>Late Penalty:</strong> ₱{selectedApp.latePenalty.toLocaleString()}</p>
-                  <p><strong>Total:</strong> ₱{selectedApp.totalFee.toLocaleString()}</p>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#cbd5e1' }}>4. TODA Line Approval</span>
+                  <span style={{ color: isTodaApproved ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
+                    {isTodaApproved ? `✓ Approved (${app.todaName.split(' ')[0]})` : 'Pending TODA Pres'}
+                  </span>
                 </div>
               </div>
 
-              <div className="app-detail__action-section">
-                <div className="form-group">
-                  <label className="form-label">Admin Notes</label>
-                  <textarea
-                    className="form-input form-textarea"
-                    rows={3}
-                    value={adminNotes}
-                    onChange={e => setAdminNotes(e.target.value)}
-                    placeholder="Add notes about this application..."
-                  />
+              {isApproved ? (
+                <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.85rem' }}>
+                  <strong style={{ color: '#34d399' }}>Official MTOP #: {app.mtopNumber || 'MTOP-2026-0891'}</strong>
+                  <br />
+                  <span style={{ color: '#cbd5e1' }}>Reviewed by {app.reviewedBy}</span>
                 </div>
-                <div className="app-detail__actions">
-                  <button className="btn btn--success" onClick={() => handleAction(selectedApp.id, 'approved')}>
-                    <CheckCircle size={16} /> Approve
-                  </button>
-                  <button className="btn btn--outline" onClick={() => handleAction(selectedApp.id, 'under_review')}>
-                    <Eye size={16} /> Mark Review
-                  </button>
-                  <button className="btn btn--warning" onClick={() => handleAction(selectedApp.id, 'requires_revision')}>
-                    <AlertCircle size={16} /> Request Revision
-                  </button>
-                  <button className="btn btn--danger" onClick={() => handleAction(selectedApp.id, 'rejected')}>
-                    <XCircle size={16} /> Reject
-                  </button>
-                </div>
+              ) : (
+                <button
+                  onClick={() => setSelectedApp(app)}
+                  className="btn-glass btn-primary-glass"
+                  style={{ width: '100%', padding: '0.85rem' }}
+                >
+                  <ShieldCheck size={18} /> Inspect & Grant MTOP Approval
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Review Modal */}
+      {selectedApp && (
+        <div className="modal-overlay" onClick={() => setSelectedApp(null)}>
+          <div className="glass-container modal-glass-content animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+              Municipal MTOP Approval Verification
+            </h3>
+            <p style={{ fontSize: '0.88rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
+              Driver: <strong style={{ color: '#ffffff' }}>{selectedApp.driverName || selectedApp.applicantName}</strong> | Plate: {selectedApp.plateNumber}
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
+                  Admin Notes & Approval Remarks
+                </label>
+                <textarea
+                  className="glass-input"
+                  rows={3}
+                  value={adminNotes}
+                  onChange={e => setAdminNotes(e.target.value)}
+                />
               </div>
             </div>
-          )}
-        </Modal>
-      </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={() => handleReject(selectedApp.id)}
+                className="btn-glass"
+                style={{ background: 'rgba(244, 63, 94, 0.15)', borderColor: 'rgba(244, 63, 94, 0.3)', color: '#fb7185' }}
+              >
+                <XCircle size={18} /> Reject
+              </button>
+
+              <button
+                onClick={() => handleGrantMtop(selectedApp.id)}
+                className="btn-glass btn-emerald-glass"
+                style={{ flex: 1 }}
+              >
+                <ShieldCheck size={18} /> Approve & Issue MTOP Permit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

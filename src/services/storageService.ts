@@ -1,459 +1,360 @@
 // ============================================
-// Storage Service - SessionStorage CRUD Operations
+// Storage Service - LocalStorage Persistence
 // ============================================
 
-import type {
-  User, Application, Franchise, Payment, Receipt,
-  DriverProfile, Feedback, FeeConfig, Notification,
-  ApplicationType, ResidencyType
-} from '../types';
-import {
-  seedUsers, seedApplications, seedFranchises, seedPayments,
-  seedReceipts, seedDrivers, seedFeedback, seedFeeConfig, seedNotifications
-} from './seedData';
+import type { User, Application, Franchise, Penalty, SMSNotification, FeeConfig, ApplicationStatus } from '../types';
+import { seedUsers, seedApplications, seedFranchises, seedPenalties, seedSMSNotifications, seedFeeConfig } from './seedData';
 
 const KEYS = {
-  INITIALIZED: 'baliuag_initialized',
   USERS: 'baliuag_users',
+  CURRENT_USER: 'baliuag_current_user',
   APPLICATIONS: 'baliuag_applications',
   FRANCHISES: 'baliuag_franchises',
   PAYMENTS: 'baliuag_payments',
   RECEIPTS: 'baliuag_receipts',
-  DRIVERS: 'baliuag_drivers',
-  FEEDBACK: 'baliuag_feedback',
+  PENALTIES: 'baliuag_penalties',
+  SMS: 'baliuag_sms_notifications',
   FEE_CONFIG: 'baliuag_fee_config',
-  NOTIFICATIONS: 'baliuag_notifications',
-  CURRENT_USER: 'baliuag_current_user',
 };
 
-// ---- Helpers ----
-function get<T>(key: string): T[] {
-  const data = sessionStorage.getItem(key);
+export function initializeData(): void {
+  if (!localStorage.getItem(KEYS.USERS)) {
+    localStorage.setItem(KEYS.USERS, JSON.stringify(seedUsers));
+  }
+  if (!localStorage.getItem(KEYS.APPLICATIONS)) {
+    localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(seedApplications));
+  }
+  if (!localStorage.getItem(KEYS.FRANCHISES)) {
+    localStorage.setItem(KEYS.FRANCHISES, JSON.stringify(seedFranchises));
+  }
+  if (!localStorage.getItem(KEYS.PENALTIES)) {
+    localStorage.setItem(KEYS.PENALTIES, JSON.stringify(seedPenalties));
+  }
+  if (!localStorage.getItem(KEYS.SMS)) {
+    localStorage.setItem(KEYS.SMS, JSON.stringify(seedSMSNotifications));
+  }
+  if (!localStorage.getItem(KEYS.FEE_CONFIG)) {
+    localStorage.setItem(KEYS.FEE_CONFIG, JSON.stringify(seedFeeConfig));
+  }
+}
+
+// ================= USER AUTH =================
+export function getUsers(): User[] {
+  initializeData();
+  const data = localStorage.getItem(KEYS.USERS);
   return data ? JSON.parse(data) : [];
 }
 
-function set<T>(key: string, data: T[]): void {
-  sessionStorage.setItem(key, JSON.stringify(data));
-}
-
-function getOne<T>(key: string): T | null {
-  const data = sessionStorage.getItem(key);
+export function getCurrentUser(): User | null {
+  const data = localStorage.getItem(KEYS.CURRENT_USER);
   return data ? JSON.parse(data) : null;
 }
 
-function setOne<T>(key: string, data: T): void {
-  sessionStorage.setItem(key, JSON.stringify(data));
-}
-
-function generateId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-}
-
-function generateRefNumber(): string {
-  const num = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
-  return `REF-${new Date().getFullYear()}-${num}`;
-}
-
-function generateReceiptNumber(): string {
-  const num = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
-  return `OR-${new Date().getFullYear()}-${num}`;
-}
-
-// ---- Initialization ----
-export function initializeData(): void {
-  const isInitialized = sessionStorage.getItem(KEYS.INITIALIZED);
-  
-  // If not initialized at all, set everything
-  if (!isInitialized) {
-    set(KEYS.USERS, seedUsers);
-    set(KEYS.APPLICATIONS, seedApplications);
-    set(KEYS.FRANCHISES, seedFranchises);
-    set(KEYS.PAYMENTS, seedPayments);
-    set(KEYS.RECEIPTS, seedReceipts);
-    set(KEYS.DRIVERS, seedDrivers);
-    set(KEYS.FEEDBACK, seedFeedback);
-    setOne(KEYS.FEE_CONFIG, seedFeeConfig);
-    set(KEYS.NOTIFICATIONS, seedNotifications);
-    sessionStorage.setItem(KEYS.INITIALIZED, 'true');
-    return;
-  }
-
-  // Self-healing: Check if passengers are missing from the users list
-  // (Happens if the user's browser was initialized before the passenger role was added)
-  const users = get<User>(KEYS.USERS);
-  const hasPassenger = users.some(u => u.role === 'passenger');
-  
-  if (!hasPassenger) {
-    // Re-seed users to include passengers
-    // We merge to preserve any local changes to existing users if possible, 
-    // but for demo purposes, just resetting users is safer.
-    set(KEYS.USERS, seedUsers);
-    console.log('StorageService: Re-seeded users to include passenger role');
-  }
-}
-
-// ---- Auth ----
 export function login(username: string, password: string): User | null {
-  const users = get<User>(KEYS.USERS);
-  const user = users.find(u => u.username === username && u.password === password);
-  if (user) {
-    setOne(KEYS.CURRENT_USER, user);
+  const users = getUsers();
+  const found = users.find(u => 
+    u.username.toLowerCase() === username.toLowerCase() && u.password === password
+  );
+  if (found) {
+    localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(found));
+    return found;
   }
-  return user || null;
+  return null;
 }
 
 export function logout(): void {
-  sessionStorage.removeItem(KEYS.CURRENT_USER);
+  localStorage.removeItem(KEYS.CURRENT_USER);
 }
 
-export function getCurrentUser(): User | null {
-  return getOne<User>(KEYS.CURRENT_USER);
-}
-
-// ---- Users ----
-export function getUsers(): User[] {
-  return get<User>(KEYS.USERS);
-}
-
-export function getUserById(id: string): User | null {
-  return get<User>(KEYS.USERS).find(u => u.id === id) || null;
-}
-
-export function createUser(userData: Omit<User, 'id' | 'createdAt'>): User {
-  const users = get<User>(KEYS.USERS);
-  const newUser: User = {
-    ...userData,
-    id: generateId('user'),
-    createdAt: new Date().toISOString(),
-  };
-  users.push(newUser);
-  set(KEYS.USERS, users);
-  return newUser;
+export function saveUser(user: User): User {
+  const users = getUsers();
+  const index = users.findIndex(u => u.id === user.id);
+  if (index >= 0) {
+    users[index] = user;
+  } else {
+    users.push(user);
+  }
+  localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+  return user;
 }
 
 export function updateUser(id: string, updates: Partial<User>): User | null {
-  const users = get<User>(KEYS.USERS);
+  const users = getUsers();
   const index = users.findIndex(u => u.id === id);
-  if (index === -1) return null;
-  users[index] = { ...users[index], ...updates };
-  set(KEYS.USERS, users);
-  
-  // Update current user if it's the same
-  const currentUser = getCurrentUser();
-  if (currentUser && currentUser.id === id) {
-    setOne(KEYS.CURRENT_USER, users[index]);
+  if (index >= 0) {
+    users[index] = { ...users[index], ...updates };
+    localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+    const current = getCurrentUser();
+    if (current && current.id === id) {
+      localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(users[index]));
+    }
+    return users[index];
   }
-  return users[index];
+  return null;
 }
 
-export function usernameExists(username: string): boolean {
-  return get<User>(KEYS.USERS).some(u => u.username === username);
-}
-
-// ---- Applications ----
+// ================= APPLICATIONS =================
 export function getApplications(): Application[] {
-  return get<Application>(KEYS.APPLICATIONS);
+  initializeData();
+  const data = localStorage.getItem(KEYS.APPLICATIONS);
+  return data ? JSON.parse(data) : [];
 }
 
-export function getApplicationById(id: string): Application | null {
-  return get<Application>(KEYS.APPLICATIONS).find(a => a.id === id) || null;
+export function getApplicationById(id: string): Application | undefined {
+  return getApplications().find(a => a.id === id);
 }
 
-export function getApplicationsByUser(userId: string): Application[] {
-  return get<Application>(KEYS.APPLICATIONS).filter(a => a.applicantId === userId);
-}
-
-export function createApplication(appData: Omit<Application, 'id' | 'submittedAt' | 'updatedAt'>): Application {
-  const apps = get<Application>(KEYS.APPLICATIONS);
-  const newApp: Application = {
-    ...appData,
-    id: generateId('app'),
-    submittedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  apps.push(newApp);
-  set(KEYS.APPLICATIONS, apps);
-  return newApp;
-}
-
-export function updateApplication(id: string, updates: Partial<Application>): Application | null {
-  const apps = get<Application>(KEYS.APPLICATIONS);
-  const index = apps.findIndex(a => a.id === id);
-  if (index === -1) return null;
-  apps[index] = { ...apps[index], ...updates, updatedAt: new Date().toISOString() };
-  set(KEYS.APPLICATIONS, apps);
-  return apps[index];
-}
-
-// ---- Franchises ----
-export function getFranchises(): Franchise[] {
-  return get<Franchise>(KEYS.FRANCHISES);
-}
-
-export function getFranchiseById(id: string): Franchise | null {
-  return get<Franchise>(KEYS.FRANCHISES).find(f => f.id === id) || null;
-}
-
-export function getFranchisesByUser(userId: string): Franchise[] {
-  return get<Franchise>(KEYS.FRANCHISES).filter(f => f.operatorId === userId);
-}
-
-export function createFranchise(franchData: Omit<Franchise, 'id'>): Franchise {
-  const franchises = get<Franchise>(KEYS.FRANCHISES);
-  const newFranch: Franchise = {
-    ...franchData,
-    id: generateId('fran'),
-  };
-  franchises.push(newFranch);
-  set(KEYS.FRANCHISES, franchises);
-  return newFranch;
-}
-
-export function updateFranchise(id: string, updates: Partial<Franchise>): Franchise | null {
-  const franchises = get<Franchise>(KEYS.FRANCHISES);
-  const index = franchises.findIndex(f => f.id === id);
-  if (index === -1) return null;
-  franchises[index] = { ...franchises[index], ...updates };
-  set(KEYS.FRANCHISES, franchises);
-  return franchises[index];
-}
-
-// ---- Payments ----
-export function getPayments(): Payment[] {
-  return get<Payment>(KEYS.PAYMENTS);
-}
-
-export function getPaymentsByUser(userId: string): Payment[] {
-  return get<Payment>(KEYS.PAYMENTS).filter(p => p.payerId === userId);
-}
-
-export function createPayment(payData: Omit<Payment, 'id' | 'referenceNumber' | 'createdAt'>): Payment {
-  const payments = get<Payment>(KEYS.PAYMENTS);
-  const newPay: Payment = {
-    ...payData,
-    id: generateId('pay'),
-    referenceNumber: generateRefNumber(),
-    createdAt: new Date().toISOString(),
-  };
-  payments.push(newPay);
-  set(KEYS.PAYMENTS, payments);
-  return newPay;
-}
-
-export function updatePayment(id: string, updates: Partial<Payment>): Payment | null {
-  const payments = get<Payment>(KEYS.PAYMENTS);
-  const index = payments.findIndex(p => p.id === id);
-  if (index === -1) return null;
-  payments[index] = { ...payments[index], ...updates };
-  set(KEYS.PAYMENTS, payments);
-  return payments[index];
-}
-
-// ---- Receipts ----
-export function getReceipts(): Receipt[] {
-  return get<Receipt>(KEYS.RECEIPTS);
-}
-
-export function getReceiptsByUser(userId: string): Receipt[] {
-  const userPayments = getPaymentsByUser(userId);
-  const paymentIds = userPayments.map(p => p.id);
-  return get<Receipt>(KEYS.RECEIPTS).filter(r => paymentIds.includes(r.paymentId));
-}
-
-export function createReceipt(receiptData: Omit<Receipt, 'id' | 'receiptNumber' | 'issuedAt'>): Receipt {
-  const receipts = get<Receipt>(KEYS.RECEIPTS);
-  const newReceipt: Receipt = {
-    ...receiptData,
-    id: generateId('rcpt'),
-    receiptNumber: generateReceiptNumber(),
-    issuedAt: new Date().toISOString(),
-  };
-  receipts.push(newReceipt);
-  set(KEYS.RECEIPTS, receipts);
-  return newReceipt;
-}
-
-// ---- Drivers ----
-export function getDrivers(): DriverProfile[] {
-  return get<DriverProfile>(KEYS.DRIVERS);
-}
-
-export function getDriverById(id: string): DriverProfile | null {
-  return get<DriverProfile>(KEYS.DRIVERS).find(d => d.id === id) || null;
-}
-
-export function getDriverByUserId(userId: string): DriverProfile | null {
-  return get<DriverProfile>(KEYS.DRIVERS).find(d => d.userId === userId) || null;
-}
-
-export function createDriver(driverData: Omit<DriverProfile, 'id' | 'registeredAt'>): DriverProfile {
-  const drivers = get<DriverProfile>(KEYS.DRIVERS);
-  const newDriver: DriverProfile = {
-    ...driverData,
-    id: generateId('drv'),
-    registeredAt: new Date().toISOString(),
-  };
-  drivers.push(newDriver);
-  set(KEYS.DRIVERS, drivers);
-  return newDriver;
-}
-
-export function updateDriver(id: string, updates: Partial<DriverProfile>): DriverProfile | null {
-  const drivers = get<DriverProfile>(KEYS.DRIVERS);
-  const index = drivers.findIndex(d => d.id === id);
-  if (index === -1) return null;
-  drivers[index] = { ...drivers[index], ...updates };
-  set(KEYS.DRIVERS, drivers);
-  return drivers[index];
-}
-
-// ---- Feedback ----
-export function getFeedback(): Feedback[] {
-  return get<Feedback>(KEYS.FEEDBACK);
-}
-
-export function getFeedbackByDriver(driverId: string): Feedback[] {
-  return get<Feedback>(KEYS.FEEDBACK).filter(f => f.driverId === driverId);
-}
-
-export function createFeedback(fbData: Omit<Feedback, 'id' | 'createdAt' | 'status'>): Feedback {
-  const feedback = get<Feedback>(KEYS.FEEDBACK);
-  const newFb: Feedback = {
-    ...fbData,
-    id: generateId('fb'),
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-  feedback.push(newFb);
-  set(KEYS.FEEDBACK, feedback);
-  
-  // Update driver's average rating
-  const driverFeedbacks = [...feedback.filter(f => f.driverId === fbData.driverId), newFb];
-  const avgRating = driverFeedbacks.reduce((sum, f) => sum + f.rating, 0) / driverFeedbacks.length;
-  updateDriver(fbData.driverId, { averageRating: Math.round(avgRating * 10) / 10 });
-  
-  return newFb;
-}
-
-export function updateFeedback(id: string, updates: Partial<Feedback>): Feedback | null {
-  const feedback = get<Feedback>(KEYS.FEEDBACK);
-  const index = feedback.findIndex(f => f.id === id);
-  if (index === -1) return null;
-  feedback[index] = { ...feedback[index], ...updates };
-  set(KEYS.FEEDBACK, feedback);
-  return feedback[index];
-}
-
-// ---- Fee Config ----
-export function getFeeConfig(): FeeConfig {
-  return getOne<FeeConfig>(KEYS.FEE_CONFIG) || {
-    newRegistrationResident: 500,
-    newRegistrationNonResident: 1000,
-    renewalResident: 300,
-    renewalNonResident: 600,
-    latePenaltyPerMonth: 50,
-    maxLatePenaltyMonths: 12,
-  };
-}
-
-export function updateFeeConfig(updates: Partial<FeeConfig>): FeeConfig {
-  const config = getFeeConfig();
-  const updated = { ...config, ...updates };
-  setOne(KEYS.FEE_CONFIG, updated);
-  return updated;
-}
-
-export function calculateFee(type: ApplicationType, residency: ResidencyType, monthsLate: number = 0): { baseFee: number; latePenalty: number; totalFee: number } {
-  const config = getFeeConfig();
-  let baseFee: number;
-
-  if (type === 'new') {
-    baseFee = residency === 'resident' ? config.newRegistrationResident : config.newRegistrationNonResident;
-  } else {
-    baseFee = residency === 'resident' ? config.renewalResident : config.renewalNonResident;
-  }
-
-  const cappedMonths = Math.min(monthsLate, config.maxLatePenaltyMonths);
-  const latePenalty = cappedMonths * config.latePenaltyPerMonth;
-
-  return {
-    baseFee,
-    latePenalty,
-    totalFee: baseFee + latePenalty,
-  };
-}
-
-// ---- Notifications ----
-export function getNotifications(userId: string): Notification[] {
-  return get<Notification>(KEYS.NOTIFICATIONS).filter(n => n.userId === userId);
-}
-
-export function getUnreadNotificationCount(userId: string): number {
-  return getNotifications(userId).filter(n => !n.read).length;
-}
-
-export function createNotification(notifData: Omit<Notification, 'id' | 'createdAt' | 'read'>): Notification {
-  const notifs = get<Notification>(KEYS.NOTIFICATIONS);
-  const newNotif: Notification = {
-    ...notifData,
-    id: generateId('notif'),
-    read: false,
-    createdAt: new Date().toISOString(),
-  };
-  notifs.push(newNotif);
-  set(KEYS.NOTIFICATIONS, notifs);
-  return newNotif;
-}
-
-export function markNotificationRead(id: string): void {
-  const notifs = get<Notification>(KEYS.NOTIFICATIONS);
-  const index = notifs.findIndex(n => n.id === id);
-  if (index !== -1) {
-    notifs[index].read = true;
-    set(KEYS.NOTIFICATIONS, notifs);
-  }
-}
-
-export function markAllNotificationsRead(userId: string): void {
-  const notifs = get<Notification>(KEYS.NOTIFICATIONS);
-  notifs.forEach(n => {
-    if (n.userId === userId) n.read = true;
-  });
-  set(KEYS.NOTIFICATIONS, notifs);
-}
-
-export function deleteNotification(id: string): void {
-  const notifs = get<Notification>(KEYS.NOTIFICATIONS);
-  const filtered = notifs.filter(n => n.id !== id);
-  set(KEYS.NOTIFICATIONS, filtered);
-}
-
-// ---- Dashboard Stats ----
-export function getAdminStats() {
+export function saveApplication(app: Application): Application {
   const apps = getApplications();
-  const franchises = getFranchises();
-  const drivers = getDrivers();
-  const payments = getPayments();
-  const feedback = getFeedback();
+  const index = apps.findIndex(a => a.id === app.id);
+  if (index >= 0) {
+    apps[index] = { ...app, updatedAt: new Date().toISOString() };
+  } else {
+    apps.push(app);
+  }
+  localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(apps));
+  return app;
+}
 
-  return {
-    totalApplications: apps.length,
-    pendingApplications: apps.filter(a => a.status === 'pending').length,
-    underReviewApplications: apps.filter(a => a.status === 'under_review').length,
-    approvedApplications: apps.filter(a => a.status === 'approved').length,
-    rejectedApplications: apps.filter(a => a.status === 'rejected').length,
-    totalFranchises: franchises.length,
-    activeFranchises: franchises.filter(f => f.status === 'active').length,
-    expiredFranchises: franchises.filter(f => f.status === 'expired').length,
-    totalDrivers: drivers.length,
-    activeDrivers: drivers.filter(d => d.status === 'active').length,
-    inactiveDrivers: drivers.filter(d => d.status === 'inactive').length,
-    suspendedDrivers: drivers.filter(d => d.status === 'suspended').length,
-    totalPayments: payments.length,
-    completedPayments: payments.filter(p => p.status === 'completed').length,
-    totalRevenue: payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0),
-    totalFeedback: feedback.length,
-    pendingFeedback: feedback.filter(f => f.status === 'pending').length,
-    averageRating: feedback.length > 0 ? Math.round((feedback.reduce((sum, f) => sum + f.rating, 0) / feedback.length) * 10) / 10 : 0,
+export function updateApplicationStatus(
+  id: string, 
+  status: ApplicationStatus, 
+  adminNotes?: string, 
+  reviewedBy?: string
+): Application | null {
+  const apps = getApplications();
+  const index = apps.findIndex(a => a.id === id);
+  if (index >= 0) {
+    apps[index].status = status;
+    if (adminNotes !== undefined) apps[index].adminNotes = adminNotes;
+    if (reviewedBy) apps[index].reviewedBy = reviewedBy;
+    apps[index].reviewedAt = new Date().toISOString();
+    apps[index].updatedAt = new Date().toISOString();
+    
+    // If approved, create MTOP and active franchise
+    if (status === 'approved') {
+      const app = apps[index];
+      const mtopNo = `MTOP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      app.mtopNumber = mtopNo;
+      app.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${mtopNo}-${app.applicantName.replace(/\s+/g, '-').toUpperCase()}`;
+      
+      const newFranchise: Franchise = {
+        id: `FRAN-${Date.now()}`,
+        mtopNumber: mtopNo,
+        applicationId: app.id,
+        operatorId: app.applicantId,
+        operatorName: app.applicantName,
+        driverId: app.applicantId,
+        driverName: app.driverName || app.applicantName,
+        vehicleMake: app.vehicleMake,
+        vehicleModel: app.vehicleModel,
+        plateNumber: app.plateNumber,
+        motorNumber: app.motorNumber,
+        chassisNumber: app.chassisNumber,
+        vehicleColor: app.vehicleColor,
+        todaName: app.todaName,
+        routeArea: app.routeArea,
+        status: 'active',
+        issuedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        renewalDate: new Date(Date.now() + 300 * 24 * 60 * 60 * 1000).toISOString(),
+        qrCodeData: `BALIUAG-MTOP|${mtopNo}|PLATE:${app.plateNumber}|DRIVER:${app.driverName || app.applicantName}`,
+      };
+      
+      saveFranchise(newFranchise);
+    }
+    
+    localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(apps));
+    return apps[index];
+  }
+  return null;
+}
+
+// Inspection & Stenciling workflow update
+export function recordInspection(
+  appId: string, 
+  engineVerified: boolean, 
+  chassisVerified: boolean, 
+  inspectorName: string, 
+  notes?: string
+): Application | null {
+  const app = getApplicationById(appId);
+  if (!app) return null;
+
+  const passed = engineVerified && chassisVerified;
+  app.inspection = {
+    id: `insp-${Date.now()}`,
+    applicationId: appId,
+    engineNumber: app.motorNumber,
+    chassisNumber: app.chassisNumber,
+    engineVerified,
+    chassisVerified,
+    inspectorName,
+    inspectedAt: new Date().toISOString(),
+    status: passed ? 'passed' : 'failed',
+    notes,
   };
+
+  if (passed) {
+    app.status = 'inspection_passed';
+  }
+  return saveApplication(app);
+}
+
+// Treasurer Payment workflow update
+export function recordTreasurerPayment(
+  appId: string, 
+  amount: number, 
+  orNumber: string,
+  paymentMethod: 'cash' | 'gcash'
+): Application | null {
+  const app = getApplicationById(appId);
+  if (!app) return null;
+
+  app.treasurerPayment = {
+    paid: true,
+    amount,
+    orNumber,
+    paidAt: new Date().toISOString(),
+    paymentMethod,
+  };
+
+  if (app.status === 'inspection_passed' || app.status === 'pending_treasurer_payment') {
+    app.status = 'pending_toda_approval';
+  }
+
+  return saveApplication(app);
+}
+
+// TODA President Line Approval workflow update
+export function approveTodaLine(
+  appId: string,
+  todaPresUser: User,
+  orNumber: string,
+  remarks?: string
+): Application | null {
+  const app = getApplicationById(appId);
+  if (!app) return null;
+
+  app.todaApproval = {
+    approvedBy: todaPresUser.id,
+    approvedByName: `${todaPresUser.firstName} ${todaPresUser.lastName}`,
+    todaName: todaPresUser.todaName || app.todaName,
+    approvedAt: new Date().toISOString(),
+    routeFeePaid: true,
+    membershipFeePaid: true,
+    routeFeeAmount: 500,
+    membershipFeeAmount: 300,
+    orNumber,
+    remarks,
+  };
+
+  // Pass to Admin for final review
+  app.status = 'pending_admin_approval';
+
+  // Send SMS Notification to Driver/Applicant
+  addSMSNotification({
+    id: `sms-${Date.now()}`,
+    userId: app.applicantId,
+    recipientPhone: '0918-555-0101',
+    title: 'TODA President Approval Received',
+    message: `Ang inyong TODA Route Approval at Membership Fee para sa TODA: ${app.todaName} ay APRUBADO na ni ${todaPresUser.firstName} ${todaPresUser.lastName}. Ipinasa na ito sa City Admin para sa final MTOP Approval.`,
+    type: 'toda_approval',
+    sentAt: new Date().toISOString(),
+    read: false,
+  });
+
+  return saveApplication(app);
+}
+
+// ================= FRANCHISES =================
+export function getFranchises(): Franchise[] {
+  initializeData();
+  const data = localStorage.getItem(KEYS.FRANCHISES);
+  return data ? JSON.parse(data) : [];
+}
+
+export function saveFranchise(franchise: Franchise): Franchise {
+  const list = getFranchises();
+  const index = list.findIndex(f => f.id === franchise.id);
+  if (index >= 0) {
+    list[index] = franchise;
+  } else {
+    list.push(franchise);
+  }
+  localStorage.setItem(KEYS.FRANCHISES, JSON.stringify(list));
+  return franchise;
+}
+
+// ================= PENALTIES =================
+export function getPenalties(): Penalty[] {
+  initializeData();
+  const data = localStorage.getItem(KEYS.PENALTIES);
+  return data ? JSON.parse(data) : [];
+}
+
+export function addPenalty(penalty: Penalty): Penalty {
+  const list = getPenalties();
+  list.unshift(penalty);
+  localStorage.setItem(KEYS.PENALTIES, JSON.stringify(list));
+  
+  // Send SMS Notification
+  addSMSNotification({
+    id: `sms-${Date.now()}`,
+    userId: penalty.driverId,
+    recipientPhone: '0918-555-0101',
+    title: `Penalty Violation Notice: ${penalty.violationType}`,
+    message: `ABISO: Mayroon kayong na-record na penalty para sa ${penalty.violationType} (PHP ${penalty.amount.toFixed(2)}). Mangyaring bayaran sa Treasurer’s Office bago mag ${new Date(penalty.dueDate).toLocaleDateString()}.`,
+    type: 'penalty_alert',
+    sentAt: new Date().toISOString(),
+    read: false,
+  });
+
+  return penalty;
+}
+
+export function payPenalty(penaltyId: string): Penalty | null {
+  const list = getPenalties();
+  const index = list.findIndex(p => p.id === penaltyId);
+  if (index >= 0) {
+    list[index].status = 'paid';
+    list[index].paidAt = new Date().toISOString();
+    localStorage.setItem(KEYS.PENALTIES, JSON.stringify(list));
+    return list[index];
+  }
+  return null;
+}
+
+// ================= SMS NOTIFICATIONS =================
+export function getSMSNotifications(userId?: string): SMSNotification[] {
+  initializeData();
+  const data = localStorage.getItem(KEYS.SMS);
+  const list: SMSNotification[] = data ? JSON.parse(data) : [];
+  if (userId) {
+    return list.filter(n => n.userId === userId || n.userId === 'all');
+  }
+  return list;
+}
+
+export function addSMSNotification(notif: SMSNotification): SMSNotification {
+  const list = getSMSNotifications();
+  list.unshift(notif);
+  localStorage.setItem(KEYS.SMS, JSON.stringify(list));
+  return notif;
+}
+
+export function markSMSAsRead(id: string): void {
+  const list = getSMSNotifications();
+  const found = list.find(n => n.id === id);
+  if (found) {
+    found.read = true;
+    localStorage.setItem(KEYS.SMS, JSON.stringify(list));
+  }
+}
+
+// ================= FEE CONFIG =================
+export function getFeeConfig(): FeeConfig {
+  initializeData();
+  const data = localStorage.getItem(KEYS.FEE_CONFIG);
+  return data ? JSON.parse(data) : seedFeeConfig;
 }

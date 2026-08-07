@@ -1,135 +1,194 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Bike, Eye, EyeOff, LogIn } from 'lucide-react';
-import { useToast } from '../components/ui/Toast';
+import { KeyRound, User, ArrowRight, ShieldCheck, UserCheck, Award, Bike } from 'lucide-react';
 
 export function LoginPage() {
-  const { login, isAuthenticated, user } = useAuth();
-  const navigate = useNavigate();
-  const { showToast } = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-  if (isAuthenticated && user) {
-    const path = user.role === 'admin' ? '/admin' : user.role === 'passenger' ? '/passenger' : '/dashboard';
-    navigate(path, { replace: true });
-    return null;
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setError('');
+    const user = login(username, password);
+    if (user) {
+      redirectUser(user.role);
+    } else {
+      setError('Maling username o password. Pakisubukan muli.');
+    }
+  };
 
-    setTimeout(() => {
-      const user = login(username, password);
-      if (user) {
-        showToast(`Welcome back, ${user.firstName}!`, 'success');
-        const path = user.role === 'admin' ? '/admin' : user.role === 'passenger' ? '/passenger' : '/dashboard';
-        navigate(path);
-      } else {
-        showToast('Invalid username or password.', 'error');
-      }
-      setLoading(false);
-    }, 800);
+  const quickLogin = (u: string, p: string) => {
+    setError('');
+    const user = login(u, p);
+    if (user) {
+      redirectUser(user.role);
+    }
+  };
+
+  const redirectUser = (role: string) => {
+    switch (role) {
+      case 'driver':
+        navigate('/driver');
+        break;
+      case 'toda_president':
+        navigate('/toda');
+        break;
+      case 'admin':
+        navigate('/admin');
+        break;
+      case 'operator':
+        navigate('/dashboard');
+        break;
+      default:
+        navigate('/login');
+    }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-page__bg"></div>
-      <div className="auth-card">
-        <div className="auth-card__header">
-          <Link to="/" className="auth-card__brand">
-            <Bike size={32} />
-          </Link>
-          <h1 className="auth-card__title">Welcome Back</h1>
-          <p className="auth-card__subtitle">Sign in to your account</p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem 1rem',
+      position: 'relative'
+    }}>
+      <div className="glass-container animate-fade-in" style={{
+        maxWidth: '520px',
+        width: '100%',
+        padding: '2.75rem 2.25rem',
+        boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)'
+      }}>
+        {/* Logo Branding */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <img
+            src="/baliuag-logo.png"
+            alt="Lungsod ng Baliwag Seal"
+            style={{ height: '70px', width: 'auto', marginBottom: '0.75rem', filter: 'drop-shadow(0 0 12px rgba(6, 182, 212, 0.5))' }}
+          />
+          <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            Lungsod ng Baliwag
+          </h2>
+          <span style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Tricycle Franchise & MTOP Portal
+          </span>
         </div>
 
-        <form className="auth-card__form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="username" className="form-label">Username</label>
-            <input
-              id="username"
-              type="text"
-              className="form-input"
-              placeholder="Enter your username"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              required
-              autoComplete="username"
-            />
+        {error && (
+          <div style={{
+            background: 'rgba(244, 63, 94, 0.15)',
+            border: '1px solid rgba(244, 63, 94, 0.3)',
+            color: '#fb7185',
+            padding: '0.85rem 1rem',
+            borderRadius: '12px',
+            fontSize: '0.88rem',
+            marginBottom: '1.5rem',
+            textAlign: 'center',
+            fontWeight: 600,
+          }}>
+            {error}
           </div>
+        )}
 
-          <div className="form-group">
-            <label htmlFor="password" className="form-label">Password</label>
-            <div className="form-input-wrapper">
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+              Username
+            </label>
+            <div style={{ position: 'relative' }}>
+              <User size={18} color="#94a3b8" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
               <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                className="form-input"
-                placeholder="Enter your password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                type="text"
+                className="glass-input"
+                style={{ paddingLeft: '2.75rem' }}
+                placeholder="Gamiting username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
                 required
-                autoComplete="current-password"
               />
-              <button
-                type="button"
-                className="form-input-icon"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
           </div>
 
-          <button type="submit" className="btn btn--primary btn--full" disabled={loading}>
-            {loading ? (
-              <span className="btn__spinner"></span>
-            ) : (
-              <>
-                <LogIn size={18} />
-                Sign In
-              </>
-            )}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+              Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <KeyRound size={18} color="#94a3b8" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="password"
+                className="glass-input"
+                style={{ paddingLeft: '2.75rem' }}
+                placeholder="Gamiting password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <button type="submit" className="btn-glass btn-primary-glass" style={{ padding: '0.95rem', fontSize: '1.05rem', marginTop: '0.5rem' }}>
+            Mag-log in sa Portal <ArrowRight size={18} />
           </button>
         </form>
 
-        <div className="auth-card__footer">
-          <p>Don't have an account? <Link to="/register">Register here</Link></p>
-        </div>
+        {/* 1-Click Quick Demo Preset Cards */}
+        <div style={{ marginTop: '2.25rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, display: 'block', textAlign: 'center', marginBottom: '1rem' }}>
+            ⚡ 1-Click Quick Demo Login Presets
+          </span>
 
-        <div className="auth-card__demo">
-          <p className="auth-card__demo-title">Demo Credentials</p>
-          <div className="auth-card__demo-grid">
-            <button type="button" className="auth-card__demo-btn" onClick={() => { setUsername('admin'); setPassword('admin123'); }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <button
+              onClick={() => quickLogin('driver', 'driver123')}
+              className="btn-glass"
+              style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
+            >
+              <Bike size={18} color="#38bdf8" />
+              <strong>Driver</strong>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>driver / driver123</span>
+            </button>
+
+            <button
+              onClick={() => quickLogin('todapres', 'toda123')}
+              className="btn-glass"
+              style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
+            >
+              <Award size={18} color="#c084fc" />
+              <strong>TODA President</strong>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>todapres / toda123</span>
+            </button>
+
+            <button
+              onClick={() => quickLogin('admin', 'admin123')}
+              className="btn-glass"
+              style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
+            >
+              <ShieldCheck size={18} color="#fb923c" />
               <strong>Admin</strong>
-              <span>admin</span>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>admin / admin123</span>
             </button>
-            <button type="button" className="auth-card__demo-btn" onClick={() => { setUsername('jcruz'); setPassword('password123'); }}>
+
+            <button
+              onClick={() => quickLogin('operator', 'operator123')}
+              className="btn-glass"
+              style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
+            >
+              <UserCheck size={18} color="#34d399" />
               <strong>Operator</strong>
-              <span>jcruz</span>
-            </button>
-            <button type="button" className="auth-card__demo-btn" onClick={() => { setUsername('mlopez'); setPassword('password123'); }}>
-              <strong>Passenger</strong>
-              <span>mlopez</span>
+              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>operator / operator123</span>
             </button>
           </div>
-          <button 
-            type="button" 
-            className="btn btn--ghost btn--sm btn--full" 
-            style={{ marginTop: 'var(--space-md)', opacity: 0.6 }}
-            onClick={() => {
-              sessionStorage.clear();
-              window.location.reload();
-            }}
-          >
-            Reset System Data (Clears All)
-          </button>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+          <Link to="/" style={{ color: '#94a3b8', fontSize: '0.85rem', textDecoration: 'none' }}>
+            ← Bumalik sa Home Page
+          </Link>
         </div>
       </div>
     </div>

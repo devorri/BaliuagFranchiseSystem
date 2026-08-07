@@ -1,155 +1,118 @@
-import { useState } from 'react';
-import { Header } from '../../components/layout/Header';
-import { StatusBadge } from '../../components/ui/StatusBadge';
-import { Modal } from '../../components/ui/Modal';
-import { useToast } from '../../components/ui/Toast';
-import { Shield, Search, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import * as storage from '../../services/storageService';
 import type { Franchise } from '../../types';
+import { Search } from 'lucide-react';
 
 export function FranchiseRegistry() {
-  const { showToast } = useToast();
-  const [selectedFranchise, setSelectedFranchise] = useState<Franchise | null>(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [franchises, setFranchises] = useState<Franchise[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired'>('all');
 
-  const allFranchises = storage.getFranchises();
-  let franchises = statusFilter === 'all' ? allFranchises : allFranchises.filter(f => f.status === statusFilter);
-  if (search) {
-    const q = search.toLowerCase();
-    franchises = franchises.filter(f =>
-      f.operatorName.toLowerCase().includes(q) ||
-      f.plateNumber.toLowerCase().includes(q) ||
-      f.todaName.toLowerCase().includes(q)
-    );
-  }
+  useEffect(() => {
+    setFranchises(storage.getFranchises());
+  }, []);
 
-  const handleStatusChange = (id: string, newStatus: Franchise['status']) => {
-    storage.updateFranchise(id, { status: newStatus });
-    showToast(`Franchise status updated to ${newStatus}.`, 'success');
-    setSelectedFranchise(null);
-  };
+  const filteredFranchises = franchises.filter(f => {
+    const matchesSearch = 
+      f.mtopNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.driverName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.plateNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.todaName.toLowerCase().includes(searchTerm.toLowerCase());
 
-  // Check for expiring franchises
-  const expiringCount = allFranchises.filter(f => {
-    const daysUntil = (new Date(f.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-    return f.status === 'active' && daysUntil <= 90 && daysUntil > 0;
-  }).length;
+    const matchesStatus = filterStatus === 'all' || f.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
-    <div className="page">
-      <Header title="Franchise Registry" subtitle="Manage all registered franchises" />
-
-      <div className="page__content">
-        {expiringCount > 0 && (
-          <div className="alert alert--warning">
-            <AlertTriangle size={18} />
-            <span><strong>{expiringCount}</strong> franchise(s) expiring within 90 days.</span>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="filter-bar">
-          <div className="filter-bar__search">
-            <Search size={16} />
-            <input placeholder="Search by name, plate, TODA..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <div className="filter-bar__btns">
-            {['all', 'active', 'expired', 'suspended', 'pending'].map(s => (
-              <button key={s} className={`filter-btn ${statusFilter === s ? 'filter-btn--active' : ''}`} onClick={() => setStatusFilter(s)}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
-          </div>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div className="glass-container" style={{ padding: '2.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+          <span className="pill-badge pill-cyan">Franchise Registry</span>
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Lungsod ng Baliwag</span>
         </div>
+        <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+          Franchise Monitoring & Registry
+        </h2>
+        <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
+          Mino-monitor at minamasdan ang lahat ng **Active** at **Expired** tricycle franchises sa Lungsod ng Baliwag.
+        </p>
 
-        {/* Franchise Cards */}
-        {franchises.length === 0 ? (
-          <div className="card">
-            <div className="card__body">
-              <div className="card__empty">
-                <Shield size={48} />
-                <h3>No Franchises Found</h3>
-              </div>
-            </div>
+        {/* Search & Filter Bar */}
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+            <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              className="glass-input"
+              style={{ paddingLeft: '2.75rem' }}
+              placeholder="Mag-search ayon sa MTOP #, Driver Name, Plate #, o TODA..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
           </div>
-        ) : (
-          <div className="franchise-grid">
-            {franchises.map(f => {
-              const daysUntilExpiry = Math.ceil((new Date(f.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              const isExpiring = daysUntilExpiry <= 90 && daysUntilExpiry > 0;
 
-              return (
-                <div key={f.id} className={`franchise-card ${isExpiring ? 'franchise-card--expiring' : ''}`} onClick={() => setSelectedFranchise(f)}>
-                  <div className="franchise-card__header">
-                    <h4>{f.operatorName}</h4>
-                    <StatusBadge status={f.status} size="sm" />
-                  </div>
-                  <div className="franchise-card__body">
-                    <div className="franchise-card__row">
-                      <span>Plate</span><span>{f.plateNumber}</span>
-                    </div>
-                    <div className="franchise-card__row">
-                      <span>Vehicle</span><span>{f.vehicleMake} {f.vehicleModel}</span>
-                    </div>
-                    <div className="franchise-card__row">
-                      <span>TODA</span><span>{f.todaName}</span>
-                    </div>
-                    <div className="franchise-card__row">
-                      <span>Residency</span><span>{f.residency === 'resident' ? 'Resident' : 'Non-Resident'}</span>
-                    </div>
-                    <div className="franchise-card__row">
-                      <span>Expires</span>
-                      <span className={isExpiring ? 'text-warning' : ''}>
-                        {new Date(f.expiresAt).toLocaleDateString()}
-                        {isExpiring && ` (${daysUntilExpiry}d)`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+          <select
+            className="glass-input glass-select"
+            style={{ width: '200px' }}
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value as any)}
+          >
+            <option value="all">Lahat ng Franchise Status</option>
+            <option value="active">Active Franchises Only</option>
+            <option value="expired">Expired Franchises Only</option>
+          </select>
+        </div>
+      </div>
 
-        {/* Detail Modal */}
-        <Modal isOpen={!!selectedFranchise} onClose={() => setSelectedFranchise(null)} title="Franchise Details" size="md">
-          {selectedFranchise && (
-            <div className="franchise-detail">
-              <div className="franchise-detail__header">
-                <h3>{selectedFranchise.operatorName}</h3>
-                <StatusBadge status={selectedFranchise.status} />
-              </div>
-              <div className="franchise-detail__grid">
-                <p><strong>Franchise ID:</strong> {selectedFranchise.id}</p>
-                <p><strong>Plate Number:</strong> {selectedFranchise.plateNumber}</p>
-                <p><strong>Vehicle:</strong> {selectedFranchise.vehicleMake} {selectedFranchise.vehicleModel} ({selectedFranchise.vehicleColor})</p>
-                <p><strong>Motor #:</strong> {selectedFranchise.motorNumber}</p>
-                <p><strong>Chassis #:</strong> {selectedFranchise.chassisNumber}</p>
-                <p><strong>TODA:</strong> {selectedFranchise.todaName}</p>
-                <p><strong>Route:</strong> {selectedFranchise.routeArea}</p>
-                <p><strong>Residency:</strong> {selectedFranchise.residency === 'resident' ? 'Resident' : 'Non-Resident'}</p>
-                <p><strong>Issued:</strong> {new Date(selectedFranchise.issuedAt).toLocaleDateString()}</p>
-                <p><strong>Expires:</strong> {new Date(selectedFranchise.expiresAt).toLocaleDateString()}</p>
-                <p><strong>Renewal Date:</strong> {new Date(selectedFranchise.renewalDate).toLocaleDateString()}</p>
-              </div>
-              <div className="franchise-detail__actions">
-                <h4>Change Status</h4>
-                <div className="franchise-detail__btns">
-                  {selectedFranchise.status !== 'active' && (
-                    <button className="btn btn--success btn--sm" onClick={() => handleStatusChange(selectedFranchise.id, 'active')}>Set Active</button>
-                  )}
-                  {selectedFranchise.status !== 'suspended' && (
-                    <button className="btn btn--warning btn--sm" onClick={() => handleStatusChange(selectedFranchise.id, 'suspended')}>Suspend</button>
-                  )}
-                  {selectedFranchise.status !== 'expired' && (
-                    <button className="btn btn--danger btn--sm" onClick={() => handleStatusChange(selectedFranchise.id, 'expired')}>Mark Expired</button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </Modal>
+      {/* Registry Table Card */}
+      <div className="glass-container" style={{ padding: '1.75rem' }}>
+        <div className="glass-table-wrapper">
+          <table className="glass-table">
+            <thead>
+              <tr>
+                <th>MTOP Number</th>
+                <th>Driver / Operator</th>
+                <th>Plate Number</th>
+                <th>TODA Route</th>
+                <th>Issued Date</th>
+                <th>Expiration Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredFranchises.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
+                    Walang nahanap na record sa registry.
+                  </td>
+                </tr>
+              ) : (
+                filteredFranchises.map(f => (
+                  <tr key={f.id}>
+                    <td style={{ fontWeight: 800, color: '#38bdf8' }}>{f.mtopNumber}</td>
+                    <td>
+                      <strong style={{ color: '#ffffff', display: 'block' }}>{f.driverName}</strong>
+                      <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Op: {f.operatorName}</span>
+                    </td>
+                    <td style={{ fontWeight: 700 }}>{f.plateNumber}</td>
+                    <td style={{ fontSize: '0.85rem' }}>{f.todaName}</td>
+                    <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{new Date(f.issuedAt).toLocaleDateString()}</td>
+                    <td style={{ fontSize: '0.82rem', color: f.status === 'expired' ? '#fb7185' : '#cbd5e1', fontWeight: f.status === 'expired' ? 700 : 400 }}>
+                      {new Date(f.expiresAt).toLocaleDateString()}
+                    </td>
+                    <td>
+                      {f.status === 'active' ? (
+                        <span className="pill-badge pill-emerald">ACTIVE</span>
+                      ) : (
+                        <span className="pill-badge pill-rose">EXPIRED</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

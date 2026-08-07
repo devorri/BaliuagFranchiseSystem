@@ -1,33 +1,45 @@
-import { Outlet, Navigate } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { Sidebar } from './Sidebar';
+import { Header } from './Header';
+import type { UserRole } from '../../types';
 
 interface DashboardLayoutProps {
-  requiredRole?: 'operator' | 'admin' | 'passenger';
+  requiredRole?: UserRole;
 }
 
 export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
   if (requiredRole && user.role !== requiredRole) {
-    const redirectPath = user.role === 'admin' 
-      ? '/admin' 
-      : user.role === 'passenger' 
-        ? '/passenger' 
-        : '/dashboard';
-    return <Navigate to={redirectPath} replace />;
+    // Redirect based on actual role
+    switch (user.role) {
+      case 'driver':
+        return <Navigate to="/driver" replace />;
+      case 'toda_president':
+        return <Navigate to="/toda" replace />;
+      case 'admin':
+        return <Navigate to="/admin" replace />;
+      case 'operator':
+        return <Navigate to="/dashboard" replace />;
+      default:
+        return <Navigate to="/login" replace />;
+    }
   }
 
   return (
-    <div className="dashboard-layout">
+    <div className="app-container">
       <Sidebar />
-      <main className="dashboard-content">
-        <Outlet />
-      </main>
+      <div className="main-content">
+        <Header />
+        <main className="content-body">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
