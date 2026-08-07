@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  ChevronRight, 
-  Sparkles, 
-  Star, 
-  Wrench, 
-  QrCode, 
-  Search, 
-  ArrowRight, 
-  Phone, 
-  MapPin, 
-  Clock, 
-  Send, 
-  UserCheck, 
-  Users, 
+import {
+  ChevronRight,
+  Sparkles,
+  Star,
+  Wrench,
+  QrCode,
+  Search,
+  ArrowRight,
+  Phone,
+  MapPin,
+  Clock,
+  Send,
+  UserCheck,
+  Users,
   CreditCard,
   CheckCircle2,
   User,
@@ -26,7 +26,7 @@ import type { Franchise } from '../types';
 
 export function LandingPage() {
   const navigate = useNavigate();
-  
+
   // Public MTOP Verification state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<Franchise | null | 'not_found'>(null);
@@ -84,8 +84,8 @@ export function LandingPage() {
     if (!searchQuery.trim()) return;
 
     const query = searchQuery.trim().toLowerCase();
-    const found = franchises.find(f => 
-      f.plateNumber.toLowerCase() === query || 
+    const found = franchises.find(f =>
+      f.plateNumber.toLowerCase() === query ||
       f.mtopNumber.toLowerCase() === query ||
       f.driverName.toLowerCase().includes(query)
     );
@@ -130,7 +130,7 @@ export function LandingPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      
+
       {/* TOP FLOATING GLASS NAVBAR */}
       <header style={{
         position: 'sticky',
@@ -199,9 +199,9 @@ export function LandingPage() {
           position: 'relative',
           overflow: 'hidden',
         }}>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '3rem', alignItems: 'center' }}>
-            
+
             {/* Left Hero Text */}
             <div>
               <div className="pill-badge pill-cyan" style={{ marginBottom: '1.25rem', fontSize: '0.82rem', padding: '0.5rem 1.1rem' }}>
@@ -209,7 +209,7 @@ export function LandingPage() {
               </div>
 
               <h1 style={{ fontSize: '3.3rem', fontWeight: 800, lineHeight: '1.1', color: '#ffffff', marginBottom: '1.25rem' }}>
-                Mabilis, Transparante, at <span style={{ color: '#22c55e', fontStyle: 'italic' }}>Modernong MTOP Franchise</span> Online
+                Mabilis, Transparant, at <span style={{ color: '#22c55e', fontStyle: 'italic' }}>Modernong MTOP Franchise</span> Online
               </h1>
 
               <p style={{ color: '#cbd5e1', fontSize: '1.1rem', lineHeight: '1.65', marginBottom: '2rem' }}>
@@ -349,7 +349,7 @@ export function LandingPage() {
       {/* WORKFLOW / STEP-BY-STEP PROCESS SECTION */}
       <section id="workflow-section" style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
         <div className="glass-container" style={{ padding: '3rem 2.5rem' }}>
-          
+
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <span className="pill-badge pill-purple" style={{ marginBottom: '0.75rem' }}>Proseso ng Aplikasyon</span>
             <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
@@ -430,7 +430,7 @@ export function LandingPage() {
       {/* PUBLIC VERIFICATION & QR LOOKUP SECTION */}
       <section id="verification-section" style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
         <div className="glass-container" style={{ padding: '3rem 2.5rem' }}>
-          
+
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
             <span className="pill-badge pill-emerald" style={{ marginBottom: '0.75rem' }}>Public Verification</span>
             <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
@@ -616,7 +616,7 @@ export function LandingPage() {
       {/* DIRECT INQUIRY / CONTACT US SECTION */}
       <section id="contact-section" style={{ padding: '4rem 1.25rem 5rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
         <div className="glass-container" style={{ padding: '3rem 2.5rem' }}>
-          
+
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
             <span className="pill-badge pill-cyan" style={{ marginBottom: '0.75rem' }}>Direktang Pagtatanong</span>
             <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
@@ -688,7 +688,7 @@ export function LandingPage() {
         marginTop: 'auto',
       }}>
         <div style={{ maxWidth: '1320px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2.5rem', marginBottom: '2.5rem' }}>
-          
+
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1rem' }}>
               <img src="/baliuag-logo.png" alt="Baliwag Seal" style={{ height: '44px', width: 'auto' }} />
