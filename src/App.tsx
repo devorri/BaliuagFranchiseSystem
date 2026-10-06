@@ -22,6 +22,8 @@ import { TodaApprovals } from './pages/toda/TodaApprovals';
 
 // Admin pages
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { AccountManagement } from './pages/admin/AccountManagement';
+import { ContentManagement } from './pages/admin/ContentManagement';
 import { ApplicationReview } from './pages/admin/ApplicationReview';
 import { FranchiseRegistry } from './pages/admin/FranchiseRegistry';
 import { PenaltyManagement } from './pages/admin/PenaltyManagement';
@@ -61,10 +63,13 @@ function App() {
               <Route path="approvals" element={<TodaApprovals />} />
             </Route>
 
-            {/* Admin Routes */}
+            {/* Admin Routes - Homepage set to /admin/accounts */}
             <Route path="/admin" element={<DashboardLayout requiredRole="admin" />}>
-              <Route index element={<AdminDashboard />} />
+              <Route index element={<Navigate to="/admin/accounts" replace />} />
+              <Route path="accounts" element={<AccountManagement />} />
+              <Route path="overview" element={<AdminDashboard />} />
               <Route path="applications" element={<ApplicationReview />} />
+              <Route path="content" element={<ContentManagement />} />
               <Route path="franchises" element={<FranchiseRegistry />} />
               <Route path="penalties" element={<PenaltyManagement />} />
               <Route path="reports" element={<Reports />} />

@@ -15,15 +15,21 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user.role !== requiredRole) {
+  const roleMatches = !requiredRole || 
+    user.role === requiredRole ||
+    ((requiredRole === 'toda_president' || requiredRole === 'president') && 
+     (user.role === 'toda_president' || user.role === 'president'));
+
+  if (!roleMatches) {
     // Redirect based on actual role
     switch (user.role) {
       case 'driver':
         return <Navigate to="/driver" replace />;
+      case 'president':
       case 'toda_president':
         return <Navigate to="/toda" replace />;
       case 'admin':
-        return <Navigate to="/admin" replace />;
+        return <Navigate to="/admin/accounts" replace />;
       case 'operator':
         return <Navigate to="/dashboard" replace />;
       default:

@@ -19,10 +19,12 @@ import {
   User,
   Award,
   ClipboardList,
-  Building
+  Building,
+  Megaphone
 } from 'lucide-react';
 import * as storage from '../services/storageService';
-import type { Franchise } from '../types';
+import * as supabaseService from '../services/supabaseService';
+import type { Franchise, Advertisement, InformationItem } from '../types';
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -31,6 +33,11 @@ export function LandingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<Franchise | null | 'not_found'>(null);
   const [franchises, setFranchises] = useState<Franchise[]>([]);
+
+  // Dynamic Advertisements & Information state
+  const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
+  const [informationItems, setInformationItems] = useState<InformationItem[]>([]);
+  const [currentAdIndex, setCurrentAdIndex] = useState(0);
 
   // Public Feedback Form state
   const [feedbackName, setFeedbackName] = useState('');
@@ -77,7 +84,32 @@ export function LandingPage() {
     storage.initializeData();
     const data = storage.getFranchises();
     setFranchises(data);
+
+    // Load dynamic content from Supabase / Storage
+    async function loadContent() {
+      try {
+        const [ads, info] = await Promise.all([
+          supabaseService.getAdvertisementsAsync(),
+          supabaseService.getInformationItemsAsync(),
+        ]);
+        setAdvertisements(ads.filter(a => a.isActive));
+        setInformationItems(info.filter(i => i.isActive));
+      } catch (err) {
+        console.warn('Failed to load dynamic content:', err);
+      }
+    }
+    loadContent();
   }, []);
+
+  // Cycle dynamic advertisement
+  useEffect(() => {
+    if (advertisements.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentAdIndex(prev => (prev + 1) % advertisements.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [advertisements.length]);
+
 
   const handleVerifySearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,10 +310,23 @@ export function LandingPage() {
                   </div>
                 </div>
 
-                <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '0.35rem' }}>OFFICIAL ANNOUNCEMENT</span>
-                  <p style={{ fontSize: '0.88rem', color: '#ffffff', lineHeight: 1.4 }}>
-                    Maaari na kayong magbayad sa Municipal Treasurer sa pamamagitan ng <strong>GCash cashless transaction</strong>.
+                {/* DYNAMIC ANNOUNCEMENT / ADVERTISEMENT IN HERO CARD */}
+                <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(56, 189, 248, 0.25)', position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Megaphone size={14} /> {advertisements[currentAdIndex]?.category?.toUpperCase() || 'OPISYAL NA ABISO'}
+                    </span>
+                    {advertisements.length > 1 && (
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        {currentAdIndex + 1}/{advertisements.length}
+                      </span>
+                    )}
+                  </div>
+                  <strong style={{ fontSize: '0.88rem', color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>
+                    {advertisements[currentAdIndex]?.title || 'Taunang Pagpaparehistro at MTOP Renewal'}
+                  </strong>
+                  <p style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                    {advertisements[currentAdIndex]?.description || 'Maaari na kayong magbayad sa Municipal Treasurer sa pamamagitan ng GCash cashless transaction.'}
                   </p>
                 </div>
               </div>
@@ -290,6 +335,51 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* DYNAMIC ADVERTISEMENTS & CITY ADVISORIES SECTION */}
+      {advertisements.length > 0 && (
+        <section style={{ maxWidth: '1320px', width: '100%', margin: '0 auto', padding: '1rem 1.25rem' }}>
+          <div className="glass-container" style={{ padding: '1.75rem 2rem', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                  <Megaphone size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+                    Mga Opisyal na Anunsyo at Impormasyon mula sa Pamahalaang Lungsod
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Pinamamahalaan sa pamamagitan ng LGU Admin Portal</span>
+                </div>
+              </div>
+              <span className="pill-badge pill-cyan">{advertisements.length} Aktibong Abiso</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+              {advertisements.map((ad) => (
+                <div key={ad.id} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span className={`pill-badge ${ad.category === 'sponsor' ? 'pill-purple' : 'pill-cyan'}`} style={{ fontSize: '0.72rem' }}>
+                        {ad.category.toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                        {new Date(ad.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', marginBottom: '0.4rem' }}>
+                      {ad.title}
+                    </h4>
+                    <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.5' }}>
+                      {ad.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ABOUT US / SYSTEM OVERVIEW SECTION */}
       <section id="about-section" style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
@@ -426,6 +516,46 @@ export function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/* DYNAMIC INFORMATION & PUBLIC GUIDELINES SECTION */}
+      {informationItems.length > 0 && (
+        <section style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <span className="pill-badge pill-emerald" style={{ marginBottom: '0.75rem' }}>Opisyal na Patnubay at Taripa</span>
+            <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
+              Impormasyon at Ordinansa ng Lungsod
+            </h2>
+            <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px', margin: '0 auto' }}>
+              Pinamamahalaan sa Admin Panel: pinakabagong taripa ng pamasahe, checklist ng mga requirements, at mga alituntunin ng pamahalaan.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+            {informationItems.map(item => (
+              <div key={item.id} className="glass-card" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span className="pill-badge pill-purple" style={{ fontSize: '0.75rem' }}>
+                      {item.category === 'fare_matrix' ? 'Taripa ng Pasahe' :
+                       item.category === 'guideline' ? 'Gabay sa Pagparehistro' :
+                       item.category === 'toda_info' ? 'TODA Info' : item.category.toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                      {item.publishedDate}
+                    </span>
+                  </div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff', marginBottom: '0.6rem' }}>
+                    {item.title}
+                  </h3>
+                  <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
+                    {item.content}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* PUBLIC VERIFICATION & QR LOOKUP SECTION */}
       <section id="verification-section" style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>

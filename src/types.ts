@@ -3,7 +3,11 @@
 // Type Definitions
 // ============================================
 
-export type UserRole = 'driver' | 'toda_president' | 'admin' | 'operator';
+export type UserRole = 'driver' | 'toda_president' | 'admin' | 'operator' | 'president';
+
+export type AdminPermission = 'security' | 'requirements' | 'payment' | 'analytics' | 'president';
+
+export type AccountStatus = 'pending' | 'approved' | 'rejected';
 
 export type ApplicationStatus = 
   | 'draft' 
@@ -45,6 +49,9 @@ export interface User {
   address: string;
   todaName?: string;
   profilePhoto?: string;
+  accountStatus?: AccountStatus;
+  adminPermissions?: AdminPermission[];
+  sessionId?: string;
   createdAt: string;
 }
 
@@ -122,6 +129,16 @@ export interface Application {
   treasurerPayment?: TreasurerPayment;
   todaApproval?: TodaApproval;
   
+  // President Endorsement Workflow
+  presidentEndorsed?: boolean;
+  presidentEndorsedAt?: string;
+  presidentEndorsedBy?: string;
+  presidentRemarks?: string;
+
+  // Effectivity Dates
+  startDate?: string;
+  endDate?: string;
+
   // Fee Info
   baseFee: number;
   todaFee: number;
@@ -161,6 +178,8 @@ export interface Franchise {
   routeArea: string;
   
   status: FranchiseStatus;
+  startDate?: string;
+  endDate?: string;
   issuedAt: string;
   expiresAt: string;
   renewalDate: string;
@@ -227,4 +246,29 @@ export interface FeeConfig {
   todaMembershipFee: number;
   stencilingFee: number;
   latePenaltyPerMonth: number;
+}
+
+export interface Advertisement {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  linkUrl?: string;
+  category: 'sponsor' | 'announcement' | 'partner' | 'promo';
+  isActive: boolean;
+  startDate?: string;
+  endDate?: string;
+  displayOrder?: number;
+  createdAt: string;
+}
+
+export interface InformationItem {
+  id: string;
+  title: string;
+  category: 'news' | 'guideline' | 'fare_matrix' | 'toda_info' | 'ordinance';
+  content: string;
+  imageUrl?: string;
+  isActive: boolean;
+  publishedDate: string;
+  updatedAt?: string;
 }

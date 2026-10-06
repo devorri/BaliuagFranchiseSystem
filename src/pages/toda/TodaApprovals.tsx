@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as storage from '../../services/storageService';
+import * as supabaseService from '../../services/supabaseService';
 import type { Application } from '../../types';
 import { CheckCircle2, ShieldCheck, UserCheck } from 'lucide-react';
 
@@ -16,21 +17,23 @@ export function TodaApprovals() {
     loadApps();
   }, []);
 
-  const loadApps = () => {
-    const apps = storage.getApplications();
+  const loadApps = async () => {
+    const apps = await supabaseService.getApplicationsAsync();
     setApplications(apps);
   };
 
-  const handleGrantApproval = (app: Application) => {
+  const handleGrantApproval = async (app: Application) => {
     if (!user) return;
     const updated = storage.approveTodaLine(app.id, user, orNumber, remarks);
     if (updated) {
-      setSuccessMsg(`Ang linya para kay ${app.driverName || app.applicantName} ay APRUBADO na at naipasa na sa Admin!`);
+      await supabaseService.saveApplicationAsync(updated);
+      setSuccessMsg(`Ang linya para kay ${app.driverName || app.applicantName} ay APRUBADO at ININDORSO na sa Municipal Admin!`);
       setSelectedApp(null);
-      loadApps();
+      await loadApps();
       setTimeout(() => setSuccessMsg(''), 4000);
     }
   };
+
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

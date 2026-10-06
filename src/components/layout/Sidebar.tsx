@@ -3,12 +3,13 @@ import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard, FileText, FilePlus, CreditCard, Shield,
   ChevronLeft, ChevronRight, LogOut, QrCode, AlertTriangle,
-  CheckCircle2, BellRing, RefreshCw, BarChart3, Wrench
+  CheckCircle2, BellRing, RefreshCw, BarChart3, Wrench,
+  Users, Megaphone
 } from 'lucide-react';
 import { useState } from 'react';
 
 export function Sidebar() {
-  const { user, isTodaPresident, isAdmin, isOperator, logout } = useAuth();
+  const { user, isPresident, isTodaPresident, isAdmin, isOperator, logout } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -30,9 +31,12 @@ export function Sidebar() {
     { to: '/toda/approvals', icon: CheckCircle2, label: 'Driver Approvals' },
   ];
 
+  // Admin Homepage is set to Accounts & Security
   const adminLinks = [
-    { to: '/admin', icon: LayoutDashboard, label: 'Admin Overview' },
+    { to: '/admin/accounts', icon: Users, label: 'Accounts & Security' },
+    { to: '/admin/overview', icon: LayoutDashboard, label: 'Admin Overview' },
     { to: '/admin/applications', icon: FileText, label: 'Review Applications' },
+    { to: '/admin/content', icon: Megaphone, label: 'Content & Ads' },
     { to: '/admin/franchises', icon: Shield, label: 'Franchise Registry' },
     { to: '/admin/penalties', icon: AlertTriangle, label: 'Penalty Management' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports & Analytics' },
@@ -52,7 +56,7 @@ export function Sidebar() {
   if (isAdmin) {
     links = adminLinks;
     roleTitle = 'City Administrator';
-  } else if (isTodaPresident) {
+  } else if (isPresident || isTodaPresident) {
     links = todaLinks;
     roleTitle = 'TODA President';
   } else if (isOperator) {

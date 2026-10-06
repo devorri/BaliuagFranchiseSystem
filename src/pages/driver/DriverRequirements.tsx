@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as storage from '../../services/storageService';
+import { uploadFileToBucketAsync } from '../../services/supabaseService';
 import type { Application, Document, DocumentType } from '../../types';
-import { FileUp, CheckCircle, UploadCloud } from 'lucide-react';
+import { FileUp, CheckCircle, UploadCloud, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function DriverRequirements() {
@@ -29,10 +30,19 @@ export function DriverRequirements() {
     id_photo: 'id_photo.png',
   });
 
+  const [uploadingState, setUploadingState] = useState<{ [key in DocumentType]?: boolean }>({});
   const [submitted, setSubmitted] = useState(false);
 
-  const handleFileUpload = (type: DocumentType, fileName: string) => {
-    setUploadedFiles(prev => ({ ...prev, [type]: fileName }));
+  const handleFileUpload = async (type: DocumentType, file: File) => {
+    setUploadingState(prev => ({ ...prev, [type]: true }));
+    const result = await uploadFileToBucketAsync(file, 'driver_documents');
+    setUploadingState(prev => ({ ...prev, [type]: false }));
+
+    if (result.url) {
+      setUploadedFiles(prev => ({ ...prev, [type]: result.url || file.name }));
+    } else {
+      setUploadedFiles(prev => ({ ...prev, [type]: file.name }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -225,18 +235,26 @@ export function DriverRequirements() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      {uploadedFiles[doc.key as DocumentType] ? (
+                      {uploadingState[doc.key as DocumentType] ? (
+                        <span className="pill-badge pill-cyan"><Loader2 size={14} className="animate-spin" /> Uploading to Bucket...</span>
+                      ) : uploadedFiles[doc.key as DocumentType] ? (
                         <span className="pill-badge pill-emerald"><CheckCircle size={14} /> Attached</span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleFileUpload(doc.key as DocumentType, `${doc.key}_uploaded.pdf`)}
-                          className="btn-glass"
-                          style={{ padding: '0.45rem 1rem', fontSize: '0.82rem' }}
-                        >
-                          <UploadCloud size={16} /> Choose File
-                        </button>
-                      )}
+                      ) : null}
+                      <label
+                        className="btn-glass cursor-pointer"
+                        style={{ padding: '0.45rem 1rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                      >
+                        <UploadCloud size={16} /> Choose File
+                        <input
+                          type="file"
+                          style={{ display: 'none' }}
+                          onChange={e => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleFileUpload(doc.key as DocumentType, e.target.files[0]);
+                            }
+                          }}
+                        />
+                      </label>
                     </div>
                   </div>
                 ))}

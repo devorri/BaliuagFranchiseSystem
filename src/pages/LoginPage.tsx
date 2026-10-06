@@ -1,31 +1,40 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { KeyRound, User, ArrowRight, ShieldCheck, UserCheck, Award, Bike } from 'lucide-react';
+import { KeyRound, User, ArrowRight, ShieldCheck, UserCheck, Award, Bike, AlertCircle } from 'lucide-react';
 
 export function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { login, sessionError, clearSessionError } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const user = login(username, password);
-    if (user) {
-      redirectUser(user.role);
+    clearSessionError();
+    setLoading(true);
+    const result = await login(username, password);
+    setLoading(false);
+    if (result.success && result.user) {
+      redirectUser(result.user.role);
     } else {
-      setError('Maling username o password. Pakisubukan muli.');
+      setError(result.error || 'Maling username o password. Pakisubukan muli.');
     }
   };
 
-  const quickLogin = (u: string, p: string) => {
+  const quickLogin = async (u: string, p: string) => {
     setError('');
-    const user = login(u, p);
-    if (user) {
-      redirectUser(user.role);
+    clearSessionError();
+    setLoading(true);
+    const result = await login(u, p);
+    setLoading(false);
+    if (result.success && result.user) {
+      redirectUser(result.user.role);
+    } else {
+      setError(result.error || 'Maling credentials.');
     }
   };
 
@@ -34,11 +43,13 @@ export function LoginPage() {
       case 'driver':
         navigate('/driver');
         break;
+      case 'president':
       case 'toda_president':
         navigate('/toda');
         break;
       case 'admin':
-        navigate('/admin');
+        // Task requirement: Yung pinaka-homepage ng admin, dapat naka-set sa "Account" page
+        navigate('/admin/accounts');
         break;
       case 'operator':
         navigate('/dashboard');
@@ -67,16 +78,36 @@ export function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img
             src="/baliuag-logo.png"
-            alt="Lungsod ng Baliwag Seal"
+            alt="Lungsod ng Baliuag Seal"
             style={{ height: '70px', width: 'auto', marginBottom: '0.75rem', filter: 'drop-shadow(0 0 12px rgba(6, 182, 212, 0.5))' }}
           />
           <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
-            Lungsod ng Baliwag
+            Lungsod ng Baliuag
           </h2>
           <span style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Tricycle Franchise & MTOP Portal
           </span>
         </div>
+
+        {/* Single Session Notice Alert */}
+        {sessionError && (
+          <div style={{
+            background: 'rgba(234, 179, 8, 0.15)',
+            border: '1px solid rgba(234, 179, 8, 0.35)',
+            color: '#fde047',
+            padding: '0.85rem 1rem',
+            borderRadius: '12px',
+            fontSize: '0.88rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.75rem',
+            lineHeight: '1.4'
+          }}>
+            <AlertCircle size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <span>{sessionError}</span>
+          </div>
+        )}
 
         {error && (
           <div style={{
@@ -131,8 +162,13 @@ export function LoginPage() {
             </div>
           </div>
 
-          <button type="submit" className="btn-glass btn-primary-glass" style={{ padding: '0.95rem', fontSize: '1.05rem', marginTop: '0.5rem' }}>
-            Mag-log in sa Portal <ArrowRight size={18} />
+          <button 
+            type="submit" 
+            className="btn-glass btn-primary-glass" 
+            style={{ padding: '0.95rem', fontSize: '1.05rem', marginTop: '0.5rem' }}
+            disabled={loading}
+          >
+            {loading ? 'Nagsusuri...' : 'Mag-log in sa Portal'} <ArrowRight size={18} />
           </button>
         </form>
 
@@ -169,7 +205,7 @@ export function LoginPage() {
               style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
             >
               <ShieldCheck size={18} color="#fb923c" />
-              <strong>Admin</strong>
+              <strong>Admin (Direct)</strong>
               <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>admin / admin123</span>
             </button>
 
@@ -185,9 +221,12 @@ export function LoginPage() {
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+        <div style={{ textAlign: 'center', marginTop: '1.5rem', display: 'flex', justifyContent: 'center', gap: '1.5rem' }}>
+          <Link to="/register" style={{ color: '#38bdf8', fontSize: '0.85rem', textDecoration: 'none' }}>
+            Walang account? Magrehistro dito
+          </Link>
           <Link to="/" style={{ color: '#94a3b8', fontSize: '0.85rem', textDecoration: 'none' }}>
-            ← Bumalik sa Home Page
+            ← Home Page
           </Link>
         </div>
       </div>

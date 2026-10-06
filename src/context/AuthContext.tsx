@@ -1,24 +1,30 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { User, UserRole } from '../types';
+import type { User, UserRole, AdminPermission } from '../types';
 import * as storage from '../services/storageService';
+import * as supabaseService from '../services/supabaseService';
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => User | null;
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
   logout: () => void;
   updateProfile: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
   role: UserRole | null;
   isDriver: boolean;
+  isPresident: boolean;
   isTodaPresident: boolean;
   isAdmin: boolean;
   isOperator: boolean;
+  hasPermission: (perm: AdminPermission) => boolean;
+  sessionError: string | null;
+  clearSessionError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   useEffect(() => {
     storage.initializeData();
@@ -28,12 +34,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = (username: string, password: string): User | null => {
-    const loggedIn = storage.login(username, password);
-    if (loggedIn) {
-      setUser(loggedIn);
+  // Single Session Enforcement check interval
+  useEffect(() => {
+    if (!user) return;
+
+    const checkSession = () => {
+      const isValid = storage.isCurrentSessionValid();
+      if (!isValid) {
+        setSessionError('Na-detect na may nag-login sa ibang device o browser gamit ang account na ito. Na-logout ang inyong session (Single Session Enforcement).');
+        storage.logout();
+        setUser(null);
+      }
+    };
+
+    const interval = setInterval(checkSession, 5000);
+    window.addEventListener('focus', checkSession);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', checkSession);
+    };
+  }, [user]);
+
+  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
+    setSessionError(null);
+    try {
+      // Backend first authentication
+      const result = await supabaseService.loginAsync(username, password);
+      if (result.user) {
+        setUser(result.user);
+        return { success: true, user: result.user };
+      }
+      return { success: false, error: result.error || 'Maling username o password.' };
+    } catch {
+      // Fallback
+      const res = storage.login(username, password);
+      if (res.user) {
+        setUser(res.user);
+        return { success: true, user: res.user };
+      }
+      return { success: false, error: res.error || 'Hindi ma-proseso ang login.' };
     }
-    return loggedIn;
   };
 
   const logout = () => {
@@ -48,6 +89,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isPresident = user?.role === 'president' || user?.role === 'toda_president';
+  const isAdmin = user?.role === 'admin';
+
+  const hasPermission = (perm: AdminPermission): boolean => {
+    if (!user) return false;
+    if (user.role !== 'admin') {
+      if (user.role === 'president' || user.role === 'toda_president') {
+        return perm === 'president';
+      }
+      return false;
+    }
+    // Admin role checks permissions array
+    if (!user.adminPermissions || user.adminPermissions.length === 0) {
+      return true; // default full permissions
+    }
+    return user.adminPermissions.includes(perm);
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -57,9 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!user,
       role: user?.role || null,
       isDriver: user?.role === 'driver',
-      isTodaPresident: user?.role === 'toda_president',
-      isAdmin: user?.role === 'admin',
+      isPresident,
+      isTodaPresident: isPresident,
+      isAdmin,
       isOperator: user?.role === 'operator',
+      hasPermission,
+      sessionError,
+      clearSessionError: () => setSessionError(null),
     }}>
       {children}
     </AuthContext.Provider>
