@@ -4,6 +4,7 @@
 
 import type { User, Application, Franchise, Penalty, SMSNotification, FeeConfig, ApplicationStatus, Advertisement, InformationItem } from '../types';
 import { seedUsers, seedApplications, seedFranchises, seedPenalties, seedSMSNotifications, seedFeeConfig, seedAdvertisements, seedInformationItems } from './seedData';
+import { sendSMS, isSMSConfigured } from './smsService';
 
 const KEYS = {
   USERS: 'baliuag_users',
@@ -338,10 +339,12 @@ export function approveTodaLine(
   app.status = 'pending_admin_approval';
 
   // Send SMS Notification to Driver/Applicant
+  const applicantUser = getUsers().find(u => u.id === app.applicantId);
+  const applicantPhone = applicantUser?.phone || '';
   addSMSNotification({
     id: `sms-${Date.now()}`,
     userId: app.applicantId,
-    recipientPhone: '0918-555-0101',
+    recipientPhone: applicantPhone,
     title: 'TODA President Approval Received',
     message: `Ang inyong TODA Route Approval at Membership Fee para sa TODA: ${app.todaName} ay APRUBADO na ni ${todaPresUser.firstName} ${todaPresUser.lastName}. Ipinasa na ito sa City Admin para sa final MTOP Approval.`,
     type: 'toda_approval',
@@ -387,7 +390,7 @@ export function addPenalty(penalty: Penalty): Penalty {
   addSMSNotification({
     id: `sms-${Date.now()}`,
     userId: penalty.driverId,
-    recipientPhone: '0918-555-0101',
+    recipientPhone: (() => { const u = getUsers().find(u => u.id === penalty.driverId); return u?.phone || ''; })(),
     title: `Penalty Violation Notice: ${penalty.violationType}`,
     message: `ABISO: Mayroon kayong na-record na penalty para sa ${penalty.violationType} (PHP ${penalty.amount.toFixed(2)}). Mangyaring bayaran sa Treasurer’s Office bago mag ${new Date(penalty.dueDate).toLocaleDateString()}.`,
     type: 'penalty_alert',
@@ -425,6 +428,20 @@ export function addSMSNotification(notif: SMSNotification): SMSNotification {
   const list = getSMSNotifications();
   list.unshift(notif);
   localStorage.setItem(KEYS.SMS, JSON.stringify(list));
+
+  // Fire real SMS via Semaphore API (non-blocking)
+  if (isSMSConfigured() && notif.recipientPhone && notif.recipientPhone.length >= 10) {
+    sendSMS(notif.recipientPhone, notif.message)
+      .then(result => {
+        if (result.success) {
+          console.log(`[SMS] ✅ Real SMS sent to ${result.recipient} (msgId: ${result.messageId})`);
+        } else {
+          console.warn(`[SMS] ⚠️ Failed to send real SMS to ${notif.recipientPhone}: ${result.error}`);
+        }
+      })
+      .catch(err => console.error('[SMS] Error sending real SMS:', err));
+  }
+
   return notif;
 }
 

@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as storage from '../../services/storageService';
-import { createGCashSource, getGCashSource, isPayMongoConfigured } from '../../services/paymongoService';
 import type { Application } from '../../types';
+import { 
+  createCheckoutSession, getCheckoutSession, 
+  createGCashSource, getGCashSource, isPayMongoConfigured 
+} from '../../services/paymongoService';
 import {
   CheckCircle2, Building, Receipt, Smartphone, QrCode,
   ArrowRight, ShieldCheck, X, Loader2, ExternalLink, RefreshCw, Printer
@@ -70,19 +73,34 @@ export function DriverPayment() {
     try {
       const currentUrl = window.location.origin + window.location.pathname;
 
-      const source = await createGCashSource({
+      const session = await createCheckoutSession({
         amount: 600,
-        successUrl: `${currentUrl}?status=success&source_id={source_id}`,
-        failedUrl: `${currentUrl}?status=failed`,
+        name: 'Tricycle Inspection & Regulatory Fee',
+        description: 'Baliwag Tricycle Stenciling & Inspection Fee',
+        successUrl: `${currentUrl}?status=success&session_id={checkout_session_id}`,
+        cancelUrl: `${currentUrl}?status=cancelled`,
       });
 
-      setCheckoutSessionId(source.id);
-      setCheckoutUrl(source.attributes.redirect.checkout_url);
-
-      // Open PayMongo's hosted GCash checkout page in a new tab
-      window.open(source.attributes.redirect.checkout_url, '_blank');
+      setCheckoutSessionId(session.id);
+      setCheckoutUrl(session.attributes.checkout_url);
+      window.open(session.attributes.checkout_url, '_blank');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create payment session.');
+      console.warn('Checkout Session failed, trying legacy GCash source:', err);
+      try {
+        const currentUrl = window.location.origin + window.location.pathname;
+
+        const source = await createGCashSource({
+          amount: 600,
+          successUrl: `${currentUrl}?status=success&source_id={source_id}`,
+          failedUrl: `${currentUrl}?status=failed`,
+        });
+
+        setCheckoutSessionId(source.id);
+        setCheckoutUrl(source.attributes.redirect.checkout_url);
+        window.open(source.attributes.redirect.checkout_url, '_blank');
+      } catch (legacyErr) {
+        setError(legacyErr instanceof Error ? legacyErr.message : 'Failed to create payment session.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -96,39 +114,46 @@ export function DriverPayment() {
     setError('');
 
     try {
-      const source = await getGCashSource(sid);
-      const status = source.attributes.status;
-
-      if (status === 'chargeable' || status === 'paid') {
-        const refNum = `PM-${sid.slice(-8).toUpperCase()}`;
-        const updated = storage.recordTreasurerPayment(
-          application.id,
-          600,
-          refNum,
-          'gcash'
-        );
-
-        if (updated) {
-          setApplication(updated);
-          setIsPaid(true);
-          setCheckoutUrl(null);
-        }
-      } else if (status === 'pending') {
-        // Automatically accept or inform user
-        const refNum = `PM-${sid.slice(-8).toUpperCase()}`;
-        const updated = storage.recordTreasurerPayment(
-          application.id,
-          600,
-          refNum,
-          'gcash'
-        );
-        if (updated) {
-          setApplication(updated);
-          setIsPaid(true);
-          setCheckoutUrl(null);
+      if (sid.startsWith('cs_')) {
+        const session = await getCheckoutSession(sid);
+        if (session.attributes.status === 'paid' || (session.attributes.payments && session.attributes.payments.length > 0)) {
+          const refNum = `PM-QRPH-${sid.slice(-8).toUpperCase()}`;
+          const updated = storage.recordTreasurerPayment(
+            application.id,
+            600,
+            refNum,
+            'gcash'
+          );
+          if (updated) {
+            setApplication(updated);
+            setIsPaid(true);
+            setCheckoutUrl(null);
+          }
+          return;
+        } else {
+          setError(`PayMongo Status: ${session.attributes.status}. Once you authorize payment on the PayMongo test page, click "Verify Payment".`);
         }
       } else {
-        setError(`GCash Source Status: ${status}. If authorized in GCash app, click "Verify Payment" again.`);
+        const source = await getGCashSource(sid);
+        const status = source.attributes.status;
+
+        if (status === 'chargeable' || status === 'paid' || status === 'pending') {
+          const refNum = `PM-${sid.slice(-8).toUpperCase()}`;
+          const updated = storage.recordTreasurerPayment(
+            application.id,
+            600,
+            refNum,
+            'gcash'
+          );
+
+          if (updated) {
+            setApplication(updated);
+            setIsPaid(true);
+            setCheckoutUrl(null);
+          }
+        } else {
+          setError(`GCash Source Status: ${status}. If authorized in GCash app, click "Verify Payment" again.`);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to verify payment status.');

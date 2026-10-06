@@ -13,6 +13,13 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/paymongo/, ''),
         secure: true,
       },
+      // Proxy Semaphore SMS API requests to avoid CORS issues in development
+      '/api/semaphore': {
+        target: 'https://api.semaphore.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/semaphore/, ''),
+        secure: true,
+      },
     },
   },
 })

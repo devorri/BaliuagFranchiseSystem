@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   CheckCircle2, Smartphone, ArrowLeft, ShieldCheck,
-  Loader2, ExternalLink, RefreshCw, Printer
+  Loader2, ExternalLink, RefreshCw, Printer, QrCode
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { createGCashSource, getGCashSource, isPayMongoConfigured } from '../../services/paymongoService';
+import { 
+  createCheckoutSession, getCheckoutSession, 
+  createGCashSource, getGCashSource, isPayMongoConfigured 
+} from '../../services/paymongoService';
 
 export function GCashPaymentModal() {
   const navigate = useNavigate();
@@ -42,17 +45,33 @@ export function GCashPaymentModal() {
     try {
       const currentUrl = window.location.origin + window.location.pathname;
 
-      const source = await createGCashSource({
+      const session = await createCheckoutSession({
         amount: 1250,
-        successUrl: `${currentUrl}?status=success&source_id={source_id}`,
-        failedUrl: `${currentUrl}?status=failed`,
+        name: 'MTOP Franchise Application Fee',
+        description: 'Baliwag City Tricycle MTOP Permit & Inspection Fee',
+        successUrl: `${currentUrl}?status=success&session_id={checkout_session_id}`,
+        cancelUrl: `${currentUrl}?status=cancelled`,
       });
 
-      setCheckoutSessionId(source.id);
-      setCheckoutUrl(source.attributes.redirect.checkout_url);
-      window.open(source.attributes.redirect.checkout_url, '_blank');
+      setCheckoutSessionId(session.id);
+      setCheckoutUrl(session.attributes.checkout_url);
+      window.open(session.attributes.checkout_url, '_blank');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create checkout session.');
+      console.warn('Checkout Session error, attempting fallback:', err);
+      try {
+        const currentUrl = window.location.origin + window.location.pathname;
+        const source = await createGCashSource({
+          amount: 1250,
+          successUrl: `${currentUrl}?status=success&source_id={source_id}`,
+          failedUrl: `${currentUrl}?status=failed`,
+        });
+
+        setCheckoutSessionId(source.id);
+        setCheckoutUrl(source.attributes.redirect.checkout_url);
+        window.open(source.attributes.redirect.checkout_url, '_blank');
+      } catch (legacyErr) {
+        setError(legacyErr instanceof Error ? legacyErr.message : 'Failed to create payment session.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -66,16 +85,29 @@ export function GCashPaymentModal() {
     setError('');
 
     try {
-      const source = await getGCashSource(sid);
-      const status = source.attributes.status;
-
-      if (status === 'chargeable' || status === 'paid' || status === 'pending') {
-        const ref = `PM-${sid.slice(-8).toUpperCase()}`;
-        setRefNumber(ref);
-        setIsPaid(true);
-        setCheckoutUrl(null);
+      if (sid.startsWith('cs_')) {
+        const session = await getCheckoutSession(sid);
+        if (session.attributes.status === 'paid' || (session.attributes.payments && session.attributes.payments.length > 0)) {
+          const ref = `PM-QRPH-${sid.slice(-8).toUpperCase()}`;
+          setRefNumber(ref);
+          setIsPaid(true);
+          setCheckoutUrl(null);
+          return;
+        } else {
+          setError(`PayMongo Status: ${session.attributes.status}. Once you authorize payment in sandbox, click Verify Payment.`);
+        }
       } else {
-        setError(`GCash Source Status: ${status}. If completed, click Verify Payment again.`);
+        const source = await getGCashSource(sid);
+        const status = source.attributes.status;
+
+        if (status === 'chargeable' || status === 'paid' || status === 'pending') {
+          const ref = `PM-${sid.slice(-8).toUpperCase()}`;
+          setRefNumber(ref);
+          setIsPaid(true);
+          setCheckoutUrl(null);
+        } else {
+          setError(`GCash Source Status: ${status}. If completed, click Verify Payment again.`);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to verify payment.');
@@ -101,19 +133,19 @@ export function GCashPaymentModal() {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-          <span className="pill-badge pill-emerald">GCash QR Payment</span>
+          <span className="pill-badge pill-emerald">QR Ph & GCash Payment</span>
           <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Cashless Transaction</span>
           {paymongoReady && (
             <span className="pill-badge pill-cyan" style={{ marginLeft: 'auto', fontSize: '0.7rem' }}>
-              <ShieldCheck size={12} /> PayMongo Live
+              <ShieldCheck size={12} /> PayMongo Sandbox Active
             </span>
           )}
         </div>
         <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-          GCash QR Code Payment Portal
+          QR Ph & GCash Payment Portal
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '2rem' }}>
-          Magbayad nang mabilis at cashless gamit ang inyong <strong>GCash App</strong> {paymongoReady ? 'sa pamamagitan ng PayMongo secure checkout.' : 'sa pamamagitan ng pag-scan ng QR Code sa ibaba.'}
+          Pay online via dynamic <strong>QR Ph Code</strong> or <strong>GCash</strong> through the official PayMongo Sandbox gateway.
         </p>
 
         {/* Error Alert */}
@@ -231,7 +263,7 @@ export function GCashPaymentModal() {
 
                 <div className="glass-panel" style={{ padding: '1.5rem', width: '100%', textAlign: 'center' }}>
                   <p style={{ fontSize: '0.95rem', color: '#cbd5e1', marginBottom: '1.25rem' }}>
-                    Click the button below to open a <strong>secure PayMongo GCash checkout page</strong>. You will be redirected to complete payment of <strong>₱1,250.00</strong>.
+                    Click the button below to generate your <strong>PayMongo dynamic QR Ph Code & GCash Checkout</strong> for <strong>₱1,250.00</strong>.
                   </p>
 
                   <div style={{
@@ -250,10 +282,19 @@ export function GCashPaymentModal() {
                   style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', opacity: isLoading ? 0.7 : 1 }}
                 >
                   {isLoading ? (
-                    <><Loader2 size={20} className="spin-icon" /> Creating Checkout...</>
+                    <><Loader2 size={20} className="spin-icon" /> Generating QR Ph & GCash Session...</>
                   ) : (
-                    <><Smartphone size={20} /> Pay ₱1,250.00 via GCash</>
+                    <><QrCode size={20} /> Pay ₱1,250.00 via QR Ph / GCash</>
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSimulatePayment}
+                  className="btn-glass btn-emerald-glass"
+                  style={{ width: '100%', padding: '0.85rem', fontSize: '0.9rem' }}
+                >
+                  <Smartphone size={18} /> Quick Test Simulation (Instant Approval)
                 </button>
               </>
             ) : (
