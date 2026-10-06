@@ -48,7 +48,7 @@ export function ContentManagement() {
       setAds(fetchedAds);
       setInfoItems(fetchedInfo);
     } catch {
-      showToast('Hindi ma-load ang nilalaman.', 'error');
+      showToast('Failed to load content.', 'error');
     }
   };
 
@@ -97,18 +97,18 @@ export function ContentManagement() {
       };
 
       await supabaseService.saveAdvertisementAsync(adToSave);
-      showToast('Matagumpay na na-save ang advertisement!', 'success');
+      showToast('Advertisement saved successfully!', 'success');
       setShowAdModal(false);
       await loadAllContent();
     } catch {
-      showToast('Nagkaroon ng problema sa pag-save ng ad.', 'error');
+      showToast('Failed to save advertisement.', 'error');
     }
   };
 
   const handleDeleteAd = async (id: string) => {
-    if (confirm('Sigurado ba kayong nais tanggalin ang advertisement na ito?')) {
+    if (confirm('Are you sure you want to delete this advertisement?')) {
       await supabaseService.deleteAdvertisementAsync(id);
-      showToast('Natanggal na ang advertisement.', 'success');
+      showToast('Advertisement deleted successfully.', 'success');
       await loadAllContent();
     }
   };
@@ -160,18 +160,18 @@ export function ContentManagement() {
       };
 
       await supabaseService.saveInformationItemAsync(infoToSave);
-      showToast('Matagumpay na na-save ang impormasyon!', 'success');
+      showToast('Information item saved successfully!', 'success');
       setShowInfoModal(false);
       await loadAllContent();
     } catch {
-      showToast('Nagkaroon ng problema sa pag-save ng impormasyon.', 'error');
+      showToast('Failed to save information item.', 'error');
     }
   };
 
   const handleDeleteInfo = async (id: string) => {
-    if (confirm('Sigurado ba kayong nais tanggalin ang impormasyong ito?')) {
+    if (confirm('Are you sure you want to delete this information item?')) {
       await supabaseService.deleteInformationItemAsync(id);
-      showToast('Natanggal na ang impormasyon.', 'success');
+      showToast('Information item deleted.', 'success');
       await loadAllContent();
     }
   };
@@ -196,7 +196,7 @@ export function ContentManagement() {
           Dynamic Content & Advertisements Management
         </h1>
         <p style={{ color: '#cbd5e1', fontSize: '0.95rem' }}>
-          Pamahalaan ang mga anunsyo, banners, taripa ng pasahe, at mga opisyal na patnubay na direktang lumalabas sa Public Landing Page.
+          Manage announcements, banners, fare matrices, and official guidelines displayed on the Public Landing Page.
         </p>
 
         {/* Tab Switcher */}
@@ -224,10 +224,10 @@ export function ContentManagement() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>Dynamic Advertisements</h3>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Lumalabas sa live advertisement carousel at banners sa home page</p>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Appears on the live advertisement carousel and home page banners</p>
             </div>
             <button onClick={openNewAdModal} className="btn-glass btn-emerald-glass" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Plus size={18} /> Magdagdag ng Advertisement
+              <Plus size={18} /> Add New Advertisement
             </button>
           </div>
 
@@ -269,7 +269,7 @@ export function ContentManagement() {
                         color: ad.isActive ? '#4ade80' : '#f87171',
                       }}
                     >
-                      {ad.isActive ? '● Aktibo' : '○ Hindi Aktibo'}
+                      {ad.isActive ? '● Active' : '○ Inactive'}
                     </button>
                   </div>
 
@@ -287,10 +287,10 @@ export function ContentManagement() {
                   </span>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button onClick={() => openEditAdModal(ad)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}>
-                      <Edit2 size={14} /> I-edit
+                      <Edit2 size={14} /> Edit
                     </button>
                     <button onClick={() => handleDeleteAd(ad.id)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-                      <Trash2 size={14} /> Burahin
+                      <Trash2 size={14} /> Delete
                     </button>
                   </div>
                 </div>
@@ -306,10 +306,10 @@ export function ContentManagement() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>Dynamic Information & Guidelines</h3>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Mga patakaran, gabay sa pagpaparehistro, at taripa sa portal</p>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Guidelines, registration steps, and fare matrices on the portal</p>
             </div>
             <button onClick={openNewInfoModal} className="btn-glass btn-emerald-glass" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Plus size={18} /> Magdagdag ng Impormasyon
+              <Plus size={18} /> Add New Information
             </button>
           </div>
 
@@ -351,7 +351,7 @@ export function ContentManagement() {
                         color: item.isActive ? '#4ade80' : '#f87171',
                       }}
                     >
-                      {item.isActive ? '● Aktibo' : '○ Hindi Aktibo'}
+                      {item.isActive ? '● Active' : '○ Inactive'}
                     </button>
                   </div>
 
@@ -365,14 +365,14 @@ export function ContentManagement() {
 
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                    Inilathala: {item.publishedDate}
+                    Published: {item.publishedDate}
                   </span>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button onClick={() => openEditInfoModal(item)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}>
-                      <Edit2 size={14} /> I-edit
+                      <Edit2 size={14} /> Edit
                     </button>
                     <button onClick={() => handleDeleteInfo(item.id)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-                      <Trash2 size={14} /> Burahin
+                      <Trash2 size={14} /> Delete
                     </button>
                   </div>
                 </div>
@@ -387,34 +387,34 @@ export function ContentManagement() {
         <div className="modal-overlay" onClick={() => setShowAdModal(false)}>
           <div className="glass-container modal-glass-content animate-fade-in" style={{ maxWidth: '600px', width: '90%' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ffffff', marginBottom: '1rem' }}>
-              {editingAd ? 'I-edit ang Advertisement' : 'Magdagdag ng Bagong Advertisement'}
+              {editingAd ? 'Edit Advertisement' : 'Add New Advertisement'}
             </h3>
 
             <form onSubmit={handleSaveAd} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Titulo ng Ad *</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Ad Title *</label>
                 <input
                   type="text"
                   className="glass-input"
                   value={adForm.title}
                   onChange={e => setAdForm({ ...adForm, title: e.target.value })}
-                  placeholder="Halimbawa: Annual MTOP Renewal Advisory 2026"
+                  placeholder="Example: Annual MTOP Renewal Advisory 2026"
                   required
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Kategorya *</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Category *</label>
                   <select
                     className="glass-input glass-select"
                     value={adForm.category}
                     onChange={e => setAdForm({ ...adForm, category: e.target.value as any })}
                   >
-                    <option value="announcement">Announcement (Opisyal na Abiso)</option>
-                    <option value="sponsor">Sponsor (Katuwang na Proyekto)</option>
+                    <option value="announcement">Announcement (Official Notice)</option>
+                    <option value="sponsor">Sponsor (Assistance Project)</option>
                     <option value="partner">Partner</option>
-                    <option value="promo">Promo / Impormasyon</option>
+                    <option value="promo">Promo / Information</option>
                   </select>
                 </div>
 
@@ -430,19 +430,19 @@ export function ContentManagement() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Deskripsyon / Nilalaman *</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Description / Content *</label>
                 <textarea
                   className="glass-input"
                   rows={4}
                   value={adForm.description}
                   onChange={e => setAdForm({ ...adForm, description: e.target.value })}
-                  placeholder="Isulat ang buong detalye ng advertisement..."
+                  placeholder="Write the full advertisement details..."
                   required
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Image URL (Opsyonal)</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Image URL (Optional)</label>
                 <input
                   type="text"
                   className="glass-input"
@@ -461,16 +461,16 @@ export function ContentManagement() {
                   style={{ width: '18px', height: '18px', accentColor: '#38bdf8' }}
                 />
                 <label htmlFor="adActiveCheck" style={{ fontSize: '0.88rem', color: '#e2e8f0', cursor: 'pointer' }}>
-                  I-publish kaagad (Aktibo sa Landing Page)
+                  Publish immediately (Active on Landing Page)
                 </label>
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowAdModal(false)} className="btn-glass">
-                  Kanselahin
+                  Cancel
                 </button>
                 <button type="submit" className="btn-glass btn-primary-glass">
-                  I-save ang Advertisement
+                  Save Advertisement
                 </button>
               </div>
             </form>
@@ -483,45 +483,45 @@ export function ContentManagement() {
         <div className="modal-overlay" onClick={() => setShowInfoModal(false)}>
           <div className="glass-container modal-glass-content animate-fade-in" style={{ maxWidth: '600px', width: '90%' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ffffff', marginBottom: '1rem' }}>
-              {editingInfo ? 'I-edit ang Impormasyon' : 'Magdagdag ng Bagong Impormasyon'}
+              {editingInfo ? 'Edit Information' : 'Add New Information'}
             </h3>
 
             <form onSubmit={handleSaveInfo} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Titulo *</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Title *</label>
                 <input
                   type="text"
                   className="glass-input"
                   value={infoForm.title}
                   onChange={e => setInfoForm({ ...infoForm, title: e.target.value })}
-                  placeholder="Halimbawa: Ordinansa Blg. 2024-08: Bagong Taripa ng Pamasahe"
+                  placeholder="Example: Ordinance No. 2024-08: New Fare Matrix"
                   required
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Kategorya *</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Category *</label>
                 <select
                   className="glass-input glass-select"
                   value={infoForm.category}
                   onChange={e => setInfoForm({ ...infoForm, category: e.target.value as any })}
                 >
-                  <option value="guideline">Guideline (Gabay sa Pagpaparehistro)</option>
-                  <option value="fare_matrix">Fare Matrix (Taripa ng Pamasahe)</option>
-                  <option value="news">Balita & Abiso</option>
-                  <option value="toda_info">Direktoryo ng TODA</option>
+                  <option value="guideline">Guideline (Registration Guide)</option>
+                  <option value="fare_matrix">Fare Matrix</option>
+                  <option value="news">News & Advisory</option>
+                  <option value="toda_info">TODA Directory</option>
                   <option value="ordinance">City Ordinance</option>
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Nilalaman / Teksto *</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Content / Text *</label>
                 <textarea
                   className="glass-input"
                   rows={5}
                   value={infoForm.content}
                   onChange={e => setInfoForm({ ...infoForm, content: e.target.value })}
-                  placeholder="Isulat ang kumpletong impormasyon, tuntunin, o taripa..."
+                  placeholder="Write the complete information, guidelines, or fare matrix details..."
                   required
                 />
               </div>
@@ -535,16 +535,16 @@ export function ContentManagement() {
                   style={{ width: '18px', height: '18px', accentColor: '#34d399' }}
                 />
                 <label htmlFor="infoActiveCheck" style={{ fontSize: '0.88rem', color: '#e2e8f0', cursor: 'pointer' }}>
-                  I-publish kaagad (Aktibo sa Landing Page)
+                  Publish immediately (Active on Landing Page)
                 </label>
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowInfoModal(false)} className="btn-glass">
-                  Kanselahin
+                  Cancel
                 </button>
                 <button type="submit" className="btn-glass btn-primary-glass">
-                  I-save ang Impormasyon
+                  Save Information
                 </button>
               </div>
             </form>

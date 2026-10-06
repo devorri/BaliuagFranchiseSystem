@@ -80,15 +80,15 @@ export function login(username: string, password: string): { user: User | null; 
     u.username.toLowerCase() === username.toLowerCase() && u.password === password
   );
   if (!found) {
-    return { user: null, error: 'Maling username o password.' };
+    return { user: null, error: 'Invalid username or password.' };
   }
 
   // Check account status if set
   if (found.accountStatus === 'rejected') {
-    return { user: null, error: 'Ang inyong account ay tinanggihan ng administrator.' };
+    return { user: null, error: 'Your account application has been rejected by the administrator.' };
   }
   if (found.accountStatus === 'pending') {
-    return { user: null, error: 'Ang inyong account ay naghihintay pa ng pagsusuri ng Security Admin.' };
+    return { user: null, error: 'Your account registration is currently pending review by the Security Admin.' };
   }
 
   // Issue single session token

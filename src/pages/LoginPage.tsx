@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { KeyRound, User, ArrowRight, ShieldCheck, UserCheck, Award, Bike, AlertCircle } from 'lucide-react';
+import { KeyRound, User, ArrowRight, AlertCircle } from 'lucide-react';
 
 export function LoginPage() {
   const [username, setUsername] = useState('');
@@ -21,20 +21,7 @@ export function LoginPage() {
     if (result.success && result.user) {
       redirectUser(result.user.role);
     } else {
-      setError(result.error || 'Maling username o password. Pakisubukan muli.');
-    }
-  };
-
-  const quickLogin = async (u: string, p: string) => {
-    setError('');
-    clearSessionError();
-    setLoading(true);
-    const result = await login(u, p);
-    setLoading(false);
-    if (result.success && result.user) {
-      redirectUser(result.user.role);
-    } else {
-      setError(result.error || 'Maling credentials.');
+      setError(result.error || 'Invalid username or password. Please try again.');
     }
   };
 
@@ -48,7 +35,6 @@ export function LoginPage() {
         navigate('/toda');
         break;
       case 'admin':
-        // Task requirement: Yung pinaka-homepage ng admin, dapat naka-set sa "Account" page
         navigate('/admin/accounts');
         break;
       case 'operator':
@@ -78,11 +64,11 @@ export function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <img
             src="/baliuag-logo.png"
-            alt="Lungsod ng Baliuag Seal"
+            alt="City of Baliwag Seal"
             style={{ height: '70px', width: 'auto', marginBottom: '0.75rem', filter: 'drop-shadow(0 0 12px rgba(6, 182, 212, 0.5))' }}
           />
           <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
-            Lungsod ng Baliuag
+            City of Baliwag
           </h2>
           <span style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Tricycle Franchise & MTOP Portal
@@ -136,7 +122,7 @@ export function LoginPage() {
                 type="text"
                 className="glass-input"
                 style={{ paddingLeft: '2.75rem' }}
-                placeholder="Gamiting username"
+                placeholder="Enter your username"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 required
@@ -154,7 +140,7 @@ export function LoginPage() {
                 type="password"
                 className="glass-input"
                 style={{ paddingLeft: '2.75rem' }}
-                placeholder="Gamiting password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
@@ -168,64 +154,15 @@ export function LoginPage() {
             style={{ padding: '0.95rem', fontSize: '1.05rem', marginTop: '0.5rem' }}
             disabled={loading}
           >
-            {loading ? 'Nagsusuri...' : 'Mag-log in sa Portal'} <ArrowRight size={18} />
+            {loading ? 'Authenticating...' : 'Log In to Portal'} <ArrowRight size={18} />
           </button>
         </form>
 
-        {/* 1-Click Quick Demo Preset Cards */}
-        <div style={{ marginTop: '2.25rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, display: 'block', textAlign: 'center', marginBottom: '1rem' }}>
-            ⚡ 1-Click Quick Demo Login Presets
-          </span>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <button
-              onClick={() => quickLogin('driver', 'driver123')}
-              className="btn-glass"
-              style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
-            >
-              <Bike size={18} color="#38bdf8" />
-              <strong>Driver</strong>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>driver / driver123</span>
-            </button>
-
-            <button
-              onClick={() => quickLogin('todapres', 'toda123')}
-              className="btn-glass"
-              style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
-            >
-              <Award size={18} color="#c084fc" />
-              <strong>TODA President</strong>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>todapres / toda123</span>
-            </button>
-
-            <button
-              onClick={() => quickLogin('admin', 'admin123')}
-              className="btn-glass"
-              style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
-            >
-              <ShieldCheck size={18} color="#fb923c" />
-              <strong>Admin (Direct)</strong>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>admin / admin123</span>
-            </button>
-
-            <button
-              onClick={() => quickLogin('operator', 'operator123')}
-              className="btn-glass"
-              style={{ padding: '0.65rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'center' }}
-            >
-              <UserCheck size={18} color="#34d399" />
-              <strong>Operator</strong>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>operator / operator123</span>
-            </button>
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', display: 'flex', justifyContent: 'center', gap: '1.5rem' }}>
-          <Link to="/register" style={{ color: '#38bdf8', fontSize: '0.85rem', textDecoration: 'none' }}>
-            Walang account? Magrehistro dito
+        <div style={{ textAlign: 'center', marginTop: '2rem', display: 'flex', justifyContent: 'center', gap: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          <Link to="/register" style={{ color: '#38bdf8', fontSize: '0.88rem', textDecoration: 'none', fontWeight: 600 }}>
+            Don't have an account? Register here
           </Link>
-          <Link to="/" style={{ color: '#94a3b8', fontSize: '0.85rem', textDecoration: 'none' }}>
+          <Link to="/" style={{ color: '#94a3b8', fontSize: '0.88rem', textDecoration: 'none' }}>
             ← Home Page
           </Link>
         </div>

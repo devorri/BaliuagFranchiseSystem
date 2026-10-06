@@ -65,10 +65,10 @@ export function PenaltyManagement() {
               <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Traffic & Route Compliance</span>
             </div>
             <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              Record at Pamamahala ng Penalties
+              Penalty Records & Management
             </h2>
             <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-              Nagrerecord ng penalties kapag may paglabag (hal. **Expired MTOP**, **Out of Route Operation**, **Overcharging**, **No License**).
+              Record penalties for violations such as **Expired MTOP**, **Out of Route Operation**, **Overcharging**, and **No License**.
             </p>
           </div>
 
@@ -86,18 +86,18 @@ export function PenaltyManagement() {
               <tr>
                 <th>Penalty ID</th>
                 <th>Driver / Plate</th>
-                <th>Uri ng Paglabag (Violation)</th>
-                <th>Multa (Amount)</th>
-                <th>Petsa ng Huli</th>
+                <th>Violation Type</th>
+                <th>Fine Amount</th>
+                <th>Date Issued</th>
                 <th>Status</th>
-                <th>Aksyon</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {penalties.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                    Walang recorded violations.
+                    No recorded violations found.
                   </td>
                 </tr>
               ) : (
@@ -142,16 +142,16 @@ export function PenaltyManagement() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="glass-container modal-glass-content animate-fade-in" onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              Mag-record ng Bagong Violation Penalty
+              Record New Violation Penalty
             </h3>
             <p style={{ fontSize: '0.88rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
-              I-fill up ang impormasyon sa ibaba para mag-issue ng opisyal na penalty citation.
+              Fill out the information below to issue an official penalty citation.
             </p>
 
             <form onSubmit={handleCreatePenalty} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Pangalan ng Driver
+                  Driver Name
                 </label>
                 <input
                   type="text"
@@ -177,7 +177,7 @@ export function PenaltyManagement() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Uri ng Paglabag (Violation Type)
+                  Violation Type
                 </label>
                 <select
                   className="glass-input glass-select"
@@ -194,7 +194,7 @@ export function PenaltyManagement() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Halaga ng Multa (Amount in PHP)
+                  Fine Amount (PHP)
                 </label>
                 <input
                   type="number"
@@ -207,7 +207,7 @@ export function PenaltyManagement() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Remarks / Details ng Huli
+                  Remarks / Violation Details
                 </label>
                 <textarea
                   className="glass-input"

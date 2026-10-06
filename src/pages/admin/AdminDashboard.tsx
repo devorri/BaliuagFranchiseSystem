@@ -5,7 +5,7 @@ import * as storage from '../../services/storageService';
 import type { Application, Franchise, Penalty, User } from '../../types';
 import { 
   ShieldCheck, FileText, AlertTriangle, Clock, BarChart3, 
-  Users, CheckCircle2, DollarSign, ArrowRight 
+  Users, CheckCircle2, Receipt, ArrowRight 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -46,7 +46,9 @@ export function AdminDashboard() {
   const totalPenaltiesCount = penalties.length;
   
   // Total Registered (Drivers + Operators registered in system)
-  const totalRegisteredUsers = users.filter(u => u.role === 'driver' || u.role === 'operator').length;
+  const registeredDrivers = users.filter(u => u.role === 'driver').length;
+  const registeredOperators = users.filter(u => u.role === 'operator').length;
+  const totalRegisteredUsers = registeredDrivers + registeredOperators;
   const totalRegisteredFranchises = franchises.length;
 
   return (
@@ -57,13 +59,13 @@ export function AdminDashboard() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
               <span className="pill-badge pill-orange">Municipal Admin Portal</span>
-              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Lungsod ng Baliuag</span>
+              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>City of Baliuag</span>
             </div>
             <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
               Admin Executive Dashboard
             </h1>
             <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '700px' }}>
-              Pangkalahatang ulat ng **Total Registered**, **Requirements Review**, **MTOP Approval**, at **Transaction Records**.
+              Executive overview of <strong>Total Registered</strong>, <strong>Requirements Review</strong>, <strong>MTOP Approval</strong>, and <strong>Transaction Records</strong>.
             </p>
           </div>
 
@@ -84,15 +86,20 @@ export function AdminDashboard() {
           gap: '1.25rem', 
           marginTop: '2rem' 
         }}>
-          {/* TASK 2: Total Registered Stat Card */}
+          {/* Total Registered Stat Card */}
           <div className="glass-card hero-stat-card" style={{ borderLeft: '4px solid #38bdf8' }}>
             <div className="stat-icon-wrapper" style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8' }}>
               <Users size={24} />
             </div>
             <div>
               <div className="stat-val" style={{ color: '#38bdf8' }}>{totalRegisteredUsers}</div>
-              <div className="stat-lbl">Total Registered Users</div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>({totalRegisteredFranchises} Franchises in record)</span>
+              <div className="stat-lbl" style={{ fontWeight: 700 }}>Total Registered</div>
+              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                <strong style={{ color: '#38bdf8' }}>{registeredDrivers}</strong> Drivers • <strong style={{ color: '#38bdf8' }}>{registeredOperators}</strong> Operators
+              </div>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '0.15rem' }}>
+                ({totalRegisteredFranchises} Franchises in record)
+              </span>
             </div>
           </div>
 
@@ -103,7 +110,7 @@ export function AdminDashboard() {
             <div>
               <div className="stat-val" style={{ color: '#facc15' }}>{pendingAdminReviews.length}</div>
               <div className="stat-lbl">Pending Admin Approval</div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Nakahanda para sa MTOP</span>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Ready for MTOP approval</span>
             </div>
           </div>
 
@@ -125,7 +132,7 @@ export function AdminDashboard() {
             <div>
               <div className="stat-val" style={{ color: '#fb7185' }}>{expiredFranchisesCount}</div>
               <div className="stat-lbl">Expired Franchises</div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Para sa renewal alert</span>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Renewal alerts pending</span>
             </div>
           </div>
 
@@ -136,7 +143,7 @@ export function AdminDashboard() {
             <div>
               <div className="stat-val" style={{ color: '#fb923c' }}>{totalPenaltiesCount}</div>
               <div className="stat-lbl">Total Penalties</div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Naitalang violations</span>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Recorded violations</span>
             </div>
           </div>
         </div>
@@ -158,7 +165,7 @@ export function AdminDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff' }}>Applications for Final MTOP Approval</h3>
-                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Mga nakapila pagkatapos ng TODA & Treasurer approval</p>
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Queued after TODA & Treasurer approval</p>
               </div>
               <span className="pill-badge pill-cyan">{pendingAdminReviews.length} Queue</span>
             </div>
@@ -171,14 +178,14 @@ export function AdminDashboard() {
                     <th>Plate / TODA</th>
                     <th>TODA Approval</th>
                     <th>Treasurer Fee</th>
-                    <th style={{ textAlign: 'right' }}>Aksyon</th>
+                    <th style={{ textAlign: 'right' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pendingAdminReviews.length === 0 ? (
                     <tr>
                       <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}>
-                        Walang nakapilang aplikasyon na nangangailangan ng final approval sa kasalukuyan.
+                        No pending applications require approval at this time.
                       </td>
                     </tr>
                   ) : (
@@ -222,17 +229,17 @@ export function AdminDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff' }}>Traffic Penalty Records</h3>
-                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Mga pinakahuling naitalang bayarin</p>
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Latest violation records</p>
               </div>
               <button onClick={() => navigate('/admin/penalties')} className="btn-glass" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
-                Lahat →
+                View All →
               </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {penalties.length === 0 ? (
                 <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem' }}>
-                  Walang naitalang penalty.
+                  No penalties recorded.
                 </div>
               ) : (
                 penalties.slice(0, 4).map(p => (
@@ -257,18 +264,18 @@ export function AdminDashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <DollarSign size={20} color="#34d399" />
+                <Receipt size={20} color="#34d399" />
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
                   System Transactions & Payment History
                 </h3>
               </div>
               <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
-                Detalyadong talaan ng lahat ng payments (MTOP base fee, TODA fee, stenciling, at penalties).
+                Detailed record of all payments (MTOP base fee, TODA fee, stenciling, and penalties).
               </p>
             </div>
 
             <button onClick={() => navigate('/admin/reports')} className="btn-glass" style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem' }}>
-              Buong Ulat & Financial Analytics <ArrowRight size={14} />
+              Full Financial Report <ArrowRight size={14} />
             </button>
           </div>
 
@@ -276,20 +283,20 @@ export function AdminDashboard() {
             <table className="glass-table" style={{ width: '100%', minWidth: '700px' }}>
               <thead>
                 <tr>
-                  <th>Transaksyon ID</th>
-                  <th>Pangalan ng Nagbayad</th>
-                  <th>Uri ng Bayarin</th>
-                  <th>Paraan ng Pagbayad</th>
-                  <th>Halaga</th>
-                  <th>Petsa</th>
-                  <th style={{ textAlign: 'right' }}>Katayuan</th>
+                  <th>Transaction ID</th>
+                  <th>Payer Name</th>
+                  <th>Fee Type</th>
+                  <th>Payment Method</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th style={{ textAlign: 'right' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {applications.filter(a => a.treasurerPayment?.paid).length === 0 ? (
                   <tr>
                     <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                      Walang transaksyon sa kasalukuyan.
+                      No transaction records found.
                     </td>
                   </tr>
                 ) : (

@@ -10,7 +10,7 @@ export function TodaApprovals() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [orNumber, setOrNumber] = useState('TODA-OR-9005');
-  const [remarks, setRemarks] = useState('Aprubado ang linya at ruta. Cleared para sa final MTOP Municipal Admin review.');
+  const [remarks, setRemarks] = useState('Route and line approved. Cleared for final MTOP Municipal Admin review.');
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function TodaApprovals() {
     const updated = storage.approveTodaLine(app.id, user, orNumber, remarks);
     if (updated) {
       await supabaseService.saveApplicationAsync(updated);
-      setSuccessMsg(`Ang linya para kay ${app.driverName || app.applicantName} ay APRUBADO at ININDORSO na sa Municipal Admin!`);
+      setSuccessMsg(`Line route for ${app.driverName || app.applicantName} is APPROVED and forwarded to Municipal Admin!`);
       setSelectedApp(null);
       await loadApps();
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -43,10 +43,10 @@ export function TodaApprovals() {
           <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{user?.todaName || 'BASTODA Baliuag'}</span>
         </div>
         <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-          Approval ng Linya at Pagtanggap ng Bayad
+          Line Route Approval & Fee Verification
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-          Dito sinusuri ng TODA President ang mga aplikasyon ng driver. Kapag natanggap ang bayad sa **route fee (₱500)** at **membership fee (₱300)**, aprobahan ang linya upang awtomatikong maipasa sa **Municipal Admin**.
+          TODA Presidents review driver applications here. Upon verifying the **route fee (₱500)** and **membership fee (₱300)**, approve the line to automatically forward to the **Municipal Admin**.
         </p>
 
         {successMsg && (
@@ -101,7 +101,7 @@ export function TodaApprovals() {
 
               {isApproved ? (
                 <div style={{ padding: '0.85rem', borderRadius: '12px', background: 'rgba(139, 92, 246, 0.15)', border: '1px solid rgba(139, 92, 246, 0.3)', fontSize: '0.85rem' }}>
-                  <span style={{ color: '#c084fc', fontWeight: 700 }}>Naipasa na sa Admin for Final Review.</span>
+                  <span style={{ color: '#c084fc', fontWeight: 700 }}>Forwarded to Admin for Final Review.</span>
                   <br />
                   <span style={{ color: '#cbd5e1' }}>OR #: {app.todaApproval?.orNumber} | Approved by {app.todaApproval?.approvedByName}</span>
                 </div>
@@ -140,7 +140,7 @@ export function TodaApprovals() {
                 <strong style={{ color: '#ffffff' }}>₱300.00</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', fontWeight: 800, color: '#c084fc' }}>
-                <span>Kabuuang Bayad sa TODA:</span>
+                <span>Total TODA Fees:</span>
                 <span>₱800.00</span>
               </div>
             </div>

@@ -11,24 +11,18 @@ export function DriverRequirements() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    vehicleMake: 'Honda',
-    vehicleModel: 'TMX 125',
-    plateNumber: '123-XYZ',
-    motorNumber: 'ENG-994821',
-    chassisNumber: 'CHS-881204',
-    vehicleColor: 'Red / Metallic Chrome',
+    vehicleMake: '',
+    vehicleModel: '',
+    plateNumber: '',
+    motorNumber: '',
+    chassisNumber: '',
+    vehicleColor: '',
     todaName: 'BASTODA (Baliuag Poblacion TODA)',
-    routeArea: 'Poblacion - Public Market - Plaza Naning',
-    licenseNumber: 'N02-18-998234',
+    routeArea: '',
+    licenseNumber: '',
   });
 
-  const [uploadedFiles, setUploadedFiles] = useState<{ [key in DocumentType]?: string }>({
-    or_cr: 'or_cr_scanned.pdf',
-    barangay_clearance: 'brgy_clearance.pdf',
-    drivers_license: 'driver_license.jpg',
-    toda_cert: 'toda_membership.pdf',
-    id_photo: 'id_photo.png',
-  });
+  const [uploadedFiles, setUploadedFiles] = useState<{ [key in DocumentType]?: string }>({});
 
   const [uploadingState, setUploadingState] = useState<{ [key in DocumentType]?: boolean }>({});
   const [submitted, setSubmitted] = useState(false);
@@ -102,15 +96,15 @@ export function DriverRequirements() {
           Submit Driver Requirements
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '2rem' }}>
-          I-upload ang mga kailangang dokumento: OR/CR, Barangay Clearance, Lisensya, TODA Certification, at ID Photo.
+          Upload required documents: OR/CR, Barangay Clearance, Driver's License, TODA Certification, and ID Photo.
         </p>
 
         {submitted ? (
           <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
             <CheckCircle size={56} color="#10b981" style={{ marginBottom: '1rem' }} />
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#34d399' }}>Matagumpay na Naitala!</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#34d399' }}>Successfully Submitted!</h3>
             <p style={{ color: '#cbd5e1', marginTop: '0.5rem' }}>
-              Naisumite na ang inyong requirements. Papunta na sa **Inspection & Stenciling** step...
+              Your requirements have been saved. Proceeding to **Inspection & Stenciling** step...
             </p>
           </div>
         ) : (
@@ -119,7 +113,7 @@ export function DriverRequirements() {
             {/* Driver & Vehicle Details */}
             <div className="glass-panel" style={{ padding: '1.5rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#38bdf8', marginBottom: '1rem' }}>
-                Impormasyon ng Makina at Lisensya
+                Engine & License Information
               </h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>

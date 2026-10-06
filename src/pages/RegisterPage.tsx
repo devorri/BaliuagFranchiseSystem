@@ -32,13 +32,18 @@ export function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (form.role !== 'driver' && form.role !== 'operator') {
+      showToast('Registration is only permitted for Tricycle Drivers and Franchise Operators.', 'error');
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
-      showToast('Hindi magkatugma ang passwords.', 'error');
+      showToast('Passwords do not match.', 'error');
       return;
     }
 
     if (form.password.length < 6) {
-      showToast('Ang password ay dapat hindi bababa sa 6 na karakter.', 'error');
+      showToast('Password must be at least 6 characters long.', 'error');
       return;
     }
 
@@ -59,12 +64,12 @@ export function RegisterPage() {
 
       if (res.user) {
         setSubmitted(true);
-        showToast('Nagawa na ang inyong account! Naghihintay ng pagsusuri ng Security Admin bago makapag-login.', 'success');
+        showToast('Account successfully created! Awaiting Security Admin approval before login.', 'success');
       } else {
-        showToast(res.error || 'Hindi ma-proseso ang pagpaparehistro.', 'error');
+        showToast(res.error || 'Failed to process registration.', 'error');
       }
     } catch {
-      showToast('Nagkaroon ng problema sa pagpaparehistro.', 'error');
+      showToast('An error occurred during registration.', 'error');
     } finally {
       setLoading(false);
     }
@@ -78,15 +83,15 @@ export function RegisterPage() {
             <CheckCircle2 size={36} color="#4ade80" />
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
-            Matagumpay na Naisumite ang Pagpaparehistro!
+            Registration Submitted Successfully!
           </h2>
           <p style={{ color: '#cbd5e1', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
-            Ang inyong account bilang <strong style={{ color: '#38bdf8' }}>{form.role === 'driver' ? 'Tricycle Driver' : 'Franchise Operator'}</strong> ay sumasailalim sa beripikasyon ng <strong>Security Admin</strong> ng Lokal na Pamahalaan.
+            Your account request for <strong style={{ color: '#38bdf8' }}>{form.role === 'driver' ? 'Tricycle Driver' : 'Franchise Operator'}</strong> is under verification by the Local Government <strong>Security Admin</strong>.
           </p>
           <div style={{ padding: '1rem', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: '10px', marginBottom: '1.75rem', textAlign: 'left', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
             <ShieldAlert size={20} color="#facc15" style={{ flexShrink: 0, marginTop: '2px' }} />
             <span style={{ fontSize: '0.85rem', color: '#fef08a', lineHeight: '1.5' }}>
-              Makakatanggap kayo ng abiso kapag na-aprubahan na ang inyong account. Pagkatapos ma-aprubahan, maaari na kayong mag-login gamit ang inyong username at password.
+              You will be able to log in using your username and password once your account is approved by the Security Administrator.
             </span>
           </div>
           <button 
@@ -95,7 +100,7 @@ export function RegisterPage() {
             className="btn-glass btn-primary-glass" 
             style={{ width: '100%', padding: '0.85rem' }}
           >
-            Bumalik sa Login
+            Return to Login
           </button>
         </div>
       </div>
@@ -107,7 +112,7 @@ export function RegisterPage() {
       <div className="glass-container animate-fade-in" style={{ maxWidth: '650px', width: '100%', padding: '2.5rem' }}>
         
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <img src="/baliuag-logo.png" alt="Baliuag Seal" style={{ height: '64px', width: 'auto', marginBottom: '0.75rem' }} />
+          <img src="/baliuag-logo.png" alt="Baliwag Seal" style={{ height: '64px', width: 'auto', marginBottom: '0.75rem' }} />
           <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffffff' }}>Create New Account</h1>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Baliuag Tricycle Franchise & MTOP System</p>
         </div>
@@ -115,7 +120,7 @@ export function RegisterPage() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-              Register As * <span style={{ color: '#64748b', fontSize: '0.75rem' }}>(Driver at Operator lamang)</span>
+              Register As * <span style={{ color: '#64748b', fontSize: '0.75rem' }}>(Driver or Operator only)</span>
             </label>
             <select
               className="glass-input glass-select"
@@ -154,12 +159,12 @@ export function RegisterPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Address *</label>
-              <input type="text" className="glass-input" placeholder="Brgy. Poblacion, Baliuag" value={form.address} onChange={e => updateField('address', e.target.value)} required />
+              <input type="text" className="glass-input" placeholder="Brgy. Poblacion, Baliwag" value={form.address} onChange={e => updateField('address', e.target.value)} required />
             </div>
 
             <div>
               <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>TODA Affiliation (Optional)</label>
-              <input type="text" className="glass-input" placeholder="Halimbawa: BASTODA" value={form.todaName} onChange={e => updateField('todaName', e.target.value)} />
+              <input type="text" className="glass-input" placeholder="Example: BASTODA" value={form.todaName} onChange={e => updateField('todaName', e.target.value)} />
             </div>
           </div>
 
@@ -181,13 +186,13 @@ export function RegisterPage() {
           </div>
 
           <button type="submit" className="btn-glass btn-primary-glass" style={{ padding: '0.95rem', fontSize: '1rem', marginTop: '0.5rem' }} disabled={loading}>
-            <UserPlus size={18} /> {loading ? 'Nirerehistro...' : 'Register Account'}
+            <UserPlus size={18} /> {loading ? 'Registering...' : 'Register Account'}
           </button>
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
           <Link to="/login" style={{ color: '#38bdf8', fontSize: '0.88rem', textDecoration: 'none' }}>
-            May account na? Mag-sign in dito
+            Already have an account? Sign in here
           </Link>
         </div>
 

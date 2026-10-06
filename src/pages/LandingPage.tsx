@@ -199,13 +199,13 @@ export function LandingPage() {
             Home
           </a>
           <a href="#about-section" style={{ padding: '0.45rem 0.85rem', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
-            Sino Kami
+            About Us
           </a>
           <a href="#workflow-section" style={{ padding: '0.45rem 0.85rem', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
-            Mga Hakbang
+            Process Steps
           </a>
           <a href="#toda-directory" style={{ padding: '0.45rem 0.85rem', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
-            Direktoryo ng TODA
+            TODA Directory
           </a>
           <a href="#verification-section" style={{ padding: '0.45rem 0.85rem', color: '#cbd5e1', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
             Verify MTOP
@@ -218,7 +218,7 @@ export function LandingPage() {
           </Link>
 
           <Link to="/register" className="btn-glass btn-primary-glass" style={{ padding: '0.5rem 1.25rem', fontSize: '0.88rem' }}>
-            Mag-rehistro <ArrowRight size={16} />
+            Register <ArrowRight size={16} />
           </Link>
         </div>
       </header>
@@ -237,23 +237,23 @@ export function LandingPage() {
             {/* Left Hero Text */}
             <div>
               <div className="pill-badge pill-cyan" style={{ marginBottom: '1.25rem', fontSize: '0.82rem', padding: '0.5rem 1.1rem' }}>
-                <Sparkles size={14} /> PAMAHALAANG LUNGSOD NG BALIWAG • MTOP SYSTEM
+                <Sparkles size={14} /> CITY GOVERNMENT OF BALIWAG • MTOP SYSTEM
               </div>
 
               <h1 style={{ fontSize: '3.3rem', fontWeight: 800, lineHeight: '1.1', color: '#ffffff', marginBottom: '1.25rem' }}>
-                Mabilis, Transparant, at <span style={{ color: '#22c55e', fontStyle: 'italic' }}>Modernong MTOP Franchise</span> Online
+                Fast, Transparent & <span style={{ color: '#22c55e', fontStyle: 'italic' }}>Modern Online MTOP Franchise</span> Portal
               </h1>
 
               <p style={{ color: '#cbd5e1', fontSize: '1.1rem', lineHeight: '1.65', marginBottom: '2rem' }}>
-                Ang opisyal na web portal ng Lungsod ng Baliwag para sa mas mabilis na pagpasa ng requirements, stenciling inspection, Treasurer payment, TODA route approval, at instant digital QR Code MTOP Permit.
+                The official web portal of the City of Baliwag for streamlined requirement submissions, stenciling inspection, Treasurer payment processing, TODA route approvals, and digital QR Code MTOP Permits.
               </p>
 
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
                 <button type="button" onClick={() => navigate('/register')} className="btn-glass btn-primary-glass" style={{ padding: '0.9rem 2.2rem', fontSize: '1.05rem' }}>
-                  Magsimula ng Aplikasyon <ChevronRight size={20} />
+                  Get Started <ChevronRight size={20} />
                 </button>
                 <a href="#verification-section" className="btn-glass" style={{ padding: '0.9rem 1.75rem', fontSize: '1.05rem' }}>
-                  <Search size={18} /> Suriin ang Plaka / MTOP
+                  <Search size={18} /> Verify Plate / MTOP
                 </a>
               </div>
 

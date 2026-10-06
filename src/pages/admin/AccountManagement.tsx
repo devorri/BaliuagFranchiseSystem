@@ -26,7 +26,7 @@ export function AccountManagement() {
       const data = await supabaseService.getUsersAsync();
       setUsers(data);
     } catch {
-      showToast('Hindi ma-load ang mga account.', 'error');
+      showToast('Failed to load accounts.', 'error');
     } finally {
       setLoading(false);
     }
@@ -38,7 +38,7 @@ export function AccountManagement() {
 
   const handleUpdateStatus = async (userId: string, newStatus: 'approved' | 'rejected', userName: string) => {
     if (!canManageSecurity) {
-      showToast('Wala kayong Security Admin permission upang mag-apruba o mag-tanggap ng accounts.', 'error');
+      showToast('You do not have Security Admin permissions to approve or reject accounts.', 'error');
       return;
     }
 
@@ -46,13 +46,13 @@ export function AccountManagement() {
     try {
       const updated = await supabaseService.updateAccountStatusAsync(userId, newStatus);
       if (updated) {
-        showToast(`Account ni ${userName} ay ${newStatus === 'approved' ? 'INAPRUBAHAN' : 'TINANGGIHAN'}.`, 'success');
+        showToast(`Account for ${userName} has been ${newStatus === 'approved' ? 'APPROVED' : 'REJECTED'}.`, 'success');
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, accountStatus: newStatus } : u));
       } else {
-        showToast('Hindi na-update ang status ng account.', 'error');
+        showToast('Failed to update account status.', 'error');
       }
     } catch {
-      showToast('Nagkaroon ng problema sa pag-update.', 'error');
+      showToast('An error occurred during account update.', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -100,30 +100,37 @@ export function AccountManagement() {
             </span>
           </div>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-            Pamahalaan ang pag-apruba at pagtanggap ng mga rehistradong Driver at Operator accounts bago sila makapag-login.
+            Manage approval and access status of registered Driver and Operator accounts before login access.
           </p>
         </div>
 
         {/* Status Counts */}
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div className="glass-card" style={{ padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.6rem', borderLeft: '3px solid #38bdf8' }}>
+            <Users size={18} color="#38bdf8" />
+            <div>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Total Registered</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8' }}>{users.filter(u => u.role === 'driver' || u.role === 'operator').length}</div>
+            </div>
+          </div>
           <div className="glass-card" style={{ padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Clock size={18} color="#facc15" />
             <div>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Naghihintay</div>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Pending</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#facc15' }}>{pendingCount}</div>
             </div>
           </div>
           <div className="glass-card" style={{ padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <UserCheck size={18} color="#4ade80" />
             <div>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Aprubado</div>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Approved</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#4ade80' }}>{approvedCount}</div>
             </div>
           </div>
           <div className="glass-card" style={{ padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <XCircle size={18} color="#f87171" />
             <div>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Tinanggihan</div>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase' }}>Rejected</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f87171' }}>{rejectedCount}</div>
             </div>
           </div>
@@ -133,7 +140,7 @@ export function AccountManagement() {
       {!canManageSecurity && (
         <div style={{ padding: '0.85rem 1.25rem', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#fef08a', fontSize: '0.88rem' }}>
           <ShieldAlert size={20} color="#facc15" />
-          <span>PAALALA: Naka-login kayo bilang Admin ngunit wala kayong <strong>Security Permission</strong>. Maaari ninyong tingnan ang mga account, ngunit ang pag-apruba o pag-reject ay para lamang sa Security Admins.</span>
+          <span>NOTICE: You are logged in as Admin, but lack <strong>Security Permissions</strong>. Account viewing is available, but account approval/rejection is restricted to Security Admins.</span>
         </div>
       )}
 
@@ -145,7 +152,7 @@ export function AccountManagement() {
             type="text"
             className="glass-input"
             style={{ paddingLeft: '2.75rem', width: '100%' }}
-            placeholder="Hanapin sa pangalan, username, TODA..."
+            placeholder="Search by name, username, TODA..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -160,10 +167,10 @@ export function AccountManagement() {
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as any)}
             >
-              <option value="all">Lahat ng Status</option>
-              <option value="pending">Pending (Naghihintay)</option>
-              <option value="approved">Approved (Aprubado)</option>
-              <option value="rejected">Rejected (Tinanggihan)</option>
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
 
@@ -173,7 +180,7 @@ export function AccountManagement() {
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
           >
-            <option value="all">Lahat ng Role</option>
+            <option value="all">All Roles</option>
             <option value="driver">Driver</option>
             <option value="operator">Operator</option>
             <option value="president">TODA President</option>
@@ -186,23 +193,23 @@ export function AccountManagement() {
       <div className="glass-container" style={{ padding: '1.5rem', overflowX: 'auto' }}>
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-            Kinukuha ang talaan ng mga account...
+            Fetching registered accounts...
           </div>
         ) : filteredUsers.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
             <Users size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-            Walang account na tumutugma sa inyong pagsala.
+            No accounts match your current filter.
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
-                <th style={{ padding: '0.75rem 1rem' }}>Pangalan / Username</th>
+                <th style={{ padding: '0.75rem 1rem' }}>Name / Username</th>
                 <th style={{ padding: '0.75rem 1rem' }}>Role</th>
-                <th style={{ padding: '0.75rem 1rem' }}>TODA / Kontak</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Petsa ng Pagrehistro</th>
+                <th style={{ padding: '0.75rem 1rem' }}>TODA / Contact</th>
+                <th style={{ padding: '0.75rem 1rem' }}>Registration Date</th>
                 <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Aksyon (Security)</th>
+                <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Action (Security)</th>
               </tr>
             </thead>
             <tbody>
@@ -291,9 +298,9 @@ export function AccountManagement() {
                                   cursor: canManageSecurity ? 'pointer' : 'not-allowed',
                                   opacity: canManageSecurity ? 1 : 0.5,
                                 }}
-                                title="Aprubahan ang account"
+                                title="Approve account"
                               >
-                                <CheckCircle2 size={14} /> Aprubahan
+                                <CheckCircle2 size={14} /> Approve
                               </button>
                             )}
 
@@ -311,9 +318,9 @@ export function AccountManagement() {
                                   cursor: canManageSecurity ? 'pointer' : 'not-allowed',
                                   opacity: canManageSecurity ? 1 : 0.5,
                                 }}
-                                title="Tanggihan ang account"
+                                title="Reject account"
                               >
-                                <XCircle size={14} /> Tanggihan
+                                <XCircle size={14} /> Reject
                               </button>
                             )}
                           </>

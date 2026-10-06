@@ -10,15 +10,15 @@ export function SubmitRequirements() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    vehicleMake: 'Suzuki',
-    vehicleModel: 'GD 110',
-    plateNumber: '992-XYZ',
-    motorNumber: 'ENG-001923',
-    chassisNumber: 'CHS-554109',
-    vehicleColor: 'Red',
+    vehicleMake: '',
+    vehicleModel: '',
+    plateNumber: '',
+    motorNumber: '',
+    chassisNumber: '',
+    vehicleColor: '',
     todaName: 'SMTODA (Sabang Terminal TODA)',
-    routeArea: 'Sabang - SM City Baliwag',
-    driverName: 'Pedro Penduko',
+    routeArea: '',
+    driverName: '',
   });
 
   const [submitted, setSubmitted] = useState(false);
@@ -69,23 +69,23 @@ export function SubmitRequirements() {
           <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Submit Requirements</span>
         </div>
         <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-          Magsumite ng Requirements para sa Renewal o Bagong Aplikasyon
+          Submit Requirements for Renewal or New Application
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '2rem' }}>
-          I-fill up ang impormasyon ng tricycle at driver para sa pag-renew ng MTOP franchise.
+          Fill in the tricycle and driver details to renew or apply for an MTOP franchise.
         </p>
 
         {submitted ? (
           <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
             <CheckCircle size={56} color="#10b981" style={{ marginBottom: '1rem' }} />
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#34d399' }}>Naisumite na ang Aplikasyon!</h3>
-            <p style={{ color: '#cbd5e1', marginTop: '0.5rem' }}>Bumabalik sa Dashboard...</p>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#34d399' }}>Application Submitted!</h3>
+            <p style={{ color: '#cbd5e1', marginTop: '0.5rem' }}>Redirecting to Dashboard...</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Pangalan ng Assigned Driver</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Assigned Driver Name</label>
                 <input type="text" className="glass-input" value={formData.driverName} onChange={e => setFormData({ ...formData, driverName: e.target.value })} required />
               </div>
               <div>

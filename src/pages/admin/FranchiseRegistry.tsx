@@ -28,13 +28,13 @@ export function FranchiseRegistry() {
       <div className="glass-container" style={{ padding: '2.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
           <span className="pill-badge pill-cyan">Franchise Registry</span>
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Lungsod ng Baliwag</span>
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>City of Baliwag</span>
         </div>
         <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
           Franchise Monitoring & Registry
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-          Mino-monitor at minamasdan ang lahat ng **Active** at **Expired** tricycle franchises sa Lungsod ng Baliwag.
+          Monitor and track all **Active** and **Expired** tricycle franchises registered in the City of Baliwag.
         </p>
 
         {/* Search & Filter Bar */}
@@ -45,7 +45,7 @@ export function FranchiseRegistry() {
               type="text"
               className="glass-input"
               style={{ paddingLeft: '2.75rem' }}
-              placeholder="Mag-search ayon sa MTOP #, Driver Name, Plate #, o TODA..."
+              placeholder="Search by MTOP #, Driver Name, Plate #, or TODA..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
@@ -57,7 +57,7 @@ export function FranchiseRegistry() {
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
           >
-            <option value="all">Lahat ng Franchise Status</option>
+            <option value="all">All Franchise Statuses</option>
             <option value="active">Active Franchises Only</option>
             <option value="expired">Expired Franchises Only</option>
           </select>
@@ -83,7 +83,7 @@ export function FranchiseRegistry() {
               {filteredFranchises.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                    Walang nahanap na record sa registry.
+                    No records found in the franchise registry.
                   </td>
                 </tr>
               ) : (

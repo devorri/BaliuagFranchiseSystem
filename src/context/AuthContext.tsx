@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkSession = () => {
       const isValid = storage.isCurrentSessionValid();
       if (!isValid) {
-        setSessionError('Na-detect na may nag-login sa ibang device o browser gamit ang account na ito. Na-logout ang inyong session (Single Session Enforcement).');
+        setSessionError('A new login was detected on another device or browser using this account. Your current session has been logged out (Single Session Policy).');
         storage.logout();
         setUser(null);
       }
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(result.user);
         return { success: true, user: result.user };
       }
-      return { success: false, error: result.error || 'Maling username o password.' };
+      return { success: false, error: result.error || 'Invalid username or password.' };
     } catch {
       // Fallback
       const res = storage.login(username, password);

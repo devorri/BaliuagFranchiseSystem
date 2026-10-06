@@ -23,7 +23,7 @@ export function ApplicationReview() {
   const [endDate, setEndDate] = useState(nextYearStr);
 
   const [adminNotes, setAdminNotes] = useState(
-    'Kumpleto ang mga requirements, stenciling inspection, at mga bayarin sa Treasurer at TODA. Inaprubahan ang MTOP permit.'
+    'Requirements, stenciling inspection, and Treasurer/TODA fees are complete. MTOP permit approved.'
   );
 
   const canManageRequirements = hasPermission('requirements');
@@ -37,7 +37,7 @@ export function ApplicationReview() {
       const data = await supabaseService.getApplicationsAsync();
       setApplications(data);
     } catch {
-      showToast('Hindi ma-load ang mga aplikasyon.', 'error');
+      showToast('Failed to load applications.', 'error');
     }
   };
 
@@ -45,19 +45,19 @@ export function ApplicationReview() {
     setSelectedApp(app);
     setStartDate(app.startDate || todayStr);
     setEndDate(app.endDate || nextYearStr);
-    setAdminNotes(app.adminNotes || 'Kumpleto ang mga requirements, stenciling inspection, at mga bayarin sa Treasurer at TODA. Inaprubahan ang MTOP permit.');
+    setAdminNotes(app.adminNotes || 'Requirements, stenciling inspection, and Treasurer/TODA fees are complete. MTOP permit approved.');
   };
 
   const handleGrantMtop = async (appId: string) => {
     if (!user) return;
 
     if (!startDate || !endDate) {
-      showToast('Pakilagay ang Start Date at End Date ng effectivity period.', 'error');
+      showToast('Please specify the Start Date and End Date for the effectivity period.', 'error');
       return;
     }
 
     if (new Date(startDate) >= new Date(endDate)) {
-      showToast('Ang End Date ay dapat mas huli kaysa sa Start Date.', 'error');
+      showToast('End Date must be after the Start Date.', 'error');
       return;
     }
 
@@ -73,12 +73,12 @@ export function ApplicationReview() {
       );
 
       if (updated) {
-        showToast(`MTOP Granted! Effectivity: ${startDate} hanggang ${endDate}.`, 'success');
+        showToast(`MTOP Granted! Effectivity: ${startDate} to ${endDate}.`, 'success');
         setSelectedApp(null);
         await loadApplications();
       }
     } catch {
-      showToast('Nagkaroon ng problema sa pag-apruba ng MTOP.', 'error');
+      showToast('An error occurred while approving the MTOP.', 'error');
     } finally {
       setLoading(false);
     }
@@ -94,11 +94,11 @@ export function ApplicationReview() {
         adminNotes, 
         `${user.firstName} ${user.lastName} (Municipal Admin)`
       );
-      showToast('Tinanggihan ang aplikasyon.', 'error');
+      showToast('Application rejected.', 'error');
       setSelectedApp(null);
       await loadApplications();
     } catch {
-      showToast('Nagkaroon ng problema sa pagtanggi.', 'error');
+      showToast('An error occurred while rejecting the application.', 'error');
     } finally {
       setLoading(false);
     }
@@ -106,7 +106,7 @@ export function ApplicationReview() {
 
   const handleToggleDocStatus = async (docId: string, newStatus: 'verified' | 'rejected') => {
     if (!canManageRequirements) {
-      showToast('Kailangan ng Requirements Admin permission upang i-verify ang mga dokumento.', 'error');
+      showToast('Requirements Admin permission is required to verify documents.', 'error');
       return;
     }
 
@@ -117,7 +117,7 @@ export function ApplicationReview() {
     const updatedApp = { ...selectedApp, documents: updatedDocs };
     setSelectedApp(updatedApp);
     await supabaseService.saveApplicationAsync(updatedApp);
-    showToast(`Dokumento ay minarkahang ${newStatus.toUpperCase()}.`, 'success');
+    showToast(`Document marked as ${newStatus.toUpperCase()}.`, 'success');
   };
 
   return (
@@ -133,7 +133,7 @@ export function ApplicationReview() {
           Review Application & MTOP Approval
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-          Suriin ang mga **Requirements**, **Stenciling Record**, **TODA Endorsement**, at itakda ang **Start & End Effectivity Dates** bago igawad ang opisyal na prangkisa.
+          Review **Requirements**, **Stenciling Record**, **TODA Endorsement**, and set **Start & End Effectivity Dates** before issuing the official franchise.
         </p>
       </div>
 

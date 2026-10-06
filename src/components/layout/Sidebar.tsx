@@ -34,7 +34,7 @@ export function Sidebar() {
   // Admin Homepage is set to Accounts & Security
   const adminLinks = [
     { to: '/admin/accounts', icon: Users, label: 'Accounts & Security' },
-    { to: '/admin/overview', icon: LayoutDashboard, label: 'Admin Overview' },
+    { to: '/admin/overview', icon: LayoutDashboard, label: 'Admin Dashboard' },
     { to: '/admin/applications', icon: FileText, label: 'Review Applications' },
     { to: '/admin/content', icon: Megaphone, label: 'Content & Ads' },
     { to: '/admin/franchises', icon: Shield, label: 'Franchise Registry' },
@@ -70,7 +70,7 @@ export function Sidebar() {
         <img src="/baliuag-logo.png" alt="Baliuag Seal" className="sidebar__logo-img" />
         {!collapsed && (
           <div>
-            <span className="sidebar__brand-name">Lungsod ng Baliwag</span>
+            <span className="sidebar__brand-name">City of Baliwag</span>
             <span className="sidebar__brand-sub">Franchise & MTOP</span>
           </div>
         )}

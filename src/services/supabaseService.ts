@@ -40,18 +40,18 @@ export async function loginAsync(username: string, password: string): Promise<{ 
         .single();
 
       if (error || !data) {
-        return { user: null, error: 'Maling username o password.' };
+        return { user: null, error: 'Invalid username or password.' };
       }
 
       if (data.password_hash !== password) {
-        return { user: null, error: 'Maling username o password.' };
+        return { user: null, error: 'Invalid username or password.' };
       }
 
       if (data.account_status === 'rejected') {
-        return { user: null, error: 'Ang inyong account ay tinanggihan ng administrator.' };
+        return { user: null, error: 'Your account application has been rejected by the administrator.' };
       }
       if (data.account_status === 'pending') {
-        return { user: null, error: 'Ang inyong account ay naghihintay pa ng pagsusuri ng Security Admin.' };
+        return { user: null, error: 'Your account registration is currently pending review by the Security Admin.' };
       }
 
       // Generate session token
@@ -75,10 +75,14 @@ export async function loginAsync(username: string, password: string): Promise<{ 
 }
 
 export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>): Promise<{ user: User | null; error?: string }> {
+  if (userData.role !== 'driver' && userData.role !== 'operator') {
+    return { user: null, error: 'Registration is restricted to Tricycle Drivers and Franchise Operators only.' };
+  }
+
   const users = await getUsersAsync();
   const exists = users.find(u => u.username.toLowerCase() === userData.username.toLowerCase());
   if (exists) {
-    return { user: null, error: 'Ang username na ito ay nagamit na.' };
+    return { user: null, error: 'This username is already taken. Please choose another.' };
   }
 
   const newUser: User = {
