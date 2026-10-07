@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as supabaseService from '../../services/supabaseService';
+import { belongsToToda } from '../../services/todaService';
 import type { Application } from '../../types';
 import { CheckCircle2, FileText, RefreshCw, UserCheck } from 'lucide-react';
 
@@ -47,9 +48,7 @@ export function TodaApprovals() {
   };
 
   const assignedApplications = applications.filter(app => {
-    const assignedToda = user?.todaName?.trim().toLowerCase();
-    return assignedToda
-      && app.todaName.trim().toLowerCase() === assignedToda
+    return belongsToToda(app.todaName, user?.todaName)
       && ['pending_toda_approval', 'pending_admin_approval', 'approved'].includes(app.status);
   });
 

@@ -159,6 +159,56 @@ ALTER TABLE public.franchises DROP CONSTRAINT IF EXISTS franchises_status_check;
 ALTER TABLE public.franchises ADD CONSTRAINT franchises_status_check
     CHECK (status IN ('active', 'expired', 'suspended', 'pending', 'available'));
 
+-- An operator application must reference an existing, approved Driver
+-- account. This protects the relationship even if a client bypasses the
+-- dropdown in the application UI.
+CREATE OR REPLACE FUNCTION public.validate_application_accounts()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    applicant_role_value VARCHAR(50);
+    applicant_status_value VARCHAR(50);
+    driver_role_value VARCHAR(50);
+    driver_status_value VARCHAR(50);
+BEGIN
+    SELECT role, account_status
+      INTO applicant_role_value, applicant_status_value
+      FROM public.profiles
+     WHERE id = NEW.applicant_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'The applicant account does not exist.';
+    END IF;
+
+    IF applicant_role_value <> NEW.applicant_role OR applicant_status_value <> 'approved' THEN
+        RAISE EXCEPTION 'The applicant account must be an approved % account.', NEW.applicant_role;
+    END IF;
+
+    SELECT role, account_status
+      INTO driver_role_value, driver_status_value
+      FROM public.profiles
+     WHERE id = NEW.driver_id;
+
+    IF NOT FOUND OR driver_role_value <> 'driver' OR driver_status_value <> 'approved' THEN
+        RAISE EXCEPTION 'The assigned account must be an approved Driver account.';
+    END IF;
+
+    IF NEW.applicant_role = 'driver' AND NEW.driver_id <> NEW.applicant_id THEN
+        RAISE EXCEPTION 'A Driver application must be assigned to the applicant Driver account.';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_application_account_validation ON public.applications;
+CREATE TRIGGER enforce_application_account_validation
+BEFORE INSERT OR UPDATE OF applicant_id, applicant_role, driver_id ON public.applications
+FOR EACH ROW EXECUTE FUNCTION public.validate_application_accounts();
+
 -- 5. DYNAMIC ADVERTISEMENTS TABLE
 CREATE TABLE IF NOT EXISTS public.advertisements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

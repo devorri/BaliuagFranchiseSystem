@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getApplicationsAsync, getPaymentsAsync, getUsersAsync, savePaymentAsync } from '../../services/supabaseService';
+import { belongsToToda } from '../../services/todaService';
 import type { Application, Payment, User } from '../../types';
 import { CheckCircle2, Clock, Award, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -23,7 +24,7 @@ export function DriverTodaStatus() {
         setApplication(userApp);
         setPresident(users.find(account =>
           (account.role === 'president' || account.role === 'toda_president')
-          && account.todaName?.trim().toLowerCase() === userApp.todaName.trim().toLowerCase()
+          && belongsToToda(userApp.todaName, account.todaName)
         ) || null);
         setPayments(allPayments.filter(payment => payment.applicationId === userApp.id));
       });

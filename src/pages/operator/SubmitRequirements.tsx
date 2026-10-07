@@ -41,6 +41,14 @@ export function SubmitRequirements() {
     e.preventDefault();
     if (!user || !uploadedDocument || uploading) return;
 
+    // Keep the selected id authoritative.  Do not trust the copied name from
+    // the form because it can become stale after an account is changed.
+    const selectedDriver = drivers.find(driver => driver.id === driverId);
+    if (!selectedDriver || selectedDriver.role !== 'driver' || selectedDriver.accountStatus !== 'approved') {
+      setSubmissionError('Pumili ng valid at approved na Driver account bago magsumite ng application.');
+      return;
+    }
+
     const newApp: Application = {
       id: crypto.randomUUID(),
       applicantId: user.id,
@@ -50,7 +58,7 @@ export function SubmitRequirements() {
       type: 'new',
       residency,
       status: 'pending_driver_requirements',
-      driverName: formData.driverName,
+      driverName: `${selectedDriver.firstName} ${selectedDriver.lastName}`,
       vehicleMake: formData.vehicleMake,
       vehicleModel: formData.vehicleModel,
       plateNumber: formData.plateNumber,
