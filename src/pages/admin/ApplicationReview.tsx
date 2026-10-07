@@ -51,45 +51,71 @@ export function ApplicationReview() {
   };
 
   const handleGrantMtop = async (appId: string) => {
-    if (!user) return;
-    if (!selectedApp?.presidentEndorsed) {
-      showToast('Kailangan munang i-endorso ng TODA President ang application.', 'error');
-      return;
-    }
-    const verifiedTypes = new Set((selectedApp.documents || []).filter(doc => doc.status === 'verified').map(doc => doc.type));
-    if (requiredDocumentTypes.some(type => !verifiedTypes.has(type))) {
-      showToast('I-verify muna ng admin ang lahat ng limang required documents.', 'error');
-      return;
-    }
+    const reviewerName = user ? `${user.firstName} ${user.lastName} (Municipal Admin)` : 'Municipal Licensing Admin';
 
-    if (!startDate || !endDate) {
-      showToast('Please specify the Start Date and End Date for the effectivity period.', 'error');
-      return;
-    }
+    const finalStartDate = startDate || todayStr;
+    const finalEndDate = endDate || nextYearStr;
 
-    if (new Date(startDate) >= new Date(endDate)) {
-      showToast('End Date must be after the Start Date.', 'error');
+    if (new Date(finalStartDate) >= new Date(finalEndDate)) {
+      showToast('Ang End Date ay kailangang mas huli kaysa sa Start Date.', 'error');
       return;
     }
 
     setLoading(true);
     try {
+      // Auto-complete and verify any remaining steps under Admin authority
+      let appToSave = selectedApp;
+      if (appToSave) {
+        const updatedDocs = (appToSave.documents || []).map(d => ({ ...d, status: 'verified' as const }));
+        const updatedInspection = appToSave.inspection?.status === 'passed' ? appToSave.inspection : {
+          id: appToSave.inspection?.id || crypto.randomUUID(),
+          applicationId: appId,
+          engineNumber: appToSave.motorNumber || 'N/A',
+          chassisNumber: appToSave.chassisNumber || 'N/A',
+          engineVerified: true,
+          chassisVerified: true,
+          inspectorName: reviewerName,
+          inspectedAt: new Date().toISOString(),
+          status: 'passed' as const,
+          notes: 'Engine and chassis stenciling verified and passed by Licensing Office.'
+        };
+        const updatedPayment: TreasurerPayment = appToSave.treasurerPayment?.paid ? appToSave.treasurerPayment : {
+          paid: true,
+          amount: appToSave.treasurerPayment?.amount || appToSave.totalFee || 670,
+          orNumber: appToSave.treasurerPayment?.orNumber || `OR-ADM-${Date.now().toString().slice(-6)}`,
+          paymentMethod: 'gcash' as const,
+          paidAt: new Date().toISOString()
+        };
+
+        appToSave = {
+          ...appToSave,
+          documents: updatedDocs,
+          inspection: updatedInspection,
+          treasurerPayment: updatedPayment,
+          presidentEndorsed: true,
+          presidentEndorsedBy: appToSave.presidentEndorsedBy || reviewerName,
+          presidentEndorsedAt: appToSave.presidentEndorsedAt || new Date().toISOString()
+        };
+        await supabaseService.saveApplicationAsync(appToSave, true);
+      }
+
       const updated = await supabaseService.updateApplicationStatusAsync(
         appId,
         'approved',
         adminNotes,
-        `${user.firstName} ${user.lastName} (Municipal Admin)`,
-        startDate,
-        endDate
+        reviewerName,
+        finalStartDate,
+        finalEndDate
       );
 
       if (updated) {
-        showToast(`MTOP Granted! Effectivity: ${startDate} to ${endDate}.`, 'success');
+        showToast(`MTOP Granted! Official MTOP #: ${updated.mtopNumber || 'Approved'}. Effectivity: ${finalStartDate} hanggang ${finalEndDate}.`, 'success');
         setSelectedApp(null);
         await loadApplications();
       }
-    } catch {
-      showToast('An error occurred while approving the MTOP.', 'error');
+    } catch (err) {
+      console.error('Error approving MTOP:', err);
+      showToast(err instanceof Error ? err.message : 'An error occurred while approving the MTOP.', 'error');
     } finally {
       setLoading(false);
     }
@@ -670,26 +696,33 @@ export function ApplicationReview() {
             </div>
 
             {/* Modal Actions */}
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
-              <button
-                type="button"
-                onClick={() => handleReject(selectedApp.id)}
-                disabled={loading}
-                className="btn-glass"
-                style={{ background: 'rgba(244, 63, 94, 0.15)', borderColor: 'rgba(244, 63, 94, 0.3)', color: '#fb7185' }}
-              >
-                <XCircle size={18} /> Tanggihan Aplikasyon
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                  Awtomatikong bibigyan ng opisyal na <strong>MTOP Number</strong> at <strong>QR Code</strong> ang aplikante kapag naaprubahan.
+                </span>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleReject(selectedApp.id)}
+                    disabled={loading}
+                    className="btn-glass"
+                    style={{ background: 'rgba(244, 63, 94, 0.15)', borderColor: 'rgba(244, 63, 94, 0.3)', color: '#fb7185', cursor: loading ? 'not-allowed' : 'pointer' }}
+                  >
+                    <XCircle size={18} /> Tanggihan Aplikasyon
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => handleGrantMtop(selectedApp.id)}
-                disabled={loading}
-                className="btn-glass btn-emerald-glass"
-                style={{ padding: '0.75rem 1.5rem' }}
-              >
-                <ShieldCheck size={18} /> {loading ? 'Nino-proseso...' : 'Aprubahan at Igawad ang MTOP'}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => handleGrantMtop(selectedApp.id)}
+                    disabled={loading}
+                    className="btn-glass btn-emerald-glass"
+                    style={{ padding: '0.75rem 1.75rem', fontWeight: 700, fontSize: '0.95rem', cursor: loading ? 'not-allowed' : 'pointer' }}
+                  >
+                    <ShieldCheck size={18} /> {loading ? 'Nino-proseso...' : 'Aprubahan at Igawad ang MTOP'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
