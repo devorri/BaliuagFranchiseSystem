@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import * as storage from '../../services/storageService';
+import * as supabaseService from '../../services/supabaseService';
 import type { Application } from '../../types';
 import { 
   createCheckoutSession, getCheckoutSession, 
@@ -27,6 +27,7 @@ export function DriverPayment() {
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const verifyingRef = useRef(false);
 
   // Fallback simulation state (if PayMongo keys not configured)
   const [showSimulatedModal, setShowSimulatedModal] = useState(false);
@@ -35,32 +36,73 @@ export function DriverPayment() {
   const paymongoReady = isPayMongoConfigured();
   const payableAmount = application?.totalFee || 450;
 
+  // Load user application from Supabase
   useEffect(() => {
-    if (user) {
-      const apps = storage.getApplications();
-      const userApp = apps.find(
-        a => a.applicantId === user.id ||
-          a.driverName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()
-      );
-      if (userApp) {
-        setApplication(userApp);
-        if (userApp.treasurerPayment?.paid) {
-          setIsPaid(true);
+    let isMounted = true;
+    async function loadApp() {
+      if (!user) return;
+      setIsLoading(true);
+      try {
+        const apps = await supabaseService.getApplicationsAsync();
+        const userApp = apps.find(
+          a => a.driverId === user.id ||
+            a.applicantId === user.id ||
+            a.driverName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()
+        );
+        if (userApp && isMounted) {
+          setApplication(userApp);
+          if (userApp.treasurerPayment?.paid) {
+            setIsPaid(true);
+          }
         }
+      } catch (err) {
+        console.warn('Failed to load application from Supabase:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
+    loadApp();
+    return () => { isMounted = false; };
   }, [user]);
 
-  // Check if returning from PayMongo checkout
+  // Check if returning from PayMongo checkout or resuming active session
   useEffect(() => {
     const sourceId = searchParams.get('source_id') || searchParams.get('session_id');
     const status = searchParams.get('status');
 
-    if (sourceId && (status === 'success' || status === 'paid')) {
-      setCheckoutSessionId(sourceId);
-      handleVerifyPayment(sourceId);
+    if (application && !isPaid) {
+      const activeSession = sourceId || sessionStorage.getItem(`pm_session_${application.id}`);
+      if (activeSession) {
+        setCheckoutSessionId(activeSession);
+        // Automatically verify if returned with success or resuming pending checkout
+        if (status === 'success' || status === 'paid' || sourceId) {
+          handleVerifyPayment(activeSession, application, false);
+        }
+      }
     }
-  }, [searchParams]);
+  }, [application, searchParams, isPaid]);
+
+  // Auto-verify polling & window focus when payment is in progress
+  useEffect(() => {
+    if (!checkoutSessionId || isPaid || !application) return;
+
+    // Check immediately when user switches focus back to this browser tab
+    const handleFocus = () => {
+      handleVerifyPayment(checkoutSessionId, application, false);
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    // Background interval check every 4 seconds
+    const interval = setInterval(() => {
+      handleVerifyPayment(checkoutSessionId, application, false);
+    }, 4000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [checkoutSessionId, isPaid, application]);
 
   // ──────────────────────────────────────
   // PayMongo GCash Checkout
@@ -84,6 +126,7 @@ export function DriverPayment() {
 
       setCheckoutSessionId(session.id);
       setCheckoutUrl(session.attributes.checkout_url);
+      sessionStorage.setItem(`pm_session_${application.id}`, session.id);
       window.open(session.attributes.checkout_url, '_blank');
     } catch (err) {
       console.warn('Checkout Session failed, trying legacy GCash source:', err);
@@ -98,6 +141,7 @@ export function DriverPayment() {
 
         setCheckoutSessionId(source.id);
         setCheckoutUrl(source.attributes.redirect.checkout_url);
+        sessionStorage.setItem(`pm_session_${application.id}`, source.id);
         window.open(source.attributes.redirect.checkout_url, '_blank');
       } catch (legacyErr) {
         setError(legacyErr instanceof Error ? legacyErr.message : 'Failed to create payment session.');
@@ -107,31 +151,39 @@ export function DriverPayment() {
     }
   };
 
-  const handleVerifyPayment = async (sourceId?: string) => {
+  const handleVerifyPayment = async (
+    sourceId?: string, 
+    targetApp?: Application | null, 
+    isManual = false
+  ) => {
     const sid = sourceId || checkoutSessionId;
-    if (!sid || !application) return;
+    const currentApp = targetApp || application;
+    if (!sid || !currentApp || verifyingRef.current) return;
 
+    verifyingRef.current = true;
     setIsVerifying(true);
-    setError('');
+    if (isManual) setError('');
 
     try {
       if (sid.startsWith('cs_')) {
         const session = await getCheckoutSession(sid);
         if (session.attributes.status === 'paid' || (session.attributes.payments && session.attributes.payments.length > 0)) {
           const refNum = `PM-QRPH-${sid.slice(-8).toUpperCase()}`;
-          const updated = storage.recordTreasurerPayment(
-            application.id,
+          const updated = await supabaseService.recordTreasurerPaymentAsync(
+            currentApp.id,
             payableAmount,
             refNum,
-            'gcash'
+            'gcash',
+            user ? { id: user.id, name: `${user.firstName} ${user.lastName}` } : undefined
           );
           if (updated) {
             setApplication(updated);
             setIsPaid(true);
             setCheckoutUrl(null);
+            sessionStorage.removeItem(`pm_session_${currentApp.id}`);
           }
           return;
-        } else {
+        } else if (isManual) {
           setError(`PayMongo Status: ${session.attributes.status}. Once you authorize payment on the PayMongo test page, click "Verify Payment".`);
         }
       } else {
@@ -140,25 +192,30 @@ export function DriverPayment() {
 
         if (status === 'chargeable' || status === 'paid' || status === 'pending') {
           const refNum = `PM-${sid.slice(-8).toUpperCase()}`;
-          const updated = storage.recordTreasurerPayment(
-            application.id,
+          const updated = await supabaseService.recordTreasurerPaymentAsync(
+            currentApp.id,
             payableAmount,
             refNum,
-            'gcash'
+            'gcash',
+            user ? { id: user.id, name: `${user.firstName} ${user.lastName}` } : undefined
           );
 
           if (updated) {
             setApplication(updated);
             setIsPaid(true);
             setCheckoutUrl(null);
+            sessionStorage.removeItem(`pm_session_${currentApp.id}`);
           }
-        } else {
+        } else if (isManual) {
           setError(`GCash Source Status: ${status}. If authorized in GCash app, click "Verify Payment" again.`);
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to verify payment status.');
+      if (isManual) {
+        setError(err instanceof Error ? err.message : 'Failed to verify payment status.');
+      }
     } finally {
+      verifyingRef.current = false;
       setIsVerifying(false);
     }
   };
@@ -167,20 +224,27 @@ export function DriverPayment() {
   // Fallback Simulated GCash
   // ──────────────────────────────────────
 
-  const handleSimulatedGCashPayment = () => {
+  const handleSimulatedGCashPayment = async () => {
     if (!application) return;
+    setIsLoading(true);
+    try {
+      const updated = await supabaseService.recordTreasurerPaymentAsync(
+        application.id,
+        payableAmount,
+        `GCASH-${gcashRef}`,
+        'gcash',
+        user ? { id: user.id, name: `${user.firstName} ${user.lastName}` } : undefined
+      );
 
-    const updated = storage.recordTreasurerPayment(
-      application.id,
-      payableAmount,
-      `GCASH-${gcashRef}`,
-      'gcash'
-    );
-
-    if (updated) {
-      setApplication(updated);
-      setIsPaid(true);
-      setShowSimulatedModal(false);
+      if (updated) {
+        setApplication(updated);
+        setIsPaid(true);
+        setShowSimulatedModal(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record simulated payment.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -188,20 +252,27 @@ export function DriverPayment() {
   // Cash Over-the-Counter
   // ──────────────────────────────────────
 
-  const handlePayCash = (e: React.FormEvent) => {
+  const handlePayCash = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!application || !orNumber.trim()) return;
+    setIsLoading(true);
+    try {
+      const updated = await supabaseService.recordTreasurerPaymentAsync(
+        application.id,
+        payableAmount,
+        orNumber.trim(),
+        'cash',
+        user ? { id: user.id, name: `${user.firstName} ${user.lastName}` } : undefined
+      );
 
-    const updated = storage.recordTreasurerPayment(
-      application.id,
-      payableAmount,
-      orNumber.trim(),
-      'cash'
-    );
-
-    if (updated) {
-      setApplication(updated);
-      setIsPaid(true);
+      if (updated) {
+        setApplication(updated);
+        setIsPaid(true);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record cash payment.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -480,7 +551,7 @@ export function DriverPayment() {
 
                             <button
                               type="button"
-                              onClick={() => handleVerifyPayment()}
+                              onClick={() => handleVerifyPayment(undefined, undefined, true)}
                               disabled={isVerifying}
                               className="btn-glass btn-emerald-glass"
                               style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', opacity: isVerifying ? 0.7 : 1 }}

@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   CheckCircle2, Smartphone, ArrowLeft, ShieldCheck,
   Loader2, ExternalLink, RefreshCw, Printer, QrCode
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import * as supabaseService from '../../services/supabaseService';
 import { 
   createCheckoutSession, getCheckoutSession, 
   createGCashSource, getGCashSource, isPayMongoConfigured 
 } from '../../services/paymongoService';
 
 export function GCashPaymentModal() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isPaid, setIsPaid] = useState(false);
@@ -17,6 +20,7 @@ export function GCashPaymentModal() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const [refNumber, setRefNumber] = useState('');
+  const verifyingRef = useRef(false);
 
   // PayMongo session tracking
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
@@ -34,9 +38,68 @@ export function GCashPaymentModal() {
 
     if (sourceId && (status === 'success' || status === 'paid')) {
       setCheckoutSessionId(sourceId);
-      verifyPayment(sourceId);
+      verifyPayment(sourceId, false);
     }
   }, [searchParams]);
+
+  // Auto-verify on focus & interval while checkout session active
+  useEffect(() => {
+    if (!checkoutSessionId || isPaid) return;
+
+    const onFocus = () => {
+      verifyPayment(checkoutSessionId, false);
+    };
+
+    window.addEventListener('focus', onFocus);
+    const interval = setInterval(() => {
+      verifyPayment(checkoutSessionId, false);
+    }, 4000);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      clearInterval(interval);
+    };
+  }, [checkoutSessionId, isPaid]);
+
+  const onPaymentConfirmed = async (ref: string) => {
+    setRefNumber(ref);
+    setIsPaid(true);
+    setCheckoutUrl(null);
+
+    if (user) {
+      try {
+        const apps = await supabaseService.getApplicationsAsync();
+        const pendingApp = apps.find(
+          a => (a.applicantId === user.id || a.driverId === user.id) && !a.treasurerPayment?.paid
+        );
+        if (pendingApp) {
+          await supabaseService.recordTreasurerPaymentAsync(
+            pendingApp.id,
+            450,
+            ref,
+            'gcash',
+            { id: user.id, name: `${user.firstName} ${user.lastName}` }
+          );
+        } else {
+          await supabaseService.savePaymentAsync({
+            id: crypto.randomUUID(),
+            applicationId: '',
+            payerId: user.id,
+            payerName: `${user.firstName} ${user.lastName}`,
+            amount: 450,
+            description: `Operator GCash Payment - Ref: ${ref}`,
+            status: 'completed',
+            paymentMethod: 'gcash',
+            referenceNumber: ref,
+            paidAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+          }, false);
+        }
+      } catch (err) {
+        console.warn('Supabase operator payment sync warning:', err);
+      }
+    }
+  };
 
   const handleCreateCheckout = async () => {
     setIsLoading(true);
@@ -77,23 +140,22 @@ export function GCashPaymentModal() {
     }
   };
 
-  const verifyPayment = async (sourceId?: string) => {
+  const verifyPayment = async (sourceId?: string, isManual = false) => {
     const sid = sourceId || checkoutSessionId;
-    if (!sid) return;
+    if (!sid || verifyingRef.current) return;
 
+    verifyingRef.current = true;
     setIsVerifying(true);
-    setError('');
+    if (isManual) setError('');
 
     try {
       if (sid.startsWith('cs_')) {
         const session = await getCheckoutSession(sid);
         if (session.attributes.status === 'paid' || (session.attributes.payments && session.attributes.payments.length > 0)) {
           const ref = `PM-QRPH-${sid.slice(-8).toUpperCase()}`;
-          setRefNumber(ref);
-          setIsPaid(true);
-          setCheckoutUrl(null);
+          await onPaymentConfirmed(ref);
           return;
-        } else {
+        } else if (isManual) {
           setError(`PayMongo Status: ${session.attributes.status}. Once you authorize payment in sandbox, click Verify Payment.`);
         }
       } else {
@@ -102,23 +164,24 @@ export function GCashPaymentModal() {
 
         if (status === 'chargeable' || status === 'paid' || status === 'pending') {
           const ref = `PM-${sid.slice(-8).toUpperCase()}`;
-          setRefNumber(ref);
-          setIsPaid(true);
-          setCheckoutUrl(null);
-        } else {
+          await onPaymentConfirmed(ref);
+        } else if (isManual) {
           setError(`GCash Source Status: ${status}. If completed, click Verify Payment again.`);
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to verify payment.');
+      if (isManual) {
+        setError(err instanceof Error ? err.message : 'Failed to verify payment.');
+      }
     } finally {
+      verifyingRef.current = false;
       setIsVerifying(false);
     }
   };
 
-  const handleSimulatePayment = () => {
-    setRefNumber(`GCASH-REF-${simRef}`);
-    setIsPaid(true);
+  const handleSimulatePayment = async () => {
+    const ref = `GCASH-REF-${simRef}`;
+    await onPaymentConfirmed(ref);
   };
 
   return (
@@ -325,7 +388,7 @@ export function GCashPaymentModal() {
                 </a>
 
                 <button
-                  onClick={() => verifyPayment()}
+                  onClick={() => verifyPayment(undefined, true)}
                   disabled={isVerifying}
                   className="btn-glass btn-emerald-glass"
                   style={{ width: '100%', padding: '1rem', fontSize: '1.05rem', opacity: isVerifying ? 0.7 : 1 }}

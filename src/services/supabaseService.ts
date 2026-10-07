@@ -361,6 +361,61 @@ export async function endorseApplicationByPresidentAsync(
   return result;
 }
 
+export async function recordTreasurerPaymentAsync(
+  appId: string, 
+  amount: number, 
+  orNumber: string,
+  paymentMethod: 'cash' | 'gcash',
+  payer?: { id?: string; name?: string }
+): Promise<Application | null> {
+  const apps = await getApplicationsAsync();
+  const app = apps.find(a => a.id === appId);
+  if (!app) return null;
+
+  const paidAt = new Date().toISOString();
+  app.treasurerPayment = {
+    paid: true,
+    amount,
+    orNumber,
+    paidAt,
+    paymentMethod,
+  };
+
+  if (app.status === 'inspection_passed' || app.status === 'pending_treasurer_payment' || app.status === 'draft') {
+    app.status = 'pending_toda_approval';
+  }
+
+  // Update storage cache
+  storage.recordTreasurerPayment(appId, amount, orNumber, paymentMethod);
+
+  // Persist to Supabase
+  const savedApp = await saveApplicationAsync(app, isSupabaseConfigured());
+
+  // Record payment in payments ledger table
+  try {
+    const isUuid = (val?: string) => Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
+    const payerId = payer?.id || app.driverId || app.applicantId;
+    const paymentRecord: Payment = {
+      id: crypto.randomUUID(),
+      applicationId: app.id,
+      payerId: isUuid(payerId) ? (payerId as string) : '',
+      payerName: payer?.name || app.driverName || app.applicantName,
+      amount,
+      description: `MTOP Fee Payment (${paymentMethod === 'gcash' ? 'GCash PayMongo' : 'Treasurer Cash'}) - OR: ${orNumber}`,
+      status: 'completed',
+      paymentMethod,
+      referenceNumber: orNumber,
+      paidAt,
+      createdAt: paidAt,
+    };
+    await savePaymentAsync(paymentRecord, false);
+  } catch (payErr) {
+    console.warn('Could not record payment transaction:', payErr);
+  }
+
+  return savedApp;
+}
+
 // ================= FRANCHISES =================
 export async function getFranchisesAsync(): Promise<Franchise[]> {
   if (isSupabaseConfigured() && supabase) {
@@ -421,10 +476,11 @@ export async function getPaymentsAsync(): Promise<Payment[]> {
 
 export async function savePaymentAsync(payment: Payment, requireSupabaseSave = false): Promise<Payment> {
   if (isSupabaseConfigured() && supabase) {
+    const isUuid = (val?: string) => Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
     const { error } = await supabase.from('payments').upsert({
-      id: payment.id,
-      application_id: payment.applicationId || null,
-      payer_id: payment.payerId,
+      id: isUuid(payment.id) ? payment.id : crypto.randomUUID(),
+      application_id: isUuid(payment.applicationId) ? payment.applicationId : null,
+      payer_id: isUuid(payment.payerId) ? payment.payerId : null,
       payer_name: payment.payerName,
       amount: payment.amount,
       description: payment.description,
