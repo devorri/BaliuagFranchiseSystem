@@ -13,6 +13,7 @@ export function Reports() {
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [penalties, setPenalties] = useState<Penalty[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [payments, setPayments] = useState<import('../../types').Payment[]>([]);
   const [showDocPreview, setShowDocPreview] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'all' | 'month' | 'quarter' | 'year'>('all');
   const [searchToda, setSearchToda] = useState('');
@@ -20,20 +21,24 @@ export function Reports() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [apps, frs, usersList] = await Promise.all([
+        const [apps, frs, usersList, paymentList, penaltyList] = await Promise.all([
           supabaseService.getApplicationsAsync(),
           supabaseService.getFranchisesAsync(),
           supabaseService.getUsersAsync(),
+          supabaseService.getPaymentsAsync(),
+          supabaseService.getPenaltiesAsync(),
         ]);
         setApplications(apps);
         setFranchises(frs);
         setUsers(usersList);
-        setPenalties(storage.getPenalties());
+        setPayments(paymentList);
+        setPenalties(penaltyList);
       } catch {
         setApplications(storage.getApplications());
         setFranchises(storage.getFranchises());
         setUsers(storage.getUsers());
         setPenalties(storage.getPenalties());
+        setPayments(storage.getPayments());
       }
     }
     loadData();
@@ -44,9 +49,8 @@ export function Reports() {
     .filter(a => a.treasurerPayment?.paid)
     .reduce((acc, curr) => acc + (curr.treasurerPayment?.amount || 450), 0);
 
-  const totalTodaFees = applications
-    .filter(a => a.todaApproval?.routeFeePaid)
-    .reduce((acc, curr) => acc + (curr.todaApproval?.routeFeeAmount || 500) + (curr.todaApproval?.membershipFeeAmount || 300), 0);
+  const completedPayments = payments.filter(payment => payment.status === 'completed');
+  const totalTodaFees = completedPayments.reduce((total, payment) => total + payment.amount, 0);
 
   const totalPenaltyRevenue = penalties
     .filter(p => p.status === 'paid')
@@ -59,8 +63,48 @@ export function Reports() {
   const gcashPayments = paidApps.filter(a => a.treasurerPayment?.paymentMethod === 'gcash');
   const cashPayments = paidApps.filter(a => a.treasurerPayment?.paymentMethod !== 'gcash');
 
-  const gcashVolume = gcashPayments.reduce((acc, curr) => acc + (curr.totalFee || curr.treasurerPayment?.amount || 950), 0);
-  const cashVolume = cashPayments.reduce((acc, curr) => acc + (curr.totalFee || curr.treasurerPayment?.amount || 950), 0);
+  const gcashPaymentCount = gcashPayments.length + completedPayments.filter(payment => payment.paymentMethod === 'gcash').length;
+  const cashPaymentCount = cashPayments.length + completedPayments.filter(payment => payment.paymentMethod !== 'gcash').length;
+  const gcashVolume = gcashPayments.reduce((acc, curr) => acc + (curr.treasurerPayment?.amount || 0), 0)
+    + completedPayments.filter(payment => payment.paymentMethod === 'gcash').reduce((total, payment) => total + payment.amount, 0);
+  const cashVolume = cashPayments.reduce((acc, curr) => acc + (curr.treasurerPayment?.amount || 0), 0)
+    + completedPayments.filter(payment => payment.paymentMethod !== 'gcash').reduce((total, payment) => total + payment.amount, 0);
+
+  const transactionRows = [
+    ...paidApps.map(app => ({
+      id: `app-${app.id}`,
+      reference: app.treasurerPayment?.orNumber || `OR-${app.id.slice(0, 8)}`,
+      payer: app.driverName || app.applicantName,
+      toda: app.todaName,
+      classification: 'MTOP Permit & Stenciling',
+      method: app.treasurerPayment?.paymentMethod === 'gcash' ? 'GCash' : 'Treasurer Cash',
+      amount: app.treasurerPayment?.amount || 0,
+      status: 'completed',
+      date: app.treasurerPayment?.paidAt || app.submittedAt,
+    })),
+    ...payments.map(payment => ({
+      id: payment.id,
+      reference: payment.referenceNumber,
+      payer: payment.payerName,
+      toda: applications.find(app => app.id === payment.applicationId)?.todaName || '—',
+      classification: payment.description,
+      method: payment.paymentMethod.toUpperCase(),
+      amount: payment.amount,
+      status: payment.status,
+      date: payment.paidAt || payment.createdAt,
+    })),
+    ...penalties.map(penalty => ({
+      id: penalty.id,
+      reference: penalty.id,
+      payer: `${penalty.driverName} · ${penalty.plateNumber}`,
+      toda: penalty.todaName,
+      classification: `Penalty: ${penalty.violationType}`,
+      method: 'Penalty',
+      amount: penalty.amount,
+      status: penalty.status,
+      date: penalty.paidAt || penalty.issuedDate,
+    })),
+  ].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
 
   // Compliance Metrics
   const activeCount = franchises.filter(f => f.status === 'active').length;
@@ -119,19 +163,11 @@ export function Reports() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['OR_Number', 'Applicant_Driver', 'TODA', 'Fee_Type', 'Payment_Method', 'Amount_PHP', 'Date', 'Status'];
-    const rows = applications
-      .filter(a => a.treasurerPayment?.paid)
-      .map(a => [
-        a.treasurerPayment?.orNumber || `OR-2026-${a.id.slice(0, 6)}`,
-        `"${a.driverName || a.applicantName}"`,
-        `"${a.todaName || 'BASTODA'}"`,
-        '"MTOP Permit & Stenciling"',
-        (a.treasurerPayment?.paymentMethod || 'cash').toUpperCase(),
-        (a.totalFee || a.treasurerPayment?.amount || 950).toFixed(2),
-        a.treasurerPayment?.paidAt ? new Date(a.treasurerPayment.paidAt).toLocaleDateString() : currentDateStr,
-        'PAID',
-      ]);
+    const headers = ['Reference', 'Payer', 'TODA', 'Fee_Type', 'Payment_Method', 'Amount_PHP', 'Date', 'Status'];
+    const rows = transactionRows.map(row => [
+      `"${row.reference}"`, `"${row.payer}"`, `"${row.toda}"`, `"${row.classification}"`,
+      row.method, row.amount.toFixed(2), new Date(row.date).toLocaleDateString() || currentDateStr, row.status.toUpperCase(),
+    ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -394,7 +430,7 @@ export function Reports() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0, 122, 255, 0.1)', border: '1px solid rgba(0, 122, 255, 0.25)', padding: '0.65rem 1rem', borderRadius: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <span style={{ fontWeight: 800, color: '#38bdf8', fontSize: '0.85rem' }}>GCash Digital QR</span>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>({gcashPayments.length} transactions)</span>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>({gcashPaymentCount} transactions)</span>
                 </div>
                 <strong style={{ color: '#4ade80', fontSize: '0.9rem' }}>
                   ₱{gcashVolume.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
@@ -404,7 +440,7 @@ export function Reports() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.65rem 1rem', borderRadius: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <span style={{ fontWeight: 800, color: '#cbd5e1', fontSize: '0.85rem' }}>Municipal Cashier (Cash)</span>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>({cashPayments.length} transactions)</span>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>({cashPaymentCount} transactions)</span>
                 </div>
                 <strong style={{ color: '#4ade80', fontSize: '0.9rem' }}>
                   ₱{cashVolume.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
@@ -591,46 +627,46 @@ export function Reports() {
               </tr>
             </thead>
             <tbody>
-              {paidApps.length === 0 ? (
+              {transactionRows.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
                     No recorded transactions available at this time.
                   </td>
                 </tr>
               ) : (
-                paidApps.slice(0, 8).map(app => (
-                  <tr key={app.id}>
+                transactionRows.slice(0, 30).map(transaction => (
+                  <tr key={transaction.id}>
                     <td style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>
-                      {app.treasurerPayment?.orNumber || `OR-2026-${app.id.slice(0, 6)}`}
+                      {transaction.reference}
                     </td>
                     <td style={{ fontWeight: 700, color: '#ffffff' }}>
-                      {app.driverName || app.applicantName}
+                      {transaction.payer}
                     </td>
                     <td>
                       <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
-                        {app.todaName || 'BASTODA'}
+                        {transaction.toda}
                       </span>
                     </td>
-                    <td style={{ color: '#cbd5e1' }}>MTOP Permit & Stenciling</td>
+                    <td style={{ color: '#cbd5e1' }}>{transaction.classification}</td>
                     <td>
                       <span style={{ 
                         textTransform: 'uppercase', 
                         fontSize: '0.75rem', 
                         fontWeight: 700, 
-                        color: app.treasurerPayment?.paymentMethod === 'gcash' ? '#38bdf8' : '#e2e8f0',
-                        background: app.treasurerPayment?.paymentMethod === 'gcash' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                        color: transaction.method.toLowerCase() === 'gcash' ? '#38bdf8' : '#e2e8f0',
+                        background: transaction.method.toLowerCase() === 'gcash' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.08)',
                         padding: '0.2rem 0.5rem',
                         borderRadius: '6px'
                       }}>
-                        {app.treasurerPayment?.paymentMethod === 'gcash' ? 'GCash' : 'Treasurer Cash'}
+                        {transaction.method}
                       </span>
                     </td>
                     <td style={{ fontWeight: 800, color: '#4ade80' }}>
-                      ₱{(app.totalFee || app.treasurerPayment?.amount || 950).toFixed(2)}
+                      ₱{transaction.amount.toFixed(2)}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <span className="pill-badge pill-emerald">
-                        <CheckCircle2 size={12} /> AUDITED & PAID
+                      <span className={`pill-badge ${transaction.status === 'completed' || transaction.status === 'paid' ? 'pill-emerald' : transaction.status === 'pending' || transaction.status === 'unpaid' ? 'pill-orange' : 'pill-rose'}`}>
+                        {transaction.status === 'completed' || transaction.status === 'paid' ? <CheckCircle2 size={12} /> : null} {transaction.status.toUpperCase()}
                       </span>
                     </td>
                   </tr>

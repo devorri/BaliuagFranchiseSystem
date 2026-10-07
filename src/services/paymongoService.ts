@@ -7,25 +7,13 @@
  * Uses Secret Key (sk_test_...) for Checkout Sessions and Public Key (pk_test_...)
  */
 
-const PAYMONGO_PUBLIC_KEY = import.meta.env.VITE_PAYMONGO_PUBLIC_KEY as string || 'pk_test_imhxYJMD1aHRKtDvNjFTNFUK';
-const PAYMONGO_SECRET_KEY = import.meta.env.VITE_PAYMONGO_SECRET_KEY as string || 'sk_test_c45YuqZKv46a1C22BDm5VbDB';
-
-// Proxy URL in Vite dev server (or fallback direct URL)
 const BASE_URL = '/api/paymongo';
+const PAYMONGO_ENABLED = import.meta.env.VITE_PAYMONGO_ENABLED === 'true';
 
-function getPublicAuthHeaders(): Record<string, string> {
+function getHeaders(): Record<string, string> {
   return {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
-    'Authorization': `Basic ${btoa(PAYMONGO_PUBLIC_KEY + ':')}`,
-  };
-}
-
-function getSecretAuthHeaders(): Record<string, string> {
-  return {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'Authorization': `Basic ${btoa(PAYMONGO_SECRET_KEY + ':')}`,
   };
 }
 
@@ -110,20 +98,11 @@ export async function createCheckoutSession(params: {
     },
   };
 
-  let response: Response;
-  try {
-    response = await fetch(`${BASE_URL}/v1/checkout_sessions`, {
-      method: 'POST',
-      headers: getSecretAuthHeaders(),
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    response = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
-      method: 'POST',
-      headers: getSecretAuthHeaders(),
-      body: JSON.stringify(payload),
-    });
-  }
+  const response = await fetch(`${BASE_URL}/v1/checkout_sessions`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  });
 
   const text = await response.text();
   if (!response.ok || !text) {
@@ -147,18 +126,10 @@ export async function createCheckoutSession(params: {
  * Retrieve PayMongo Checkout Session to verify payment status
  */
 export async function getCheckoutSession(sessionId: string): Promise<PayMongoCheckoutResponse> {
-  let response: Response;
-  try {
-    response = await fetch(`${BASE_URL}/v1/checkout_sessions/${sessionId}`, {
-      method: 'GET',
-      headers: getSecretAuthHeaders(),
-    });
-  } catch {
-    response = await fetch(`https://api.paymongo.com/v1/checkout_sessions/${sessionId}`, {
-      method: 'GET',
-      headers: getSecretAuthHeaders(),
-    });
-  }
+  const response = await fetch(`${BASE_URL}/v1/checkout_sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
 
   const text = await response.text();
   if (!response.ok || !text) {
@@ -179,44 +150,23 @@ export async function createGCashSource(params: {
 }): Promise<PayMongoSourceResponse> {
   const amountInCentavos = Math.round(params.amount * 100);
 
-  let response: Response;
-  try {
-    response = await fetch(`${BASE_URL}/v1/sources`, {
-      method: 'POST',
-      headers: getPublicAuthHeaders(),
-      body: JSON.stringify({
-        data: {
-          attributes: {
-            type: 'gcash',
-            amount: amountInCentavos,
-            currency: 'PHP',
-            redirect: {
-              success: params.successUrl,
-              failed: params.failedUrl,
-            },
+  const response = await fetch(`${BASE_URL}/v1/sources`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      data: {
+        attributes: {
+          type: 'gcash',
+          amount: amountInCentavos,
+          currency: 'PHP',
+          redirect: {
+            success: params.successUrl,
+            failed: params.failedUrl,
           },
         },
-      }),
-    });
-  } catch {
-    response = await fetch('https://api.paymongo.com/v1/sources', {
-      method: 'POST',
-      headers: getPublicAuthHeaders(),
-      body: JSON.stringify({
-        data: {
-          attributes: {
-            type: 'gcash',
-            amount: amountInCentavos,
-            currency: 'PHP',
-            redirect: {
-              success: params.successUrl,
-              failed: params.failedUrl,
-            },
-          },
-        },
-      }),
-    });
-  }
+      },
+    }),
+  });
 
   const text = await response.text();
   if (!response.ok || !text) {
@@ -240,18 +190,10 @@ export async function createGCashSource(params: {
  * Retrieve GCash Source by ID
  */
 export async function getGCashSource(sourceId: string): Promise<PayMongoSourceResponse> {
-  let response: Response;
-  try {
-    response = await fetch(`${BASE_URL}/v1/sources/${sourceId}`, {
-      method: 'GET',
-      headers: getPublicAuthHeaders(),
-    });
-  } catch {
-    response = await fetch(`https://api.paymongo.com/v1/sources/${sourceId}`, {
-      method: 'GET',
-      headers: getPublicAuthHeaders(),
-    });
-  }
+  const response = await fetch(`${BASE_URL}/v1/sources/${encodeURIComponent(sourceId)}`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
 
   const text = await response.text();
   if (!response.ok || !text) {
@@ -263,5 +205,5 @@ export async function getGCashSource(sourceId: string): Promise<PayMongoSourceRe
 }
 
 export function isPayMongoConfigured(): boolean {
-  return Boolean(PAYMONGO_PUBLIC_KEY && PAYMONGO_SECRET_KEY);
+  return PAYMONGO_ENABLED;
 }

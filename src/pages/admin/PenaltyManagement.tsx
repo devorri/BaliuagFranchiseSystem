@@ -1,41 +1,51 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import * as storage from '../../services/storageService';
-import type { Penalty } from '../../types';
+import * as supabaseService from '../../services/supabaseService';
+import type { Franchise, Penalty, User } from '../../types';
 import { PlusCircle } from 'lucide-react';
 
 export function PenaltyManagement() {
   const { user } = useAuth();
   const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [drivers, setDrivers] = useState<User[]>([]);
+  const [franchises, setFranchises] = useState<Franchise[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [selectedFranchiseId, setSelectedFranchiseId] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
-    driverName: 'Juan Manaloto',
-    plateNumber: '123-XYZ',
-    todaName: 'BASTODA (Baliuag Poblacion TODA)',
     violationType: 'Out of Route Operation' as Penalty['violationType'],
     amount: 500,
-    remarks: 'Operated outside designated TODA route without valid special municipal permit.',
+    remarks: '',
   });
+  const isExpiredFranchisePenalty = formData.violationType === 'Expired MTOP';
 
   useEffect(() => {
-    loadPenalties();
+    void supabaseService.getPenaltiesAsync().then(setPenalties);
+    Promise.all([supabaseService.getUsersAsync(), supabaseService.getFranchisesAsync()]).then(([accounts, units]) => {
+      setDrivers(accounts.filter(account => account.role === 'driver' && account.accountStatus === 'approved'));
+      setFranchises(units);
+    });
   }, []);
 
-  const loadPenalties = () => {
-    setPenalties(storage.getPenalties());
+  const loadPenalties = async () => {
+    setPenalties(await supabaseService.getPenaltiesAsync());
   };
 
   const handleCreatePenalty = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    const driver = drivers.find(account => account.id === selectedDriverId);
+    const franchise = franchises.find(unit => unit.id === selectedFranchiseId && unit.driverId === selectedDriverId);
+    if (!user || !driver || !franchise) return;
 
-    const newPen: Penalty = {
-      id: `PEN-2026-${Math.floor(100 + Math.random() * 900)}`,
-      driverId: 'user-driver-01',
-      driverName: formData.driverName,
-      plateNumber: formData.plateNumber,
-      todaName: formData.todaName,
+    const newPenalty: Penalty = {
+      id: crypto.randomUUID(),
+      driverId: driver.id,
+      driverName: `${driver.firstName} ${driver.lastName}`,
+      plateNumber: franchise.plateNumber,
+      todaName: franchise.todaName,
       violationType: formData.violationType,
       amount: Number(formData.amount),
       status: 'unpaid',
@@ -45,15 +55,27 @@ export function PenaltyManagement() {
       issuedBy: `${user.firstName} ${user.lastName} (Municipal Admin)`,
     };
 
-    storage.addPenalty(newPen);
-    setShowModal(false);
-    loadPenalties();
+    setSaving(true);
+    setError('');
+    void supabaseService.savePenaltyAsync(newPenalty, true).then(() => {
+      setShowModal(false);
+      setFormData({ ...formData, remarks: '' });
+      return loadPenalties();
+    }).catch(saveError => {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save the penalty.');
+    }).finally(() => setSaving(false));
   };
 
-  const handleMarkAsPaid = (penaltyId: string) => {
-    storage.payPenalty(penaltyId);
-    loadPenalties();
+  const handleMarkAsPaid = async (penaltyId: string) => {
+    try {
+      await supabaseService.updatePenaltyStatusAsync(penaltyId, 'paid');
+      await loadPenalties();
+    } catch (paymentError) {
+      setError(paymentError instanceof Error ? paymentError.message : 'Could not update the penalty payment.');
+    }
   };
+
+  const eligibleFranchises = franchises.filter(franchise => franchise.driverId === selectedDriverId && franchise.status === 'active');
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -77,6 +99,8 @@ export function PenaltyManagement() {
           </button>
         </div>
       </div>
+
+      {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
 
       {/* Penalties List Table */}
       <div className="glass-container" style={{ padding: '1.75rem' }}>
@@ -150,29 +174,19 @@ export function PenaltyManagement() {
 
             <form onSubmit={handleCreatePenalty} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Driver Name
-                </label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  value={formData.driverName}
-                  onChange={e => setFormData({ ...formData, driverName: e.target.value })}
-                  required
-                />
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Driver</label>
+                <select className="glass-input glass-select" value={selectedDriverId} onChange={e => { setSelectedDriverId(e.target.value); setSelectedFranchiseId(''); }} required>
+                  <option value="">Select an approved driver</option>
+                  {drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.firstName} {driver.lastName}</option>)}
+                </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Plate / Body Number
-                </label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  value={formData.plateNumber}
-                  onChange={e => setFormData({ ...formData, plateNumber: e.target.value })}
-                  required
-                />
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Assigned Tricycle</label>
+                <select className="glass-input glass-select" value={selectedFranchiseId} onChange={e => setSelectedFranchiseId(e.target.value)} required disabled={!selectedDriverId}>
+                  <option value="">Select the registered plate</option>
+                  {eligibleFranchises.map(franchise => <option key={franchise.id} value={franchise.id}>{franchise.plateNumber} · {franchise.todaName}</option>)}
+                </select>
               </div>
 
               <div>
@@ -182,13 +196,17 @@ export function PenaltyManagement() {
                 <select
                   className="glass-input glass-select"
                   value={formData.violationType}
-                  onChange={e => setFormData({ ...formData, violationType: e.target.value as any })}
+                  onChange={e => {
+                    const violationType = e.target.value as Penalty['violationType'];
+                    setFormData({ ...formData, violationType, amount: violationType === 'Expired MTOP' ? 125 : formData.amount });
+                  }}
                 >
                   <option value="Expired MTOP">Expired MTOP Permit</option>
                   <option value="Out of Route Operation">Out of Route Operation</option>
                   <option value="Overcharging">Overcharging Fare Rate</option>
                   <option value="Illegal Parking">Illegal Parking / Obstruction</option>
                   <option value="No License">No Driver License</option>
+                  <option value="No TODA Cert">No TODA Certificate</option>
                 </select>
               </div>
 
@@ -202,7 +220,9 @@ export function PenaltyManagement() {
                   value={formData.amount}
                   onChange={e => setFormData({ ...formData, amount: Number(e.target.value) })}
                   required
+                  readOnly={isExpiredFranchisePenalty}
                 />
+                {isExpiredFranchisePenalty && <span style={{ color: '#facc15', fontSize: '0.78rem' }}>Expired franchise penalty is fixed at ₱125.00.</span>}
               </div>
 
               <div>
@@ -221,8 +241,8 @@ export function PenaltyManagement() {
                 <button type="button" onClick={() => setShowModal(false)} className="btn-glass" style={{ flex: 1 }}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-glass btn-orange-glass" style={{ flex: 2 }}>
-                  Issue Citation & Send SMS Alert
+                <button type="submit" disabled={saving || !selectedFranchiseId} className="btn-glass btn-orange-glass" style={{ flex: 2 }}>
+                  {saving ? 'Saving...' : 'Issue Penalty'}
                 </button>
               </div>
             </form>

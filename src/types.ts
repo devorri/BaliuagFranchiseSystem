@@ -11,6 +11,7 @@ export type AccountStatus = 'pending' | 'approved' | 'rejected';
 
 export type ApplicationStatus = 
   | 'draft' 
+  | 'pending_driver_requirements'
   | 'pending_inspection' 
   | 'inspection_passed' 
   | 'pending_treasurer_payment' 
@@ -20,13 +21,14 @@ export type ApplicationStatus =
   | 'rejected' 
   | 'requires_revision';
 
-export type FranchiseStatus = 'active' | 'expired' | 'suspended' | 'pending';
+export type FranchiseStatus = 'active' | 'expired' | 'suspended' | 'pending' | 'available';
 
 export type DriverStatus = 'active' | 'inactive' | 'suspended';
 
 export type PaymentStatus = 'pending' | 'completed' | 'failed';
 
 export type ApplicationType = 'new' | 'renewal';
+export type Residency = 'baliwag_resident' | 'non_resident';
 
 export type DocumentType = 
   | 'or_cr' 
@@ -48,6 +50,7 @@ export interface User {
   phone: string;
   address: string;
   todaName?: string;
+  todaPaymentQrUrl?: string;
   profilePhoto?: string;
   accountStatus?: AccountStatus;
   adminPermissions?: AdminPermission[];
@@ -104,7 +107,9 @@ export interface Application {
   applicantId: string;
   applicantName: string;
   applicantRole: 'driver' | 'operator';
+  driverId?: string;
   type: ApplicationType;
+  residency?: Residency;
   status: ApplicationStatus;
   
   // Driver / Vehicle Info
@@ -184,6 +189,7 @@ export interface Franchise {
   expiresAt: string;
   renewalDate: string;
   qrCodeData: string;
+  slotReleasedAt?: string;
 }
 
 export interface Penalty {
@@ -242,6 +248,7 @@ export interface Receipt {
 
 export interface FeeConfig {
   mtopBaseFee: number;
+  nonResidentFranchiseFee: number;
   todaRouteFee: number;
   todaMembershipFee: number;
   stencilingFee: number;

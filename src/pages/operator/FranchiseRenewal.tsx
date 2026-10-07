@@ -1,26 +1,37 @@
 import { useState, useEffect } from 'react';
-import * as storage from '../../services/storageService';
-import type { Franchise } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import * as supabaseService from '../../services/supabaseService';
+import type { Application, Franchise } from '../../types';
+import { FRANCHISE_FEES } from '../../services/fees';
 import { RefreshCw, CheckCircle2 } from 'lucide-react';
 
 export function FranchiseRenewal() {
+  const { user } = useAuth();
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [renewedId, setRenewedId] = useState<string | null>(null);
 
   useEffect(() => {
-    setFranchises(storage.getFranchises());
-  }, []);
+    if (!user) return;
+    void supabaseService.getFranchisesAsync().then(items => setFranchises(items.filter(item => item.operatorId === user.id)));
+  }, [user]);
 
-  const handleInitiateRenewal = (franchiseId: string) => {
-    const list = storage.getFranchises();
-    const found = list.find(f => f.id === franchiseId);
-    if (found) {
-      found.status = 'active';
-      found.expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-      storage.saveFranchise(found);
-      setRenewedId(franchiseId);
-      setFranchises(storage.getFranchises());
-    }
+  const handleInitiateRenewal = async (franchise: Franchise) => {
+    if (!user || renewedId) return;
+    const isExpired = franchise.status === 'expired' || new Date(franchise.expiresAt).getTime() < Date.now();
+    const latePenalty = isExpired ? FRANCHISE_FEES.expiredFranchisePenalty : 0;
+    const now = new Date().toISOString();
+    const renewal: Application = {
+      id: crypto.randomUUID(), applicantId: user.id, applicantName: `${user.firstName} ${user.lastName}`,
+      applicantRole: 'operator', driverId: franchise.driverId, driverName: franchise.driverName,
+      type: 'renewal', residency: 'baliwag_resident', status: 'pending_driver_requirements',
+      vehicleMake: franchise.vehicleMake, vehicleModel: franchise.vehicleModel, plateNumber: franchise.plateNumber,
+      motorNumber: franchise.motorNumber, chassisNumber: franchise.chassisNumber, vehicleColor: franchise.vehicleColor,
+      todaName: franchise.todaName, routeArea: franchise.routeArea, documents: [],
+      baseFee: FRANCHISE_FEES.baliwagResident, todaFee: 0, latePenalty,
+      totalFee: FRANCHISE_FEES.baliwagResident + latePenalty, submittedAt: now, updatedAt: now,
+    };
+    await supabaseService.saveApplicationAsync(renewal, true);
+    setRenewedId(franchise.id);
   };
 
   return (
@@ -50,14 +61,14 @@ export function FranchiseRenewal() {
 
               <div>
                 {renewedId === f.id ? (
-                  <span className="pill-badge pill-emerald"><CheckCircle2 size={16} /> RENEWED UNTIL 2027</span>
+                  <span className="pill-badge pill-emerald"><CheckCircle2 size={16} /> Renewal sent to assigned driver</span>
                 ) : (
                   <button
-                    onClick={() => handleInitiateRenewal(f.id)}
+                    onClick={() => void handleInitiateRenewal(f)}
                     className="btn-glass btn-orange-glass"
                     style={{ padding: '0.65rem 1.25rem' }}
                   >
-                    <RefreshCw size={18} /> Renew Franchise (₱1,250)
+                    <RefreshCw size={18} /> Start renewal (₱450{f.status === 'expired' ? ' + ₱125 expired fee' : ''})
                   </button>
                 )}
               </div>

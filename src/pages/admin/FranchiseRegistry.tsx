@@ -1,16 +1,56 @@
 import { useState, useEffect } from 'react';
-import * as storage from '../../services/storageService';
-import type { Franchise } from '../../types';
-import { Search } from 'lucide-react';
+import * as supabaseService from '../../services/supabaseService';
+import type { Franchise, FranchiseStatus, User } from '../../types';
+import { Search, UserCheck } from 'lucide-react';
 
 export function FranchiseRegistry() {
   const [franchises, setFranchises] = useState<Franchise[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | FranchiseStatus>('all');
+  const [selectedOperators, setSelectedOperators] = useState<Record<string, string>>({});
+  const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
+  const [savingSlotId, setSavingSlotId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    setFranchises(storage.getFranchises());
+    Promise.all([supabaseService.getFranchisesAsync(), supabaseService.getUsersAsync()]).then(([units, accounts]) => {
+      setFranchises(units);
+      setUsers(accounts.filter(account => account.accountStatus === 'approved'));
+    });
   }, []);
+
+  const handleAssignSlot = async (franchise: Franchise) => {
+    const operator = users.find(user => user.id === selectedOperators[franchise.id] && user.role === 'operator');
+    const driver = users.find(user => user.id === selectedDrivers[franchise.id] && user.role === 'driver');
+    if (franchise.status !== 'available' || !operator || !driver) return;
+    setSavingSlotId(franchise.id);
+    setError('');
+    const now = new Date();
+    const expiresAt = new Date(now);
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    try {
+      const reassigned = await supabaseService.saveFranchiseAsync({
+        ...franchise,
+        operatorId: operator.id,
+        operatorName: `${operator.firstName} ${operator.lastName}`,
+        driverId: driver.id,
+        driverName: `${driver.firstName} ${driver.lastName}`,
+        status: 'active',
+        startDate: now.toISOString().slice(0, 10),
+        endDate: expiresAt.toISOString().slice(0, 10),
+        issuedAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        renewalDate: new Date(expiresAt.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        slotReleasedAt: undefined,
+      }, true);
+      setFranchises(current => current.map(item => item.id === reassigned.id ? reassigned : item));
+    } catch (assignError) {
+      setError(assignError instanceof Error ? assignError.message : 'Could not reassign the slot.');
+    } finally {
+      setSavingSlotId(null);
+    }
+  };
 
   const filteredFranchises = franchises.filter(f => {
     const matchesSearch = 
@@ -55,14 +95,17 @@ export function FranchiseRegistry() {
             className="glass-input glass-select"
             style={{ width: '200px' }}
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value as any)}
+            onChange={e => setFilterStatus(e.target.value as 'all' | FranchiseStatus)}
           >
             <option value="all">All Franchise Statuses</option>
             <option value="active">Active Franchises Only</option>
             <option value="expired">Expired Franchises Only</option>
+            <option value="available">Available Slots</option>
           </select>
         </div>
       </div>
+
+      {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
 
       {/* Registry Table Card */}
       <div className="glass-container" style={{ padding: '1.75rem' }}>
@@ -77,12 +120,13 @@ export function FranchiseRegistry() {
                 <th>Issued Date</th>
                 <th>Expiration Date</th>
                 <th>Status</th>
+                <th>Slot Assignment</th>
               </tr>
             </thead>
             <tbody>
               {filteredFranchises.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
                     No records found in the franchise registry.
                   </td>
                 </tr>
@@ -100,11 +144,22 @@ export function FranchiseRegistry() {
                     <td style={{ fontSize: '0.82rem', color: f.status === 'expired' ? '#fb7185' : '#cbd5e1', fontWeight: f.status === 'expired' ? 700 : 400 }}>
                       {new Date(f.expiresAt).toLocaleDateString()}
                     </td>
+                    <td><span className={`pill-badge ${f.status === 'active' ? 'pill-emerald' : f.status === 'available' ? 'pill-cyan' : 'pill-rose'}`}>{f.status.toUpperCase()}</span></td>
                     <td>
-                      {f.status === 'active' ? (
-                        <span className="pill-badge pill-emerald">ACTIVE</span>
-                      ) : (
-                        <span className="pill-badge pill-rose">EXPIRED</span>
+                      {f.status === 'available' && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(130px, 1fr) minmax(130px, 1fr) auto', gap: '0.4rem', minWidth: '410px' }}>
+                          <select className="glass-input glass-select" aria-label="Assign operator" value={selectedOperators[f.id] || ''} onChange={e => setSelectedOperators(current => ({ ...current, [f.id]: e.target.value }))}>
+                            <option value="">Select operator</option>
+                            {users.filter(account => account.role === 'operator').map(operator => <option key={operator.id} value={operator.id}>{operator.firstName} {operator.lastName}</option>)}
+                          </select>
+                          <select className="glass-input glass-select" aria-label="Assign driver" value={selectedDrivers[f.id] || ''} onChange={e => setSelectedDrivers(current => ({ ...current, [f.id]: e.target.value }))}>
+                            <option value="">Select driver</option>
+                            {users.filter(account => account.role === 'driver').map(driver => <option key={driver.id} value={driver.id}>{driver.firstName} {driver.lastName}</option>)}
+                          </select>
+                          <button type="button" className="btn-glass btn-primary-glass" title="Assign available slot" disabled={!selectedOperators[f.id] || !selectedDrivers[f.id] || savingSlotId === f.id} onClick={() => void handleAssignSlot(f)}>
+                            <UserCheck size={16} />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

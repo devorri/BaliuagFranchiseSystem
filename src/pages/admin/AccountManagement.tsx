@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Users, CheckCircle2, XCircle, Search, Filter, 
-  ShieldCheck, Clock, UserCheck, ShieldAlert 
+  ShieldCheck, Clock, UserCheck, ShieldAlert, Plus
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
@@ -17,6 +17,11 @@ export function AccountManagement() {
   const [statusFilter, setStatusFilter] = useState<'all' | AccountStatus>('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [showPresidentForm, setShowPresidentForm] = useState(false);
+  const [creatingPresident, setCreatingPresident] = useState(false);
+  const [presidentForm, setPresidentForm] = useState({
+    firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: '',
+  });
 
   const canManageSecurity = hasPermission('security');
 
@@ -58,6 +63,27 @@ export function AccountManagement() {
     }
   };
 
+  const handleCreatePresident = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManageSecurity || presidentForm.password.length < 6) return;
+    setCreatingPresident(true);
+    try {
+      const created = await supabaseService.createPresidentAsync({
+        ...presidentForm,
+        middleName: undefined,
+        adminPermissions: ['president'],
+      });
+      setUsers(current => [created, ...current]);
+      setShowPresidentForm(false);
+      setPresidentForm({ firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: '' });
+      showToast('TODA President account created.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not create the President account.', 'error');
+    } finally {
+      setCreatingPresident(false);
+    }
+  };
+
   const filteredUsers = users.filter(u => {
     const matchesSearch = 
       `${u.firstName} ${u.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
@@ -67,7 +93,7 @@ export function AccountManagement() {
 
     const status = u.accountStatus || 'approved'; // default legacy to approved
     const matchesStatus = statusFilter === 'all' || status === statusFilter;
-    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter || (roleFilter === 'president' && u.role === 'toda_president');
 
     return matchesSearch && matchesStatus && matchesRole;
   });
@@ -103,6 +129,11 @@ export function AccountManagement() {
             Manage approval and access status of registered Driver and Operator accounts before login access.
           </p>
         </div>
+        {canManageSecurity && (
+          <button type="button" onClick={() => setShowPresidentForm(true)} className="btn-glass btn-primary-glass">
+            <Plus size={18} /> Create President Account
+          </button>
+        )}
 
         {/* Status Counts */}
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -184,6 +215,7 @@ export function AccountManagement() {
             <option value="driver">Driver</option>
             <option value="operator">Operator</option>
             <option value="president">TODA President</option>
+            <option value="toda_president">TODA President (Legacy)</option>
             <option value="admin">Administrator</option>
           </select>
         </div>
@@ -337,6 +369,32 @@ export function AccountManagement() {
           </table>
         )}
       </div>
+
+      {showPresidentForm && (
+        <div className="modal-overlay" onClick={() => setShowPresidentForm(false)}>
+          <div className="glass-container modal-glass-content animate-fade-in" onClick={event => event.stopPropagation()}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '1rem' }}>Create TODA President Account</h2>
+            <form onSubmit={handleCreatePresident} style={{ display: 'grid', gap: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <input aria-label="First name" className="glass-input" placeholder="First name" value={presidentForm.firstName} onChange={e => setPresidentForm({ ...presidentForm, firstName: e.target.value })} required />
+                <input aria-label="Last name" className="glass-input" placeholder="Last name" value={presidentForm.lastName} onChange={e => setPresidentForm({ ...presidentForm, lastName: e.target.value })} required />
+              </div>
+              <input aria-label="TODA name" className="glass-input" placeholder="TODA association" value={presidentForm.todaName} onChange={e => setPresidentForm({ ...presidentForm, todaName: e.target.value })} required />
+              <input aria-label="Username" className="glass-input" placeholder="Username" value={presidentForm.username} onChange={e => setPresidentForm({ ...presidentForm, username: e.target.value })} required />
+              <input aria-label="Temporary password" className="glass-input" type="password" placeholder="Temporary password (minimum 6 characters)" value={presidentForm.password} onChange={e => setPresidentForm({ ...presidentForm, password: e.target.value })} minLength={6} required />
+              <input aria-label="Email" className="glass-input" type="email" placeholder="Email" value={presidentForm.email} onChange={e => setPresidentForm({ ...presidentForm, email: e.target.value })} required />
+              <input aria-label="Phone" className="glass-input" type="tel" placeholder="Phone" value={presidentForm.phone} onChange={e => setPresidentForm({ ...presidentForm, phone: e.target.value })} required />
+              <input aria-label="Address" className="glass-input" placeholder="Address" value={presidentForm.address} onChange={e => setPresidentForm({ ...presidentForm, address: e.target.value })} required />
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowPresidentForm(false)} className="btn-glass" style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" disabled={creatingPresident} className="btn-glass btn-primary-glass" style={{ flex: 1 }}>
+                  {creatingPresident ? 'Creating...' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

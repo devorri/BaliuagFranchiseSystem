@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     phone VARCHAR(50),
     address TEXT,
     toda_name VARCHAR(150),
+    toda_payment_qr_url TEXT,
     profile_photo TEXT,
     account_status VARCHAR(50) DEFAULT 'approved' CHECK (account_status IN ('pending', 'approved', 'rejected')),
     admin_permissions JSONB DEFAULT '["security", "requirements", "payment", "analytics", "president"]'::jsonb,
@@ -53,7 +54,9 @@ CREATE TABLE IF NOT EXISTS public.applications (
     applicant_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     applicant_name VARCHAR(255) NOT NULL,
     applicant_role VARCHAR(50) NOT NULL CHECK (applicant_role IN ('driver', 'operator')),
+    driver_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     type VARCHAR(50) NOT NULL CHECK (type IN ('new', 'renewal')),
+    residency VARCHAR(30) CHECK (residency IN ('baliwag_resident', 'non_resident')) DEFAULT 'baliwag_resident',
     status VARCHAR(50) NOT NULL DEFAULT 'draft',
     
     -- Driver & Vehicle Information
@@ -131,19 +134,30 @@ CREATE TABLE IF NOT EXISTS public.franchises (
     toda_name VARCHAR(150) NOT NULL,
     route_area TEXT NOT NULL,
     
-    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'suspended', 'pending')),
+    status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'suspended', 'pending', 'available')),
     start_date DATE,
     end_date DATE,
     issued_at TIMESTAMPTZ DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL,
     renewal_date TIMESTAMPTZ NOT NULL,
     qr_code_data TEXT NOT NULL,
+    slot_released_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_franchises_mtop ON public.franchises(mtop_number);
 CREATE INDEX IF NOT EXISTS idx_franchises_status ON public.franchises(status);
+
+-- Upgrade-safe additions for existing deployments.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS toda_payment_qr_url TEXT;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS residency VARCHAR(30) DEFAULT 'baliwag_resident'
+    CHECK (residency IN ('baliwag_resident', 'non_resident'));
+ALTER TABLE public.franchises ADD COLUMN IF NOT EXISTS slot_released_at TIMESTAMPTZ;
+ALTER TABLE public.franchises DROP CONSTRAINT IF EXISTS franchises_status_check;
+ALTER TABLE public.franchises ADD CONSTRAINT franchises_status_check
+    CHECK (status IN ('active', 'expired', 'suspended', 'pending', 'available'));
 
 -- 5. DYNAMIC ADVERTISEMENTS TABLE
 CREATE TABLE IF NOT EXISTS public.advertisements (
@@ -225,13 +239,16 @@ CREATE TABLE IF NOT EXISTS public.payments (
 -- 10. FEE CONFIGURATION TABLE
 CREATE TABLE IF NOT EXISTS public.fee_configs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    mtop_base_fee NUMERIC(10, 2) DEFAULT 850.00,
-    toda_route_fee NUMERIC(10, 2) DEFAULT 250.00,
-    toda_membership_fee NUMERIC(10, 2) DEFAULT 150.00,
-    stenciling_fee NUMERIC(10, 2) DEFAULT 100.00,
-    late_penalty_per_month NUMERIC(10, 2) DEFAULT 150.00,
+    mtop_base_fee NUMERIC(10, 2) DEFAULT 450.00,
+    non_resident_franchise_fee NUMERIC(10, 2) DEFAULT 550.00,
+    toda_route_fee NUMERIC(10, 2) DEFAULT 0.00,
+    toda_membership_fee NUMERIC(10, 2) DEFAULT 0.00,
+    stenciling_fee NUMERIC(10, 2) DEFAULT 0.00,
+    late_penalty_per_month NUMERIC(10, 2) DEFAULT 125.00,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.fee_configs ADD COLUMN IF NOT EXISTS non_resident_franchise_fee NUMERIC(10, 2) DEFAULT 550.00;
 
 -- ========================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -323,8 +340,8 @@ CREATE POLICY "Public Delete Access for Files Bucket"
 -- ========================================================
 
 -- Insert Default Fee Config
-INSERT INTO public.fee_configs (mtop_base_fee, toda_route_fee, toda_membership_fee, stenciling_fee, late_penalty_per_month)
-VALUES (850.00, 250.00, 150.00, 100.00, 150.00)
+INSERT INTO public.fee_configs (mtop_base_fee, non_resident_franchise_fee, toda_route_fee, toda_membership_fee, stenciling_fee, late_penalty_per_month)
+VALUES (450.00, 550.00, 0.00, 0.00, 0.00, 125.00)
 ON CONFLICT DO NOTHING;
 
 -- Insert Default Admin User
@@ -349,3 +366,62 @@ VALUES
 ('Ordinansa Blg. 2024-08: Bagong Taripa ng Pamasahe', 'fare_matrix', 'Alinsunod sa City Ordinance, ang minimum regular fare para sa unang 2 kilometro ay Php 15.00 at Php 2.50 bawat dagdag na kilometro. 20% discount para sa Senior Citizen, PWD, at Estudyante.', true, CURRENT_DATE),
 ('Mga Kinakailangang Dokumento sa Pagpaparehistro', 'guideline', '1. Valid Driver''s License (Professional) 2. Latest LTO Official Receipt & Certificate of Registration (OR/CR) 3. Barangay Clearance mula sa nasasakupang barangay 4. TODA Certificate of Endorsement 5. 2x2 ID Picture.', true, CURRENT_DATE),
 ('Direktoryo ng mga Akreditadong TODA sa Baliuag', 'toda_info', 'Kasalukuyang may 12 rehistradong TODA sa Baliuag City kabilang ang Poblacion TODA, Subic TODA, Concepcion TODA, Tibag TODA, Tarcan TODA, at San Jose TODA.', true, CURRENT_DATE);
+
+-- Automated expiry, one-month reminders, and one-year unrenewed slot release.
+CREATE OR REPLACE FUNCTION public.process_franchise_lifecycle()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    UPDATE public.franchises
+    SET status = 'expired', updated_at = NOW()
+    WHERE status = 'active' AND expires_at::date < CURRENT_DATE;
+
+    INSERT INTO public.sms_notifications (user_id, recipient_phone, title, message, type, sent_at, read)
+    SELECT f.driver_id,
+           COALESCE(p.phone, ''),
+           'Renewal due in 30 days: ' || f.mtop_number,
+           'Paalala: mag-renew ng MTOP ' || f.mtop_number || ' para sa plate ' || f.plate_number || '. Mag-e-expire ito sa ' || f.expires_at::date || '.',
+           'renewal_reminder', NOW(), FALSE
+    FROM public.franchises f
+    JOIN public.profiles p ON p.id = f.driver_id
+    WHERE f.status = 'active'
+      AND f.expires_at::date = CURRENT_DATE + 30
+      AND NOT EXISTS (
+          SELECT 1 FROM public.sms_notifications n
+          WHERE n.user_id = f.driver_id
+            AND n.type = 'renewal_reminder'
+            AND n.message LIKE '%' || f.mtop_number || '%'
+      );
+
+    UPDATE public.franchises
+    SET status = 'available',
+        operator_id = NULL,
+        operator_name = 'Available for reassignment',
+        driver_id = NULL,
+        driver_name = 'Available slot',
+        slot_released_at = COALESCE(slot_released_at, NOW()),
+        updated_at = NOW()
+    WHERE status = 'expired'
+      AND expires_at::date <= CURRENT_DATE - INTERVAL '1 year';
+END;
+$$;
+
+DO $$
+DECLARE
+    lifecycle_job_id BIGINT;
+BEGIN
+    BEGIN
+        CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
+        EXECUTE 'SELECT jobid FROM cron.job WHERE jobname = $1' INTO lifecycle_job_id USING 'franchise-lifecycle-daily';
+        IF lifecycle_job_id IS NOT NULL THEN
+            PERFORM cron.unschedule(lifecycle_job_id);
+        END IF;
+        PERFORM cron.schedule('franchise-lifecycle-daily', '0 1 * * *', 'SELECT public.process_franchise_lifecycle();');
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'pg_cron unavailable; call public.process_franchise_lifecycle() from a scheduled job.';
+    END;
+END;
+$$;

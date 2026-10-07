@@ -21,15 +21,16 @@ export function AdminDashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [apps, frs, usersList] = await Promise.all([
+        const [apps, frs, usersList, penaltyList] = await Promise.all([
           supabaseService.getApplicationsAsync(),
           supabaseService.getFranchisesAsync(),
           supabaseService.getUsersAsync(),
+          supabaseService.getPenaltiesAsync(),
         ]);
         setApplications(apps);
         setFranchises(frs);
         setUsers(usersList);
-        setPenalties(storage.getPenalties());
+        setPenalties(penaltyList);
       } catch {
         setApplications(storage.getApplications());
         setFranchises(storage.getFranchises());

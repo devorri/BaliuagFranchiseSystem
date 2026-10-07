@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import * as storage from '../../services/storageService';
-import type { Franchise, SMSNotification } from '../../types';
-import { ShieldCheck, RefreshCw, QrCode, Users, Clock } from 'lucide-react';
+import * as supabaseService from '../../services/supabaseService';
+import type { Application, Franchise, SMSNotification, User } from '../../types';
+import { ShieldCheck, RefreshCw, QrCode, Users, Clock, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function OperatorDashboard() {
@@ -11,16 +11,50 @@ export function OperatorDashboard() {
 
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [smsNotifs, setSmsNotifs] = useState<SMSNotification[]>([]);
+  const [drivers, setDrivers] = useState<User[]>([]);
+  const [driverSelections, setDriverSelections] = useState<Record<string, string>>({});
+  const [pendingApplications, setPendingApplications] = useState<Application[]>([]);
+  const [savingAssignment, setSavingAssignment] = useState<string | null>(null);
+  const [assignmentError, setAssignmentError] = useState('');
 
   useEffect(() => {
-    if (user) {
-      const allFranchises = storage.getFranchises();
-      const myFranchises = allFranchises.filter(f => f.operatorId === user.id || f.operatorName.toLowerCase().includes(user.lastName.toLowerCase()));
-      setFranchises(myFranchises.length > 0 ? myFranchises : allFranchises.slice(0, 2));
-
-      setSmsNotifs(storage.getSMSNotifications(user.id));
-    }
+    if (!user) return;
+    Promise.all([
+      supabaseService.getFranchisesAsync(),
+      supabaseService.getUsersAsync(),
+      supabaseService.getApplicationsAsync(),
+      supabaseService.getSMSNotificationsAsync(user.id),
+    ]).then(([allFranchises, allUsers, allApplications, userNotifications]) => {
+      const owned = allFranchises.filter(franchise => franchise.operatorId === user.id);
+      setFranchises(owned);
+      setDriverSelections(Object.fromEntries(owned.map(franchise => [franchise.id, franchise.driverId])));
+      setDrivers(allUsers.filter(account => account.role === 'driver' && account.accountStatus === 'approved'));
+      setPendingApplications(allApplications.filter(app =>
+        app.applicantId === user.id && app.status !== 'approved' && app.status !== 'rejected'
+      ));
+      setSmsNotifs(userNotifications);
+    });
   }, [user]);
+
+  const handleAssignDriver = async (franchise: Franchise) => {
+    const driverId = driverSelections[franchise.id];
+    const selectedDriver = drivers.find(driver => driver.id === driverId);
+    if (!selectedDriver || franchise.operatorId !== user?.id) return;
+    setSavingAssignment(franchise.id);
+    setAssignmentError('');
+    try {
+      const updated = await supabaseService.saveFranchiseAsync({
+        ...franchise,
+        driverId: selectedDriver.id,
+        driverName: `${selectedDriver.firstName} ${selectedDriver.lastName}`,
+      }, true);
+      setFranchises(current => current.map(item => item.id === updated.id ? updated : item));
+    } catch (error) {
+      setAssignmentError(error instanceof Error ? error.message : 'Could not assign the driver.');
+    } finally {
+      setSavingAssignment(null);
+    }
+  };
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -94,22 +128,42 @@ export function OperatorDashboard() {
             <span className="pill-badge pill-cyan">{franchises.length} Units</span>
           </div>
 
+          {assignmentError && <p role="alert" style={{ color: '#f87171', marginBottom: '1rem' }}>{assignmentError}</p>}
+
           <div className="glass-table-wrapper">
             <table className="glass-table">
               <thead>
                 <tr>
                   <th>MTOP Permit #</th>
                   <th>Assigned Driver</th>
+                  <th>Driver Account</th>
                   <th>Plate Number</th>
                   <th>Expiration</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {franchises.map(f => (
+                {franchises.length === 0 ? (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>Wala ka pang rehistradong tricycle. Mag-apply ng unit para maidagdag ito rito.</td></tr>
+                ) : franchises.map(f => (
                   <tr key={f.id}>
                     <td style={{ fontWeight: 800, color: '#38bdf8' }}>{f.mtopNumber}</td>
                     <td style={{ fontWeight: 700 }}>{f.driverName}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.4rem', minWidth: '250px' }}>
+                        <select
+                          className="glass-input glass-select"
+                          value={driverSelections[f.id] || ''}
+                          onChange={e => setDriverSelections(current => ({ ...current, [f.id]: e.target.value }))}
+                        >
+                          <option value="">Select driver</option>
+                          {drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.firstName} {driver.lastName}</option>)}
+                        </select>
+                        <button type="button" onClick={() => handleAssignDriver(f)} disabled={savingAssignment === f.id} className="btn-glass" title="Assign driver">
+                          <UserCheck size={16} />
+                        </button>
+                      </div>
+                    </td>
                     <td>{f.plateNumber}</td>
                     <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{new Date(f.expiresAt).toLocaleDateString()}</td>
                     <td>
@@ -122,6 +176,11 @@ export function OperatorDashboard() {
               </tbody>
             </table>
           </div>
+          {pendingApplications.length > 0 && (
+            <div style={{ marginTop: '1rem', color: '#facc15', fontSize: '0.85rem' }}>
+              {pendingApplications.length} tricycle application{pendingApplications.length === 1 ? '' : 's'} in progress. Drivers must submit their requirements before TODA review.
+            </div>
+          )}
         </div>
 
         {/* SMS Notifications Inbox Brief */}

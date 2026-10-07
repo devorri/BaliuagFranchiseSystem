@@ -111,10 +111,11 @@ export const seedSMSNotifications: SMSNotification[] = [];
 
 export const seedFeeConfig: FeeConfig = {
   mtopBaseFee: 450,
-  todaRouteFee: 500,
-  todaMembershipFee: 300,
-  stencilingFee: 150,
-  latePenaltyPerMonth: 200,
+  nonResidentFranchiseFee: 550,
+  todaRouteFee: 0,
+  todaMembershipFee: 0,
+  stencilingFee: 0,
+  latePenaltyPerMonth: 125,
 };
 
 export const seedAdvertisements: Advertisement[] = [

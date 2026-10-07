@@ -2,7 +2,7 @@
 // Storage Service - LocalStorage Persistence
 // ============================================
 
-import type { User, Application, Franchise, Penalty, SMSNotification, FeeConfig, ApplicationStatus, Advertisement, InformationItem } from '../types';
+import type { User, Application, Document, Franchise, Penalty, SMSNotification, FeeConfig, ApplicationStatus, Advertisement, InformationItem, Payment } from '../types';
 import { seedUsers, seedApplications, seedFranchises, seedPenalties, seedSMSNotifications, seedFeeConfig, seedAdvertisements, seedInformationItems } from './seedData';
 import { sendSMS, isSMSConfigured } from './smsService';
 
@@ -39,6 +39,16 @@ export function initializeData(): void {
   }
   if (!localStorage.getItem(KEYS.FEE_CONFIG)) {
     localStorage.setItem(KEYS.FEE_CONFIG, JSON.stringify(seedFeeConfig));
+  } else {
+    // Migrate preview data created before the official 2026 fee schedule.
+    const fees = JSON.parse(localStorage.getItem(KEYS.FEE_CONFIG) || '{}') as Partial<FeeConfig>;
+    const official = {
+      ...fees,
+      mtopBaseFee: 450,
+      nonResidentFranchiseFee: 550,
+      latePenaltyPerMonth: 125,
+    };
+    localStorage.setItem(KEYS.FEE_CONFIG, JSON.stringify(official));
   }
   if (!localStorage.getItem(KEYS.ADVERTISEMENTS)) {
     localStorage.setItem(KEYS.ADVERTISEMENTS, JSON.stringify(seedAdvertisements));
@@ -149,7 +159,28 @@ export function updateUser(id: string, updates: Partial<User>): User | null {
 export function getApplications(): Application[] {
   initializeData();
   const data = localStorage.getItem(KEYS.APPLICATIONS);
-  return data ? JSON.parse(data) : [];
+  const applications: Application[] = data ? JSON.parse(data) : [];
+  return applications.map(application => ({
+    ...application,
+    documents: normalizeDocuments(application.documents),
+  }));
+}
+
+/**
+ * Older preview records and some JSONB responses may contain a single document
+ * object or a serialized array. Normalize them before pages use array methods.
+ */
+function normalizeDocuments(value: unknown): Document[] {
+  if (Array.isArray(value)) return value as Document[];
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed as Document[] : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 export function getApplicationById(id: string): Application | undefined {
@@ -325,8 +356,8 @@ export function approveTodaLine(
     approvedAt: new Date().toISOString(),
     routeFeePaid: true,
     membershipFeePaid: true,
-    routeFeeAmount: 500,
-    membershipFeeAmount: 300,
+    routeFeeAmount: 0,
+    membershipFeeAmount: 0,
     orNumber,
     remarks,
   };
@@ -374,6 +405,21 @@ export function saveFranchise(franchise: Franchise): Franchise {
   return franchise;
 }
 
+export function getPayments(): Payment[] {
+  initializeData();
+  const data = localStorage.getItem(KEYS.PAYMENTS);
+  return data ? JSON.parse(data) : [];
+}
+
+export function savePayment(payment: Payment): Payment {
+  const payments = getPayments();
+  const index = payments.findIndex(item => item.id === payment.id);
+  if (index >= 0) payments[index] = payment;
+  else payments.unshift(payment);
+  localStorage.setItem(KEYS.PAYMENTS, JSON.stringify(payments));
+  return payment;
+}
+
 // ================= PENALTIES =================
 export function getPenalties(): Penalty[] {
   initializeData();
@@ -398,6 +444,15 @@ export function addPenalty(penalty: Penalty): Penalty {
     read: false,
   });
 
+  return penalty;
+}
+
+export function savePenalty(penalty: Penalty): Penalty {
+  const list = getPenalties();
+  const index = list.findIndex(item => item.id === penalty.id);
+  if (index >= 0) list[index] = penalty;
+  else list.unshift(penalty);
+  localStorage.setItem(KEYS.PENALTIES, JSON.stringify(list));
   return penalty;
 }
 
@@ -442,6 +497,15 @@ export function addSMSNotification(notif: SMSNotification): SMSNotification {
       .catch(err => console.error('[SMS] Error sending real SMS:', err));
   }
 
+  return notif;
+}
+
+export function saveSMSNotification(notif: SMSNotification): SMSNotification {
+  const notifications = getSMSNotifications();
+  const index = notifications.findIndex(item => item.id === notif.id);
+  if (index >= 0) notifications[index] = notif;
+  else notifications.unshift(notif);
+  localStorage.setItem(KEYS.SMS, JSON.stringify(notifications));
   return notif;
 }
 

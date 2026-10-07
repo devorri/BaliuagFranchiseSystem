@@ -1,37 +1,79 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import * as storage from '../../services/storageService';
-import type { Application } from '../../types';
-import { CheckCircle2, Clock, Award } from 'lucide-react';
+import { getApplicationsAsync, getPaymentsAsync, getUsersAsync, savePaymentAsync } from '../../services/supabaseService';
+import type { Application, Payment, User } from '../../types';
+import { CheckCircle2, Clock, Award, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function DriverTodaStatus() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [application, setApplication] = useState<Application | null>(null);
+  const [president, setPresident] = useState<User | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+  const [submittingPayment, setSubmittingPayment] = useState(false);
 
   useEffect(() => {
     if (user) {
-      const apps = storage.getApplications();
-      const userApp = apps.find(a => a.applicantId === user.id || a.driverName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase());
-      if (userApp) setApplication(userApp);
+      Promise.all([getApplicationsAsync(), getUsersAsync(), getPaymentsAsync()]).then(([apps, users, allPayments]) => {
+        const userApp = apps.find(app => app.driverId === user.id || app.applicantId === user.id);
+        if (!userApp) return;
+        setApplication(userApp);
+        setPresident(users.find(account =>
+          (account.role === 'president' || account.role === 'toda_president')
+          && account.todaName?.trim().toLowerCase() === userApp.todaName.trim().toLowerCase()
+        ) || null);
+        setPayments(allPayments.filter(payment => payment.applicationId === userApp.id));
+      });
     }
   }, [user]);
 
-  const hasTodaApproval = application?.todaApproval?.routeFeePaid;
+  const hasTodaApproval = application?.presidentEndorsed || application?.todaApproval?.routeFeePaid;
+  const currentPayment = payments.find(payment => payment.status === 'pending')
+    || payments.find(payment => payment.status === 'completed');
+
+  const handleSubmitPayment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!user || !application || !paymentReference.trim() || currentPayment) return;
+    setSubmittingPayment(true);
+    setPaymentError('');
+    const payment: Payment = {
+      id: crypto.randomUUID(),
+      applicationId: application.id,
+      payerId: user.id,
+      payerName: `${user.firstName} ${user.lastName}`,
+      amount: application.todaFee || 800,
+      description: `${application.todaName} route and membership fees`,
+      status: 'pending',
+      paymentMethod: 'gcash',
+      referenceNumber: paymentReference.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      await savePaymentAsync(payment, true);
+      setPayments(previous => [payment, ...previous]);
+      setPaymentReference('');
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : 'Could not submit payment reference.');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '900px', margin: '0 auto' }}>
       <div className="glass-container" style={{ padding: '2.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-          <span className="pill-badge pill-purple">Step 4 of Workflow</span>
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>TODA Line Approval & Route Fee</span>
+          <span className="pill-badge pill-purple">Step 2 of Workflow</span>
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>TODA Line Eligibility Review</span>
         </div>
         <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
           TODA President Line Approval
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '2rem' }}>
-          Ipapasa ang aplikasyon sa **TODA President** para sa approval ng linya at pagtanggap ng bayad sa membership/route fee.
+          Ipapasa ang aplikasyon sa TODA President para suriin kung pasok ang driver sa linya. Kapag inendorso, susuriin ng Municipal Admin ang lahat ng requirements.
         </p>
 
         {application ? (
@@ -54,13 +96,8 @@ export function DriverTodaStatus() {
               {hasTodaApproval ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'rgba(139, 92, 246, 0.12)', padding: '1.25rem', borderRadius: '14px' }}>
                   <p style={{ color: '#ffffff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <CheckCircle2 size={18} color="#4ade80" /> Naaprubahan na ni <strong>{application.todaApproval?.approvedByName}</strong> (TODA President).
+                    <CheckCircle2 size={18} color="#4ade80" /> Inendorso ni <strong>{application.presidentEndorsedBy || application.todaApproval?.approvedByName || 'TODA President'}</strong> ang aplikasyon.
                   </p>
-                  <div style={{ fontSize: '0.88rem', color: '#cbd5e1' }}>
-                    • TODA Membership Fee: <strong>₱300.00 (PAID)</strong><br />
-                    • TODA Route Fee: <strong>₱500.00 (PAID)</strong><br />
-                    • Receipt / Ref OR: <strong>{application.todaApproval?.orNumber || 'TODA-OR-9001'}</strong>
-                  </div>
                   <p style={{ fontSize: '0.85rem', color: '#34d399', marginTop: '0.5rem', fontWeight: 700 }}>
                     Automatic na ipinasa sa Municipal Admin para sa final MTOP review & release!
                   </p>
@@ -81,6 +118,31 @@ export function DriverTodaStatus() {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <Wallet size={18} /> TODA Line Payment
+              </h3>
+              {president?.todaPaymentQrUrl ? (
+                <img src={president.todaPaymentQrUrl} alt={`${application.todaName} payment QR`} style={{ width: 180, aspectRatio: '1', objectFit: 'contain', background: '#fff', padding: '0.5rem', borderRadius: '6px' }} />
+              ) : <p style={{ color: '#facc15', fontSize: '0.88rem' }}>Wala pang naka-upload na official payment QR ang inyong TODA President.</p>}
+              <p style={{ color: '#cbd5e1', fontSize: '0.88rem', margin: '0.75rem 0' }}>
+                Route at membership fees: <strong>₱{(application.todaFee || 800).toFixed(2)}</strong>. Pagkatapos magbayad, ilagay ang GCash reference number para ma-verify ng President.
+              </p>
+              {currentPayment ? (
+                <p className={`pill-badge ${currentPayment.status === 'completed' ? 'pill-emerald' : 'pill-orange'}`}>
+                  Payment {currentPayment.status}: {currentPayment.referenceNumber}
+                </p>
+              ) : (
+                <form onSubmit={handleSubmitPayment} style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <input aria-label="GCash payment reference" className="glass-input" placeholder="GCash reference number" value={paymentReference} onChange={e => setPaymentReference(e.target.value)} required />
+                  <button type="submit" className="btn-glass btn-primary-glass" disabled={submittingPayment || !president?.todaPaymentQrUrl}>
+                    {submittingPayment ? 'Sending...' : 'Submit Payment Reference'}
+                  </button>
+                </form>
+              )}
+              {paymentError && <p role="alert" style={{ color: '#f87171', marginTop: '0.5rem' }}>{paymentError}</p>}
             </div>
 
           </div>

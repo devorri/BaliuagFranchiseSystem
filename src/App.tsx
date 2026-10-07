@@ -52,6 +52,7 @@ function App() {
             <Route path="/driver" element={<DashboardLayout requiredRole="driver" />}>
               <Route index element={<DriverDashboard />} />
               <Route path="requirements" element={<DriverRequirements />} />
+              <Route path="notifications" element={<SMSNotifications />} />
               <Route path="inspection" element={<DriverInspection />} />
               <Route path="payment" element={<DriverPayment />} />
               <Route path="toda-status" element={<DriverTodaStatus />} />

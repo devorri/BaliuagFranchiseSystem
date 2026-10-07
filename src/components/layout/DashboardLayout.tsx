@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import * as supabaseService from '../../services/supabaseService';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import type { UserRole } from '../../types';
@@ -10,6 +12,10 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
   const { user, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (user) void supabaseService.processFranchiseLifecycleAsync().catch(error => console.error('Franchise lifecycle check failed:', error));
+  }, [user?.id]);
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;

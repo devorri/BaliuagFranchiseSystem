@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import * as storage from '../../services/storageService';
+import * as supabaseService from '../../services/supabaseService';
 import type { SMSNotification } from '../../types';
 
 
@@ -10,7 +10,7 @@ export function SMSNotifications() {
 
   useEffect(() => {
     if (user) {
-      setNotifications(storage.getSMSNotifications(user.id));
+      void supabaseService.getSMSNotificationsAsync(user.id).then(setNotifications);
     }
   }, [user]);
 

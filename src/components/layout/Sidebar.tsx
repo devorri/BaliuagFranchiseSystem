@@ -21,6 +21,7 @@ export function Sidebar() {
   const driverLinks = [
     { to: '/driver', icon: LayoutDashboard, label: 'Dashboard & QR' },
     { to: '/driver/requirements', icon: FilePlus, label: 'Submit Requirements' },
+    { to: '/driver/notifications', icon: BellRing, label: 'Renewal & Penalty Alerts' },
     { to: '/driver/inspection', icon: Wrench, label: 'Inspection & Stenciling' },
     { to: '/driver/payment', icon: CreditCard, label: 'Payment of Fees (GCash/Cash)' },
     { to: '/driver/toda-status', icon: CheckCircle2, label: 'TODA Line Status' },

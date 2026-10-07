@@ -46,7 +46,7 @@ export function GCashPaymentModal() {
       const currentUrl = window.location.origin + window.location.pathname;
 
       const session = await createCheckoutSession({
-        amount: 1250,
+        amount: 450,
         name: 'MTOP Franchise Application Fee',
         description: 'Baliwag City Tricycle MTOP Permit & Inspection Fee',
         successUrl: `${currentUrl}?status=success&session_id={checkout_session_id}`,
@@ -61,7 +61,7 @@ export function GCashPaymentModal() {
       try {
         const currentUrl = window.location.origin + window.location.pathname;
         const source = await createGCashSource({
-          amount: 1250,
+          amount: 450,
           successUrl: `${currentUrl}?status=success&source_id={source_id}`,
           failedUrl: `${currentUrl}?status=failed`,
         });
@@ -215,7 +215,7 @@ export function GCashPaymentModal() {
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <span style={{ color: '#94a3b8', fontSize: '0.78rem', display: 'block' }}>Total Amount Paid</span>
                 <strong style={{ color: '#4ade80', fontSize: '1.2rem', fontWeight: 800 }}>
-                  ₱1,250.00
+                  ₱450.00
                 </strong>
               </div>
 
@@ -263,7 +263,7 @@ export function GCashPaymentModal() {
 
                 <div className="glass-panel" style={{ padding: '1.5rem', width: '100%', textAlign: 'center' }}>
                   <p style={{ fontSize: '0.95rem', color: '#cbd5e1', marginBottom: '1.25rem' }}>
-                    Click the button below to generate your <strong>PayMongo dynamic QR Ph Code & GCash Checkout</strong> for <strong>₱1,250.00</strong>.
+                    Click the button below to generate your <strong>PayMongo dynamic QR Ph Code & GCash Checkout</strong> for the resident franchise fee of <strong>₱450.00</strong>. Non-resident applications are billed at ₱550.00 through the application workflow.
                   </p>
 
                   <div style={{
@@ -271,7 +271,7 @@ export function GCashPaymentModal() {
                     borderRadius: '12px', marginBottom: '1.25rem'
                   }}>
                     <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', display: 'block', color: '#94a3b8' }}>Total Amount</span>
-                    <strong style={{ fontSize: '1.6rem', color: '#22c55e' }}>₱1,250.00</strong>
+                    <strong style={{ fontSize: '1.6rem', color: '#22c55e' }}>₱450.00</strong>
                   </div>
                 </div>
 
@@ -284,7 +284,7 @@ export function GCashPaymentModal() {
                   {isLoading ? (
                     <><Loader2 size={20} className="spin-icon" /> Generating QR Ph & GCash Session...</>
                   ) : (
-                    <><QrCode size={20} /> Pay ₱1,250.00 via QR Ph / GCash</>
+                    <><QrCode size={20} /> Pay ₱450.00 via QR Ph / GCash</>
                   )}
                 </button>
 
@@ -364,7 +364,7 @@ export function GCashPaymentModal() {
               </div>
               <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.15)', padding: '0.75rem', borderRadius: '12px', color: '#ffffff' }}>
                 <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', display: 'block' }}>Total Amount</span>
-                <strong style={{ fontSize: '1.4rem' }}>₱1,250.00</strong>
+                <strong style={{ fontSize: '1.4rem' }}>₱450.00</strong>
               </div>
             </div>
 

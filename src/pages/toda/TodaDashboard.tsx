@@ -1,24 +1,64 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import * as storage from '../../services/storageService';
-import type { Application } from '../../types';
-import { Award, CheckCircle2, Clock, ShieldCheck } from 'lucide-react';
+import * as supabaseService from '../../services/supabaseService';
+import type { Application, Payment } from '../../types';
+import { Award, CheckCircle2, Clock, ShieldCheck, UploadCloud, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function TodaDashboard() {
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const navigate = useNavigate();
   const [applications, setApplications] = useState<Application[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [qrUploading, setQrUploading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const apps = storage.getApplications();
-    setApplications(apps);
-  }, []);
+    void loadData();
+  }, [user?.todaName]);
 
-  const pendingApprovals = applications.filter(a => a.status === 'pending_toda_approval' || (a.treasurerPayment?.paid && !a.todaApproval?.routeFeePaid));
-  const approvedApps = applications.filter(a => a.todaApproval?.routeFeePaid);
+  const loadData = async () => {
+    const [allApplications, allPayments] = await Promise.all([
+      supabaseService.getApplicationsAsync(),
+      supabaseService.getPaymentsAsync(),
+    ]);
+    const assigned = allApplications.filter(app => app.todaName.trim().toLowerCase() === user?.todaName?.trim().toLowerCase());
+    const appIds = new Set(assigned.map(app => app.id));
+    setApplications(assigned);
+    setPayments(allPayments.filter(payment => appIds.has(payment.applicationId)));
+  };
 
-  const totalCollectedRouteFees = approvedApps.reduce((acc, curr) => acc + (curr.todaApproval?.routeFeeAmount || 500) + (curr.todaApproval?.membershipFeeAmount || 300), 0);
+  const pendingApprovals = applications.filter(app => app.status === 'pending_toda_approval');
+  const endorsedApps = applications.filter(app => app.presidentEndorsed);
+  const totalCollectedRouteFees = payments
+    .filter(payment => payment.status === 'completed')
+    .reduce((total, payment) => total + payment.amount, 0);
+
+  const handleQrUpload = async (file?: File) => {
+    if (!file || !user) return;
+    setQrUploading(true);
+    setError('');
+    try {
+      const uploaded = await supabaseService.uploadFileToBucketAsync(file, 'toda_payment_qr');
+      if (!uploaded.url) throw new Error(uploaded.error || 'Could not upload the payment QR.');
+      await supabaseService.updatePresidentQrAsync(user.id, uploaded.url);
+      updateProfile({ todaPaymentQrUrl: uploaded.url });
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Could not save the payment QR.');
+    } finally {
+      setQrUploading(false);
+    }
+  };
+
+  const handlePaymentStatus = async (paymentId: string, status: Payment['status']) => {
+    setError('');
+    try {
+      await supabaseService.updatePaymentStatusAsync(paymentId, status);
+      await loadData();
+    } catch (paymentError) {
+      setError(paymentError instanceof Error ? paymentError.message : 'Could not update the payment.');
+    }
+  };
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -64,7 +104,7 @@ export function TodaDashboard() {
               <Award size={24} />
             </div>
             <div>
-              <div className="stat-val">{approvedApps.length}</div>
+              <div className="stat-val">{endorsedApps.length}</div>
               <div className="stat-lbl">Approved Route Lines</div>
             </div>
           </div>
@@ -78,6 +118,50 @@ export function TodaDashboard() {
               <div className="stat-lbl">Total TODA Fees Collected</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="glass-container" style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', gap: '1.25rem' }}>
+        <div>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Wallet size={18} /> TODA Payment QR</h3>
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.35rem' }}>I-upload ang official GCash/QR Ph code ng inyong TODA. Ang payment references ay kukumpirmahin dito bago maisama sa collections.</p>
+          {error && <p role="alert" style={{ color: '#f87171', marginTop: '0.5rem' }}>{error}</p>}
+          <label className="btn-glass" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', padding: '0.55rem 0.85rem', cursor: 'pointer' }}>
+            <UploadCloud size={16} /> {qrUploading ? 'Uploading...' : 'Upload TODA QR'}
+            <input type="file" accept="image/*" hidden disabled={qrUploading} onChange={event => void handleQrUpload(event.target.files?.[0])} />
+          </label>
+        </div>
+        {user?.todaPaymentQrUrl ? (
+          <img src={user.todaPaymentQrUrl} alt={`${user.todaName} payment QR`} style={{ width: 150, aspectRatio: '1', objectFit: 'contain', background: '#fff', padding: '0.5rem', borderRadius: '6px' }} />
+        ) : <span style={{ color: '#facc15', fontSize: '0.85rem' }}>No QR uploaded</span>}
+      </div>
+
+      <div className="glass-container" style={{ padding: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>TODA Payment Transactions</h3>
+          <button type="button" onClick={() => void loadData()} className="btn-glass" style={{ padding: '0.45rem 0.75rem' }}>Refresh</button>
+        </div>
+        {error && <p role="alert" style={{ color: '#f87171', marginBottom: '0.75rem' }}>{error}</p>}
+        <div className="glass-table-wrapper">
+          <table className="glass-table">
+            <thead><tr><th>Payer / Driver</th><th>Plate</th><th>Reference</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              {payments.length === 0 ? <tr><td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.25rem' }}>No TODA payments submitted.</td></tr> : payments.map(payment => {
+                const app = applications.find(item => item.id === payment.applicationId);
+                return (
+                  <tr key={payment.id}>
+                    <td>{payment.payerName}</td><td>{app?.plateNumber || '—'}</td><td>{payment.referenceNumber}</td>
+                    <td>₱{payment.amount.toFixed(2)}</td>
+                    <td><span className={`pill-badge ${payment.status === 'completed' ? 'pill-emerald' : payment.status === 'failed' ? 'pill-rose' : 'pill-orange'}`}>{payment.status.toUpperCase()}</span></td>
+                    <td>{payment.status === 'pending' && <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button type="button" onClick={() => void handlePaymentStatus(payment.id, 'completed')} className="btn-glass btn-emerald-glass" style={{ padding: '0.35rem 0.55rem' }}>Confirm</button>
+                      <button type="button" onClick={() => void handlePaymentStatus(payment.id, 'failed')} className="btn-glass" style={{ padding: '0.35rem 0.55rem' }}>Reject</button>
+                    </div>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -112,13 +196,7 @@ export function TodaDashboard() {
                     <td style={{ fontWeight: 700, color: '#ffffff' }}>{app.driverName || app.applicantName}</td>
                     <td style={{ color: '#38bdf8', fontWeight: 600 }}>{app.plateNumber}</td>
                     <td>{app.todaName}</td>
-                    <td>
-                      {app.treasurerPayment?.paid ? (
-                        <span className="pill-badge pill-emerald">Paid (OR #{app.treasurerPayment.orNumber})</span>
-                      ) : (
-                        <span className="pill-badge pill-orange">Unpaid</span>
-                      )}
-                    </td>
+                    <td>{(app.documents || []).length} documents</td>
                     <td>
                       <button
                         onClick={() => navigate('/toda/approvals')}

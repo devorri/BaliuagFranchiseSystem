@@ -1,1 +1,3 @@
+/api/paymongo/*  /.netlify/functions/paymongo/:splat  200
+/api/semaphore/*  /.netlify/functions/semaphore/:splat  200
 /*  /index.html  200

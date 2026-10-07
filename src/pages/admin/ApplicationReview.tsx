@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import * as supabaseService from '../../services/supabaseService';
-import type { Application, Document } from '../../types';
+import type { Application, Document, DocumentType } from '../../types';
 import { 
   CheckCircle2, ShieldCheck, XCircle, FileText, Calendar, 
-  Eye, FileCheck, AlertCircle, Award, CreditCard, Wrench 
+  Eye, FileCheck, AlertCircle, Award, CreditCard, Wrench, RefreshCw
 } from 'lucide-react';
 
 export function ApplicationReview() {
@@ -27,6 +27,7 @@ export function ApplicationReview() {
   );
 
   const canManageRequirements = hasPermission('requirements');
+  const requiredDocumentTypes: DocumentType[] = ['or_cr', 'barangay_clearance', 'drivers_license', 'toda_cert', 'id_photo'];
 
   useEffect(() => {
     loadApplications();
@@ -50,6 +51,15 @@ export function ApplicationReview() {
 
   const handleGrantMtop = async (appId: string) => {
     if (!user) return;
+    if (!selectedApp?.presidentEndorsed) {
+      showToast('Kailangan munang i-endorso ng TODA President ang application.', 'error');
+      return;
+    }
+    const verifiedTypes = new Set((selectedApp.documents || []).filter(doc => doc.status === 'verified').map(doc => doc.type));
+    if (requiredDocumentTypes.some(type => !verifiedTypes.has(type))) {
+      showToast('I-verify muna ng admin ang lahat ng limang required documents.', 'error');
+      return;
+    }
 
     if (!startDate || !endDate) {
       showToast('Please specify the Start Date and End Date for the effectivity period.', 'error');
@@ -116,8 +126,13 @@ export function ApplicationReview() {
     );
     const updatedApp = { ...selectedApp, documents: updatedDocs };
     setSelectedApp(updatedApp);
-    await supabaseService.saveApplicationAsync(updatedApp);
-    showToast(`Document marked as ${newStatus.toUpperCase()}.`, 'success');
+    try {
+      await supabaseService.saveApplicationAsync(updatedApp, true);
+      showToast(`Document marked as ${newStatus.toUpperCase()}.`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not save document verification.', 'error');
+      await loadApplications();
+    }
   };
 
   return (
@@ -128,6 +143,9 @@ export function ApplicationReview() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
           <span className="pill-badge pill-orange">Admin Review & Approval</span>
           <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>MTOP Issuance Portal</span>
+          <button type="button" onClick={loadApplications} className="btn-glass" style={{ marginLeft: 'auto', padding: '0.5rem 0.75rem' }} title="Refresh applications">
+            <RefreshCw size={16} /> Refresh
+          </button>
         </div>
         <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem', color: '#ffffff' }}>
           Review Application & MTOP Approval
@@ -139,9 +157,10 @@ export function ApplicationReview() {
 
       {/* Applications Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.75rem' }}>
-        {applications.map(app => {
+        {applications.filter(app => app.status === 'pending_admin_approval' || app.status === 'approved').map(app => {
           const isApproved = app.status === 'approved';
-          const isRequirementsComplete = app.documents && app.documents.length >= 3;
+          const isRequirementsComplete = requiredDocumentTypes.every(type => app.documents?.some(doc => doc.type === type));
+          const isRequirementsVerified = requiredDocumentTypes.every(type => app.documents?.some(doc => doc.type === type && doc.status === 'verified'));
           const isStenciled = app.inspection?.status === 'passed';
           const isTreasurerPaid = app.treasurerPayment?.paid;
           const isTodaApproved = app.todaApproval?.routeFeePaid || app.presidentEndorsed;
@@ -184,7 +203,7 @@ export function ApplicationReview() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span style={{ color: '#cbd5e1' }}>1. Requirements Upload ({app.documents?.length || 0})</span>
                     <span style={{ color: isRequirementsComplete ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
-                      {isRequirementsComplete ? '✓ Complete' : 'Incomplete'}
+                      {isRequirementsVerified ? '✓ Verified' : isRequirementsComplete ? 'Uploaded, needs verification' : 'Incomplete'}
                     </span>
                   </div>
 
@@ -205,7 +224,7 @@ export function ApplicationReview() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <span style={{ color: '#cbd5e1' }}>4. TODA Line Approval</span>
                     <span style={{ color: isTodaApproved ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
-                      {isTodaApproved ? `✓ Endorsed (${app.todaName.split(' ')[0]})` : 'Pending TODA Pres'}
+                      {isTodaApproved ? `✓ Endorsed (${app.todaName?.split(' ')[0] || 'TODA'})` : 'Pending TODA Pres'}
                     </span>
                   </div>
 
@@ -504,8 +523,20 @@ export function ApplicationReview() {
               justifyContent: 'center',
               border: '1px dashed rgba(255,255,255,0.2)'
             }}>
-              {viewingDoc.fileUrl ? (
-                <img src={viewingDoc.fileUrl} alt={viewingDoc.name} style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px' }} />
+              {(viewingDoc.fileUrl || /^(https?:|blob:)/i.test(viewingDoc.fileName)) ? (
+                (() => {
+                  const documentUrl = viewingDoc.fileUrl || viewingDoc.fileName;
+                  return (
+                    <>
+                      {/\.(png|jpe?g|gif|webp)(\?|$)/i.test(documentUrl) ? (
+                        <img src={documentUrl} alt={viewingDoc.name} style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px' }} />
+                      ) : (
+                        <iframe title={viewingDoc.name} src={documentUrl} style={{ width: '100%', height: '400px', border: 0, borderRadius: '8px' }} />
+                      )}
+                      <a href={documentUrl} target="_blank" rel="noreferrer" style={{ color: '#38bdf8', marginTop: '0.75rem' }}>Open document in new tab</a>
+                    </>
+                  );
+                })()
               ) : (
                 <>
                   <FileText size={64} color="#38bdf8" style={{ marginBottom: '1rem' }} />

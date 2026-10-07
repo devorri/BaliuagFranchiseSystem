@@ -11,8 +11,12 @@ import type {
   Franchise, 
   Advertisement, 
   InformationItem, 
-  ApplicationStatus 
+  ApplicationStatus,
+  Payment,
+  Penalty,
+  SMSNotification,
 } from '../types';
+import { FRANCHISE_FEES } from './fees';
 
 // ================= USER & AUTH =================
 export async function getUsersAsync(): Promise<User[]> {
@@ -107,6 +111,7 @@ export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>
           phone: newUser.phone,
           address: newUser.address,
           toda_name: newUser.todaName,
+          toda_payment_qr_url: newUser.todaPaymentQrUrl,
           account_status: 'pending',
           admin_permissions: newUser.adminPermissions || [],
         }])
@@ -141,6 +146,59 @@ export async function updateAccountStatusAsync(userId: string, status: 'approved
   return storage.updateAccountStatus(userId, status);
 }
 
+export async function updatePresidentQrAsync(userId: string, qrUrl: string): Promise<User | null> {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('profiles')
+      .update({ toda_payment_qr_url: qrUrl, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+    if (error) throw new Error(error.message);
+  }
+  return storage.updateUser(userId, { todaPaymentQrUrl: qrUrl });
+}
+
+export async function createPresidentAsync(
+  presidentData: Omit<User, 'id' | 'createdAt' | 'role' | 'accountStatus'>
+): Promise<User> {
+  const users = await getUsersAsync();
+  if (users.some(user => user.username.toLowerCase() === presidentData.username.toLowerCase())) {
+    throw new Error('Username is already in use.');
+  }
+
+  const newPresident: User = {
+    ...presidentData,
+    id: crypto.randomUUID(),
+    role: 'toda_president',
+    accountStatus: 'approved',
+    adminPermissions: ['president'],
+    createdAt: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured() && supabase) {
+    const { data, error } = await supabase.from('profiles').insert({
+      username: newPresident.username,
+      password_hash: newPresident.password,
+      role: newPresident.role,
+      first_name: newPresident.firstName,
+      last_name: newPresident.lastName,
+      middle_name: newPresident.middleName,
+      email: newPresident.email,
+      phone: newPresident.phone,
+      address: newPresident.address,
+      toda_name: newPresident.todaName,
+      toda_payment_qr_url: newPresident.todaPaymentQrUrl,
+      account_status: 'approved',
+      admin_permissions: ['president'],
+    }).select().single();
+    if (error) throw new Error(error.message);
+    const created = mapProfileToUser(data);
+    storage.saveUser(created);
+    return created;
+  }
+
+  storage.saveUser(newPresident);
+  return newPresident;
+}
+
 // ================= APPLICATIONS =================
 export async function getApplicationsAsync(): Promise<Application[]> {
   if (isSupabaseConfigured() && supabase) {
@@ -160,15 +218,17 @@ export async function getApplicationsAsync(): Promise<Application[]> {
   return storage.getApplications();
 }
 
-export async function saveApplicationAsync(app: Application): Promise<Application> {
+export async function saveApplicationAsync(app: Application, requireSupabaseSave = false): Promise<Application> {
   if (isSupabaseConfigured() && supabase) {
     try {
-      await supabase.from('applications').upsert({
+      const { error } = await supabase.from('applications').upsert({
         id: app.id,
         applicant_id: app.applicantId,
         applicant_name: app.applicantName,
         applicant_role: app.applicantRole,
+        driver_id: app.driverId || null,
         type: app.type,
+        residency: app.residency || 'baliwag_resident',
         status: app.status,
         driver_name: app.driverName,
         license_number: app.licenseNumber,
@@ -202,8 +262,12 @@ export async function saveApplicationAsync(app: Application): Promise<Applicatio
         submitted_at: app.submittedAt,
         updated_at: new Date().toISOString(),
       });
+      if (error) throw error;
     } catch (err) {
       console.warn('Supabase save application error:', err);
+      if (requireSupabaseSave) {
+        throw new Error('Hindi na-save sa shared application database. Pakisuri ang Supabase table access at subukang muli.');
+      }
     }
   }
   return storage.saveApplication(app);
@@ -217,25 +281,61 @@ export async function updateApplicationStatusAsync(
   startDate?: string,
   endDate?: string
 ): Promise<Application | null> {
-  const result = storage.updateApplicationStatus(id, status, adminNotes, reviewedBy, startDate, endDate);
-  if (isSupabaseConfigured() && supabase && result) {
-    try {
-      await supabase.from('applications').update({
-        status: result.status,
-        admin_notes: result.adminNotes,
-        reviewed_by: result.reviewedBy,
-        reviewed_at: result.reviewedAt,
-        start_date: result.startDate,
-        end_date: result.endDate,
-        mtop_number: result.mtopNumber,
-        qr_code_url: result.qrCodeUrl,
-        updated_at: new Date().toISOString(),
-      }).eq('id', id);
-    } catch (err) {
-      console.warn('Supabase update status error:', err);
-    }
+  const application = (await getApplicationsAsync()).find(item => item.id === id);
+  if (!application) return null;
+
+  const now = new Date().toISOString();
+  const updated: Application = {
+    ...application,
+    status,
+    adminNotes: adminNotes ?? application.adminNotes,
+    reviewedBy: reviewedBy ?? application.reviewedBy,
+    reviewedAt: now,
+    startDate: startDate ?? application.startDate,
+    endDate: endDate ?? application.endDate,
+    updatedAt: now,
+  };
+  let franchiseToSave: Franchise | undefined;
+
+  if (status === 'approved') {
+    const driverId = updated.driverId || (updated.applicantRole === 'driver' ? updated.applicantId : '');
+    if (!driverId) throw new Error('Assign an approved driver before granting this franchise.');
+
+    const existing = (await getFranchisesAsync()).find(item => item.applicationId === id);
+    const mtopNumber = existing?.mtopNumber || `MTOP-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const effectiveStart = startDate || now.slice(0, 10);
+    const effectiveEnd = endDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    updated.mtopNumber = mtopNumber;
+    updated.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(mtopNumber)}`;
+    franchiseToSave = {
+      id: existing?.id || crypto.randomUUID(),
+      mtopNumber,
+      applicationId: id,
+      operatorId: updated.applicantRole === 'operator' ? updated.applicantId : '',
+      operatorName: updated.applicantRole === 'operator' ? updated.applicantName : 'Independent Driver',
+      driverId,
+      driverName: updated.driverName || updated.applicantName,
+      vehicleMake: updated.vehicleMake,
+      vehicleModel: updated.vehicleModel,
+      plateNumber: updated.plateNumber,
+      motorNumber: updated.motorNumber,
+      chassisNumber: updated.chassisNumber,
+      vehicleColor: updated.vehicleColor,
+      todaName: updated.todaName,
+      routeArea: updated.routeArea,
+      status: 'active',
+      startDate: effectiveStart,
+      endDate: effectiveEnd,
+      issuedAt: new Date(effectiveStart).toISOString(),
+      expiresAt: new Date(effectiveEnd).toISOString(),
+      renewalDate: new Date(new Date(effectiveEnd).getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      qrCodeData: `BALIUAG-MTOP|${mtopNumber}|PLATE:${updated.plateNumber}|DRIVER:${updated.driverName || updated.applicantName}`,
+    };
   }
-  return result;
+
+  await saveApplicationAsync(updated, isSupabaseConfigured());
+  if (franchiseToSave) await saveFranchiseAsync(franchiseToSave, isSupabaseConfigured());
+  return updated;
 }
 
 export async function endorseApplicationByPresidentAsync(
@@ -274,6 +374,229 @@ export async function getFranchisesAsync(): Promise<Franchise[]> {
     }
   }
   return storage.getFranchises();
+}
+
+export async function saveFranchiseAsync(franchise: Franchise, requireSupabaseSave = false): Promise<Franchise> {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('franchises').upsert({
+      id: franchise.id,
+      mtop_number: franchise.mtopNumber,
+      application_id: franchise.applicationId || null,
+      operator_id: franchise.operatorId || null,
+      operator_name: franchise.operatorName,
+      driver_id: franchise.driverId || null,
+      driver_name: franchise.driverName,
+      vehicle_make: franchise.vehicleMake,
+      vehicle_model: franchise.vehicleModel,
+      plate_number: franchise.plateNumber,
+      motor_number: franchise.motorNumber,
+      chassis_number: franchise.chassisNumber,
+      vehicle_color: franchise.vehicleColor,
+      toda_name: franchise.todaName,
+      route_area: franchise.routeArea,
+      status: franchise.status,
+      start_date: franchise.startDate,
+      end_date: franchise.endDate,
+      issued_at: franchise.issuedAt,
+      expires_at: franchise.expiresAt,
+      renewal_date: franchise.renewalDate,
+      qr_code_data: franchise.qrCodeData,
+      slot_released_at: franchise.slotReleasedAt,
+      updated_at: new Date().toISOString(),
+    });
+    if (error && requireSupabaseSave) throw new Error(error.message);
+    if (error) console.warn('Supabase save franchise error:', error.message);
+  }
+  return storage.saveFranchise(franchise);
+}
+
+export async function getPaymentsAsync(): Promise<Payment[]> {
+  if (isSupabaseConfigured() && supabase) {
+    const { data, error } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
+    if (!error && data) return data.map(mapDbPayment);
+    if (error) console.warn('Supabase get payments error:', error.message);
+  }
+  return storage.getPayments();
+}
+
+export async function savePaymentAsync(payment: Payment, requireSupabaseSave = false): Promise<Payment> {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('payments').upsert({
+      id: payment.id,
+      application_id: payment.applicationId || null,
+      payer_id: payment.payerId,
+      payer_name: payment.payerName,
+      amount: payment.amount,
+      description: payment.description,
+      status: payment.status,
+      payment_method: payment.paymentMethod,
+      reference_number: payment.referenceNumber,
+      qr_code_data: payment.qrCodeData,
+      paid_at: payment.paidAt,
+      created_at: payment.createdAt,
+    });
+    if (error && requireSupabaseSave) throw new Error(error.message);
+    if (error) console.warn('Supabase save payment error:', error.message);
+  }
+  return storage.savePayment(payment);
+}
+
+export async function updatePaymentStatusAsync(paymentId: string, status: Payment['status']): Promise<Payment> {
+  const payment = (await getPaymentsAsync()).find(item => item.id === paymentId);
+  if (!payment) throw new Error('Payment record not found.');
+  const updated = { ...payment, status, paidAt: status === 'completed' ? new Date().toISOString() : undefined };
+  return savePaymentAsync(updated, isSupabaseConfigured());
+}
+
+export async function getPenaltiesAsync(): Promise<Penalty[]> {
+  if (isSupabaseConfigured() && supabase) {
+    const { data, error } = await supabase.from('penalties').select('*').order('issued_date', { ascending: false });
+    if (!error && data) return data.map(mapDbPenalty);
+    if (error) console.warn('Supabase get penalties error:', error.message);
+  }
+  return storage.getPenalties();
+}
+
+export async function savePenaltyAsync(penalty: Penalty, requireSupabaseSave = false): Promise<Penalty> {
+  const isNewPenalty = !storage.getPenalties().some(item => item.id === penalty.id);
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('penalties').upsert({
+      id: penalty.id,
+      driver_id: penalty.driverId || null,
+      driver_name: penalty.driverName,
+      plate_number: penalty.plateNumber,
+      toda_name: penalty.todaName,
+      violation_type: penalty.violationType,
+      amount: penalty.amount,
+      status: penalty.status,
+      issued_date: penalty.issuedDate.slice(0, 10),
+      due_date: penalty.dueDate.slice(0, 10),
+      paid_at: penalty.paidAt,
+      remarks: penalty.remarks,
+      issued_by: penalty.issuedBy,
+    });
+    if (error && requireSupabaseSave) throw new Error(error.message);
+    if (error) console.warn('Supabase save penalty error:', error.message);
+  }
+  const savedPenalty = storage.savePenalty(penalty);
+  if (isNewPenalty && penalty.status === 'unpaid') {
+    const recipient = (await getUsersAsync()).find(account => account.id === penalty.driverId);
+    if (recipient) {
+      const notification: SMSNotification = {
+        id: crypto.randomUUID(),
+        userId: recipient.id,
+        recipientPhone: recipient.phone,
+        title: `Penalty notice: ${penalty.violationType}`,
+        message: `May penalty na ₱${penalty.amount.toFixed(2)} para sa ${penalty.plateNumber}. Due date: ${new Date(penalty.dueDate).toLocaleDateString()}.`,
+        type: 'penalty_alert',
+        sentAt: new Date().toISOString(),
+        read: false,
+      };
+      try {
+        await saveSMSNotificationAsync(notification);
+      } catch (error) {
+        console.warn('Could not save penalty notification:', error);
+        storage.saveSMSNotification(notification);
+      }
+    }
+  }
+  return savedPenalty;
+}
+
+export async function updatePenaltyStatusAsync(penaltyId: string, status: Penalty['status']): Promise<Penalty> {
+  const penalty = (await getPenaltiesAsync()).find(item => item.id === penaltyId);
+  if (!penalty) throw new Error('Penalty record not found.');
+  return savePenaltyAsync({ ...penalty, status, paidAt: status === 'paid' ? new Date().toISOString() : undefined }, isSupabaseConfigured());
+}
+
+export async function getSMSNotificationsAsync(userId?: string): Promise<SMSNotification[]> {
+  if (isSupabaseConfigured() && supabase) {
+    let query = supabase.from('sms_notifications').select('*').order('sent_at', { ascending: false });
+    if (userId) query = query.eq('user_id', userId);
+    const { data, error } = await query;
+    if (!error && data) return data.map(mapDbSMSNotification);
+    if (error) console.warn('Supabase get notifications error:', error.message);
+  }
+  return storage.getSMSNotifications(userId);
+}
+
+export async function saveSMSNotificationAsync(notification: SMSNotification): Promise<SMSNotification> {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('sms_notifications').upsert({
+      id: notification.id,
+      user_id: notification.userId,
+      recipient_phone: notification.recipientPhone,
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      sent_at: notification.sentAt,
+      read: notification.read,
+    });
+    if (error) throw new Error(error.message);
+  }
+  return storage.saveSMSNotification(notification);
+}
+
+export async function processFranchiseLifecycleAsync(): Promise<void> {
+  const [franchises, users, penalties] = await Promise.all([getFranchisesAsync(), getUsersAsync(), getPenaltiesAsync()]);
+  const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`).getTime();
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  for (const franchise of franchises) {
+    const expiry = new Date(`${franchise.expiresAt.slice(0, 10)}T00:00:00Z`).getTime();
+    if (!Number.isFinite(expiry)) continue;
+    const daysUntilExpiry = Math.floor((expiry - today) / dayMs);
+
+    if (franchise.status === 'active' && daysUntilExpiry < 0) {
+      await saveFranchiseAsync({ ...franchise, status: 'expired' }, isSupabaseConfigured());
+      const hasExpiryPenalty = penalties.some(penalty =>
+        penalty.driverId === franchise.driverId
+        && penalty.plateNumber === franchise.plateNumber
+        && penalty.violationType === 'Expired MTOP'
+      );
+      if (!hasExpiryPenalty && franchise.driverId) {
+        await savePenaltyAsync({
+          id: crypto.randomUUID(), driverId: franchise.driverId, driverName: franchise.driverName,
+          plateNumber: franchise.plateNumber, todaName: franchise.todaName,
+          violationType: 'Expired MTOP', amount: FRANCHISE_FEES.expiredFranchisePenalty,
+          status: 'unpaid', issuedDate: new Date().toISOString(), dueDate: new Date().toISOString(),
+          remarks: 'Fixed penalty for an expired franchise.', issuedBy: 'Baliwag Franchise System',
+        }, isSupabaseConfigured());
+      }
+      continue;
+    }
+
+    if (franchise.status === 'expired' && daysUntilExpiry <= -365) {
+      await saveFranchiseAsync({
+        ...franchise,
+        status: 'available',
+        operatorId: '',
+        operatorName: 'Available for reassignment',
+        driverId: '',
+        driverName: 'Available slot',
+        slotReleasedAt: new Date().toISOString(),
+      }, isSupabaseConfigured());
+      continue;
+    }
+
+    if (franchise.status !== 'active' || daysUntilExpiry < 0 || daysUntilExpiry > 30 || !franchise.driverId) continue;
+    const driver = users.find(account => account.id === franchise.driverId);
+    if (!driver) continue;
+
+    const existing = await getSMSNotificationsAsync(driver.id);
+    if (existing.some(item => item.type === 'renewal_reminder' && item.message.includes(franchise.mtopNumber))) continue;
+
+    await saveSMSNotificationAsync({
+      id: crypto.randomUUID(),
+      userId: driver.id,
+      recipientPhone: driver.phone,
+      title: 'Renewal due in 30 days',
+      message: `Paalala: mag-renew ng MTOP ${franchise.mtopNumber} para sa plate ${franchise.plateNumber}. Mag-e-expire ito sa ${new Date(franchise.expiresAt).toLocaleDateString()}.`,
+      type: 'renewal_reminder',
+      sentAt: new Date().toISOString(),
+      read: false,
+    });
+  }
 }
 
 // ================= ADVERTISEMENTS =================
@@ -391,6 +714,7 @@ function mapProfileToUser(p: any): User {
     phone: p.phone,
     address: p.address,
     todaName: p.toda_name,
+    todaPaymentQrUrl: p.toda_payment_qr_url,
     profilePhoto: p.profile_photo,
     accountStatus: p.account_status,
     adminPermissions: p.admin_permissions || [],
@@ -405,7 +729,9 @@ function mapDbApplication(a: any): Application {
     applicantId: a.applicant_id,
     applicantName: a.applicant_name,
     applicantRole: a.applicant_role,
+    driverId: a.driver_id,
     type: a.type,
+    residency: a.residency,
     status: a.status,
     driverName: a.driver_name,
     licenseNumber: a.license_number,
@@ -417,7 +743,7 @@ function mapDbApplication(a: any): Application {
     vehicleColor: a.vehicle_color,
     todaName: a.toda_name,
     routeArea: a.route_area,
-    documents: a.documents || [],
+    documents: Array.isArray(a.documents) ? a.documents : [],
     inspection: a.inspection,
     treasurerPayment: a.treasurer_payment,
     todaApproval: a.toda_approval,
@@ -465,6 +791,55 @@ function mapDbFranchise(f: any): Franchise {
     expiresAt: f.expires_at,
     renewalDate: f.renewal_date,
     qrCodeData: f.qr_code_data,
+    slotReleasedAt: f.slot_released_at,
+  };
+}
+
+function mapDbPayment(payment: any): Payment {
+  return {
+    id: payment.id,
+    applicationId: payment.application_id || '',
+    payerId: payment.payer_id || '',
+    payerName: payment.payer_name,
+    amount: Number(payment.amount || 0),
+    description: payment.description || '',
+    status: payment.status,
+    paymentMethod: payment.payment_method,
+    referenceNumber: payment.reference_number,
+    qrCodeData: payment.qr_code_data,
+    paidAt: payment.paid_at,
+    createdAt: payment.created_at,
+  };
+}
+
+function mapDbPenalty(penalty: any): Penalty {
+  return {
+    id: penalty.id,
+    driverId: penalty.driver_id || '',
+    driverName: penalty.driver_name,
+    plateNumber: penalty.plate_number,
+    todaName: penalty.toda_name,
+    violationType: penalty.violation_type,
+    amount: Number(penalty.amount || 0),
+    status: penalty.status,
+    issuedDate: penalty.issued_date,
+    dueDate: penalty.due_date,
+    paidAt: penalty.paid_at,
+    remarks: penalty.remarks || '',
+    issuedBy: penalty.issued_by,
+  };
+}
+
+function mapDbSMSNotification(notification: any): SMSNotification {
+  return {
+    id: notification.id,
+    userId: notification.user_id,
+    recipientPhone: notification.recipient_phone,
+    title: notification.title,
+    message: notification.message,
+    type: notification.type,
+    sentAt: notification.sent_at,
+    read: notification.read,
   };
 }
 

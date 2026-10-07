@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import * as storage from '../../services/storageService';
-import type { Application, Penalty } from '../../types';
+import * as supabaseService from '../../services/supabaseService';
+import type { Application, Franchise, Penalty, SMSNotification } from '../../types';
 import { QrCode, AlertTriangle, CheckCircle2, ShieldCheck, Clock, Award, X, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,19 +10,29 @@ export function DriverDashboard() {
   const navigate = useNavigate();
   const [application, setApplication] = useState<Application | null>(null);
   const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [franchises, setFranchises] = useState<Franchise[]>([]);
+  const [notifications, setNotifications] = useState<SMSNotification[]>([]);
   const [showQRModal, setShowQRModal] = useState(false);
 
   useEffect(() => {
     if (user) {
-      const apps = storage.getApplications();
-      const userApp = apps.find(a => a.applicantId === user.id || a.driverName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase());
-      if (userApp) setApplication(userApp);
-
-      const allPenalties = storage.getPenalties();
-      const myPenalties = allPenalties.filter(p => p.driverId === user.id || p.driverName.toLowerCase().includes(user.lastName.toLowerCase()));
-      setPenalties(myPenalties);
+      Promise.all([
+        supabaseService.getApplicationsAsync(),
+        supabaseService.getFranchisesAsync(),
+        supabaseService.getPenaltiesAsync(),
+        supabaseService.getSMSNotificationsAsync(user.id),
+      ]).then(([apps, allFranchises, allPenalties, userNotifications]) => {
+        const myApplications = apps.filter(app => app.driverId === user.id || app.applicantId === user.id);
+        myApplications.sort((left, right) => right.submittedAt.localeCompare(left.submittedAt));
+        if (myApplications[0]) setApplication(myApplications[0]);
+        setFranchises(allFranchises.filter(franchise => franchise.driverId === user.id));
+        setPenalties(allPenalties.filter(penalty => penalty.driverId === user.id));
+        setNotifications(userNotifications);
+      });
     }
   }, [user]);
+
+  const renewalNotifications = notifications.filter(notification => notification.type === 'renewal_reminder');
 
   const getStatusPill = (status?: string) => {
     switch (status) {
@@ -116,6 +126,27 @@ export function DriverDashboard() {
         </div>
       </div>
 
+      {franchises.length > 0 && (
+        <div className="glass-container" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Mga Tricycle na Nakatalaga sa Iyo</h3>
+            <span className="pill-badge pill-cyan">{franchises.length} Units</span>
+          </div>
+          {franchises.map(franchise => {
+            const daysRemaining = Math.ceil((new Date(franchise.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+            return (
+              <div key={franchise.id} className="glass-panel" style={{ padding: '0.9rem 1rem', marginTop: '0.65rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div><strong>{franchise.plateNumber}</strong> · {franchise.mtopNumber}<div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Operator: {franchise.operatorName} · {franchise.todaName}</div></div>
+                <div style={{ color: daysRemaining <= 30 ? '#facc15' : '#cbd5e1', fontSize: '0.85rem' }}>
+                  Expires {new Date(franchise.expiresAt).toLocaleDateString()} {daysRemaining <= 30 && daysRemaining >= 0 ? `· ${daysRemaining} days left` : ''}
+                </div>
+              </div>
+            );
+          })}
+          {renewalNotifications.length > 0 && <p style={{ color: '#facc15', fontSize: '0.85rem', marginTop: '0.75rem' }}>{renewalNotifications.length} renewal reminder{renewalNotifications.length === 1 ? '' : 's'} in your inbox.</p>}
+        </div>
+      )}
+
       {/* Main Content Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.75rem' }}>
         
@@ -183,7 +214,7 @@ export function DriverDashboard() {
               {!application.treasurerPayment?.paid && (
                 <div style={{ marginTop: '0.75rem', padding: '1rem', borderRadius: '14px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div>
-                    <strong style={{ color: '#facc15', fontSize: '0.92rem', display: 'block' }}>Kailangan ng Bayad sa Treasurer (₱600.00)</strong>
+                    <strong style={{ color: '#facc15', fontSize: '0.92rem', display: 'block' }}>Kailangan ng Bayad sa Treasurer (₱{application.totalFee.toFixed(2)})</strong>
                     <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Maaaring magbayad via GCash o Cash sa Treasurer's Office.</span>
                   </div>
                   <button

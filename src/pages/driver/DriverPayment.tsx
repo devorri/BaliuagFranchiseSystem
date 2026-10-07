@@ -33,6 +33,7 @@ export function DriverPayment() {
   const [gcashRef] = useState(`900${Math.floor(10000000 + Math.random() * 90000000)}`);
 
   const paymongoReady = isPayMongoConfigured();
+  const payableAmount = application?.totalFee || 450;
 
   useEffect(() => {
     if (user) {
@@ -74,7 +75,7 @@ export function DriverPayment() {
       const currentUrl = window.location.origin + window.location.pathname;
 
       const session = await createCheckoutSession({
-        amount: 600,
+        amount: payableAmount,
         name: 'Tricycle Inspection & Regulatory Fee',
         description: 'Baliwag Tricycle Stenciling & Inspection Fee',
         successUrl: `${currentUrl}?status=success&session_id={checkout_session_id}`,
@@ -90,7 +91,7 @@ export function DriverPayment() {
         const currentUrl = window.location.origin + window.location.pathname;
 
         const source = await createGCashSource({
-          amount: 600,
+          amount: payableAmount,
           successUrl: `${currentUrl}?status=success&source_id={source_id}`,
           failedUrl: `${currentUrl}?status=failed`,
         });
@@ -120,7 +121,7 @@ export function DriverPayment() {
           const refNum = `PM-QRPH-${sid.slice(-8).toUpperCase()}`;
           const updated = storage.recordTreasurerPayment(
             application.id,
-            600,
+            payableAmount,
             refNum,
             'gcash'
           );
@@ -141,7 +142,7 @@ export function DriverPayment() {
           const refNum = `PM-${sid.slice(-8).toUpperCase()}`;
           const updated = storage.recordTreasurerPayment(
             application.id,
-            600,
+            payableAmount,
             refNum,
             'gcash'
           );
@@ -171,7 +172,7 @@ export function DriverPayment() {
 
     const updated = storage.recordTreasurerPayment(
       application.id,
-      600,
+      payableAmount,
       `GCASH-${gcashRef}`,
       'gcash'
     );
@@ -193,7 +194,7 @@ export function DriverPayment() {
 
     const updated = storage.recordTreasurerPayment(
       application.id,
-      600,
+      payableAmount,
       orNumber.trim(),
       'cash'
     );
@@ -270,7 +271,7 @@ export function DriverPayment() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
                   <span style={{ fontWeight: 700, color: '#ffffff' }}>Kabuuang Bayarin sa Treasurer:</span>
-                  <strong style={{ fontSize: '1.3rem', color: '#22c55e', fontWeight: 800 }}>₱600.00</strong>
+                  <strong style={{ fontSize: '1.3rem', color: '#22c55e', fontWeight: 800 }}>₱{payableAmount.toFixed(2)}</strong>
                 </div>
               </div>
             </div>
@@ -323,7 +324,7 @@ export function DriverPayment() {
                   <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <span style={{ color: '#94a3b8', fontSize: '0.78rem', display: 'block' }}>Total Amount Paid</span>
                     <strong style={{ color: '#4ade80', fontSize: '1.2rem', fontWeight: 800 }}>
-                      ₱600.00
+                      ₱{payableAmount.toFixed(2)}
                     </strong>
                   </div>
 
@@ -423,7 +424,7 @@ export function DriverPayment() {
                         {!checkoutUrl ? (
                           <>
                             <p style={{ fontSize: '0.9rem', color: '#cbd5e1', marginBottom: '1.5rem', maxWidth: '550px', margin: '0 auto 1.5rem auto' }}>
-                              I-click ang button sa ibaba upang mag-open ng <strong>PayMongo GCash Checkout</strong>. Ire-redirect ka sa secure na payment page upang makumpleto ang ₱600.00 na bayad.
+                              I-click ang button sa ibaba upang mag-open ng <strong>PayMongo GCash Checkout</strong>. Ire-redirect ka sa secure na payment page upang makumpleto ang ₱{payableAmount.toFixed(2)} na bayad.
                             </p>
 
                             {/* PayMongo Badge */}
@@ -447,7 +448,7 @@ export function DriverPayment() {
                               {isLoading ? (
                                 <><Loader2 size={20} className="spin-icon" /> Creating Checkout Session...</>
                               ) : (
-                                <><Smartphone size={20} /> Pay ₱600.00 via GCash</>
+                                <><Smartphone size={20} /> Pay ₱{payableAmount.toFixed(2)} via GCash</>
                               )}
                             </button>
                           </>
@@ -497,7 +498,7 @@ export function DriverPayment() {
                       /* ── Simulated GCash (No PayMongo Keys) ── */
                       <div style={{ textAlign: 'center' }}>
                         <p style={{ fontSize: '0.9rem', color: '#cbd5e1', marginBottom: '1.5rem', maxWidth: '550px', margin: '0 auto 1.5rem auto' }}>
-                          I-click ang button sa ibaba upang buksan ang <strong>GCash QR Scanner Modal</strong> at kumpletuhin ang pagbabayad ng <strong>₱600.00</strong>.
+                          I-click ang button sa ibaba upang buksan ang <strong>GCash QR Scanner Modal</strong> at kumpletuhin ang pagbabayad ng <strong>₱{payableAmount.toFixed(2)}</strong>.
                         </p>
                         <button
                           type="button"
@@ -505,7 +506,7 @@ export function DriverPayment() {
                           className="btn-glass btn-primary-glass"
                           style={{ padding: '1rem 2rem', fontSize: '1.05rem' }}
                         >
-                          <Smartphone size={20} /> Open GCash QR Payment (₱600.00)
+                          <Smartphone size={20} /> Open GCash QR Payment (₱{payableAmount.toFixed(2)})
                         </button>
                       </div>
                     )}
@@ -519,7 +520,7 @@ export function DriverPayment() {
                       I-record ang Cash Official Receipt (OR)
                     </h3>
                     <p style={{ fontSize: '0.88rem', color: '#cbd5e1' }}>
-                      Kung nabayaran na ang ₱600.00 sa Municipal Treasurer's Office cashier, i-type ang OR number sa ibaba.
+                      Kung nabayaran na ang ₱{payableAmount.toFixed(2)} sa Municipal Treasurer's Office cashier, i-type ang OR number sa ibaba.
                     </p>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
@@ -582,7 +583,7 @@ export function DriverPayment() {
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.15)', padding: '0.65rem', borderRadius: '10px', fontSize: '0.85rem' }}>
                   <span>Ref No: </span><strong>GCASH-{gcashRef}</strong><br />
-                  <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>₱600.00</span>
+                  <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>₱{payableAmount.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -591,7 +592,7 @@ export function DriverPayment() {
                 className="btn-glass btn-emerald-glass"
                 style={{ width: '100%', padding: '0.95rem', fontSize: '1rem' }}
               >
-                <ShieldCheck size={20} /> Confirm GCash Payment (₱600.00)
+                <ShieldCheck size={20} /> Confirm GCash Payment (₱{payableAmount.toFixed(2)})
               </button>
             </div>
           </div>
