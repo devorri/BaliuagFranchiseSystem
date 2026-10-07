@@ -361,6 +361,41 @@ export async function endorseApplicationByPresidentAsync(
   return result;
 }
 
+export async function recordInspectionAsync(
+  appId: string, 
+  engineVerified: boolean, 
+  chassisVerified: boolean,
+  inspectorName: string,
+  notes: string
+): Promise<Application | null> {
+  const apps = await getApplicationsAsync();
+  const app = apps.find(a => a.id === appId);
+  if (!app) return null;
+
+  const passed = engineVerified && chassisVerified;
+  app.inspection = {
+    id: `insp-${Date.now()}`,
+    applicationId: appId,
+    engineNumber: app.motorNumber,
+    chassisNumber: app.chassisNumber,
+    engineVerified,
+    chassisVerified,
+    inspectorName,
+    inspectedAt: new Date().toISOString(),
+    status: passed ? 'passed' : 'failed',
+    notes,
+  };
+
+  if (passed && (app.status === 'pending_inspection' || app.status === 'draft')) {
+    app.status = 'inspection_passed';
+  }
+
+  // Update storage cache
+  storage.recordInspection(appId, engineVerified, chassisVerified, inspectorName, notes);
+  // Persist to Supabase
+  return saveApplicationAsync(app, isSupabaseConfigured());
+}
+
 export async function recordTreasurerPaymentAsync(
   appId: string, 
   amount: number, 

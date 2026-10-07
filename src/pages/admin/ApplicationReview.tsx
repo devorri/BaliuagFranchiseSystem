@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import * as supabaseService from '../../services/supabaseService';
-import type { Application, Document, DocumentType } from '../../types';
+import type { Application, Document, DocumentType, TreasurerPayment } from '../../types';
 import { 
   CheckCircle2, ShieldCheck, XCircle, FileText, Calendar, 
   Eye, FileCheck, AlertCircle, Award, CreditCard, Wrench, RefreshCw
@@ -25,6 +25,7 @@ export function ApplicationReview() {
   const [adminNotes, setAdminNotes] = useState(
     'Requirements, stenciling inspection, and Treasurer/TODA fees are complete. MTOP permit approved.'
   );
+  const [filterTab, setFilterTab] = useState<'needs_action' | 'pending_admin' | 'approved' | 'all'>('needs_action');
 
   const canManageRequirements = hasPermission('requirements');
   const requiredDocumentTypes: DocumentType[] = ['or_cr', 'barangay_clearance', 'drivers_license', 'toda_cert', 'id_photo'];
@@ -135,6 +136,96 @@ export function ApplicationReview() {
     }
   };
 
+  const handleVerifyAllDocs = async () => {
+    if (!selectedApp) return;
+    setLoading(true);
+    try {
+      const updatedDocs = (selectedApp.documents || []).map(d => ({
+        ...d,
+        status: 'verified' as const
+      }));
+      const updatedApp = { ...selectedApp, documents: updatedDocs };
+      const saved = await supabaseService.saveApplicationAsync(updatedApp, true);
+      setSelectedApp(saved);
+      showToast('Lahat ng dokumento ay matagumpay na na-verify!', 'success');
+      await loadApplications();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Hindi na-save ang beripikasyon ng dokumento.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveInspection = async (appId: string) => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const inspectorName = `${user.firstName} ${user.lastName} (City Stenciling Office)`;
+      const notes = 'Engine and chassis stenciling verified. All numbers verified against registered OR/CR.';
+      const updated = await supabaseService.recordInspectionAsync(
+        appId,
+        true,
+        true,
+        inspectorName,
+        notes
+      );
+      if (updated) {
+        showToast('Nai-record na pumasa ang makina at chassis stenciling!', 'success');
+        setSelectedApp(updated);
+        await loadApplications();
+      }
+    } catch {
+      showToast('Hindi na-save ang stenciling record.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdminEndorseToda = async (appId: string) => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const updated = await supabaseService.endorseApplicationByPresidentAsync(
+        appId,
+        `${user.firstName} ${user.lastName} (Admin Override)`,
+        'Verified and endorsed for MTOP grant by Municipal Licensing Officer.'
+      );
+      if (updated) {
+        showToast('Nai-record ang TODA endorsement ng Admin!', 'success');
+        setSelectedApp(updated);
+        await loadApplications();
+      }
+    } catch {
+      showToast('Hindi na-save ang TODA endorsement.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarkTreasurerPaid = async (appId: string) => {
+    if (!user || !selectedApp || selectedApp.id !== appId) return;
+    setLoading(true);
+    try {
+      const orNumber = `OR-ADM-${Date.now().toString().slice(-6)}`;
+      const updatedPayment: TreasurerPayment = {
+        amount: selectedApp.treasurerPayment?.amount || selectedApp.totalFee || 670,
+        paid: true,
+        paidAt: new Date().toISOString(),
+        orNumber: selectedApp.treasurerPayment?.orNumber || orNumber,
+        paymentMethod: 'gcash'
+      };
+      const updatedApp = { ...selectedApp, treasurerPayment: updatedPayment };
+      const saved = await supabaseService.saveApplicationAsync(updatedApp, true);
+      setSelectedApp(saved);
+      showToast('Nai-record na bayad na ang Treasurer Fee!', 'success');
+      await loadApplications();
+    } catch {
+      showToast('Hindi na-save ang payment record.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
@@ -153,11 +244,53 @@ export function ApplicationReview() {
         <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
           Review **Requirements**, **Stenciling Record**, **TODA Endorsement**, and set **Start & End Effectivity Dates** before issuing the official franchise.
         </p>
+
+        {/* Filter Tabs */}
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+          {[
+            { key: 'needs_action' as const, label: 'Needs Action', color: '#facc15' },
+            { key: 'pending_admin' as const, label: 'Pending Approval', color: '#f97316' },
+            { key: 'approved' as const, label: 'Approved / Granted', color: '#34d399' },
+            { key: 'all' as const, label: 'All Applications', color: '#38bdf8' },
+          ].map(tab => {
+            const isActive = filterTab === tab.key;
+            const count = applications.filter(app => {
+              if (tab.key === 'needs_action') return app.status !== 'approved' && app.status !== 'rejected';
+              if (tab.key === 'pending_admin') return app.status === 'pending_admin_approval';
+              if (tab.key === 'approved') return app.status === 'approved';
+              return true;
+            }).length;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setFilterTab(tab.key)}
+                className="btn-glass"
+                style={{
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.82rem',
+                  fontWeight: isActive ? 700 : 500,
+                  background: isActive ? `${tab.color}22` : 'transparent',
+                  borderColor: isActive ? `${tab.color}66` : 'rgba(255,255,255,0.12)',
+                  color: isActive ? tab.color : '#94a3b8',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {tab.label} ({count})
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Applications Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.75rem' }}>
-        {applications.filter(app => app.status === 'pending_admin_approval' || app.status === 'approved').map(app => {
+        {applications.filter(app => {
+          if (filterTab === 'needs_action') return app.status !== 'approved' && app.status !== 'rejected';
+          if (filterTab === 'pending_admin') return app.status === 'pending_admin_approval';
+          if (filterTab === 'approved') return app.status === 'approved';
+          return true; // 'all'
+        }).map(app => {
           const isApproved = app.status === 'approved';
           const isRequirementsComplete = requiredDocumentTypes.every(type => app.documents?.some(doc => doc.type === type));
           const isRequirementsVerified = requiredDocumentTypes.every(type => app.documents?.some(doc => doc.type === type && doc.status === 'verified'));
@@ -244,6 +377,12 @@ export function ApplicationReview() {
                     <strong style={{ color: '#34d399' }}>Official MTOP #: {app.mtopNumber || 'MTOP-2026-0891'}</strong>
                     <br />
                     <span style={{ color: '#cbd5e1' }}>Reviewed by {app.reviewedBy}</span>
+                  </div>
+                ) : app.status === 'rejected' ? (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.85rem' }}>
+                    <strong style={{ color: '#f87171' }}>❌ Application Rejected</strong>
+                    <br />
+                    <span style={{ color: '#cbd5e1' }}>{app.reviewedBy ? `By ${app.reviewedBy}` : ''}</span>
                   </div>
                 ) : (
                   <button
@@ -377,11 +516,34 @@ export function ApplicationReview() {
                   })}
                 </div>
               )}
+
+              {/* Verify All Documents Button */}
+              {canManageRequirements && selectedApp.documents && selectedApp.documents.length > 0 && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleVerifyAllDocs}
+                    disabled={loading || requiredDocumentTypes.every(type => selectedApp.documents?.some(doc => doc.type === type && doc.status === 'verified'))}
+                    className="btn-glass"
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem',
+                      fontSize: '0.85rem',
+                      background: 'rgba(34, 197, 94, 0.12)',
+                      borderColor: 'rgba(34, 197, 94, 0.3)',
+                      color: '#4ade80'
+                    }}
+                  >
+                    <FileCheck size={16} /> {requiredDocumentTypes.every(type => selectedApp.documents?.some(doc => doc.type === type && doc.status === 'verified')) ? '✓ Lahat ng Dokumento ay Verified Na' : 'I-Verify Lahat ng Dokumento'}
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Workflow Progress Details Grid */}
+            {/* Workflow Progress Details Grid — with Admin Action Buttons */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div className="glass-panel" style={{ padding: '0.85rem' }}>
+              {/* Stenciling Panel */}
+              <div className="glass-panel" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <Wrench size={14} /> Makina & Chassis Stenciling
                 </span>
@@ -389,9 +551,21 @@ export function ApplicationReview() {
                   {selectedApp.inspection?.status === 'passed' ? 'PASSED (Stenciled)' : 'PENDING'}
                 </strong>
                 <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>Motor: {selectedApp.motorNumber}</span>
+                {selectedApp.inspection?.status !== 'passed' && (
+                  <button
+                    type="button"
+                    onClick={() => handleApproveInspection(selectedApp.id)}
+                    disabled={loading}
+                    className="btn-glass"
+                    style={{ marginTop: '0.4rem', padding: '0.4rem 0.6rem', fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.12)', borderColor: 'rgba(34, 197, 94, 0.3)', color: '#4ade80' }}
+                  >
+                    <CheckCircle2 size={13} /> Approve Stenciling
+                  </button>
+                )}
               </div>
 
-              <div className="glass-panel" style={{ padding: '0.85rem' }}>
+              {/* Treasurer Fee Panel */}
+              <div className="glass-panel" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <CreditCard size={14} /> Treasurer Fee
                 </span>
@@ -399,9 +573,21 @@ export function ApplicationReview() {
                   {selectedApp.treasurerPayment?.paid ? `PAID (₱${selectedApp.treasurerPayment.amount})` : 'UNPAID'}
                 </strong>
                 <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>OR #: {selectedApp.treasurerPayment?.orNumber || 'None'}</span>
+                {!selectedApp.treasurerPayment?.paid && (
+                  <button
+                    type="button"
+                    onClick={() => handleMarkTreasurerPaid(selectedApp.id)}
+                    disabled={loading}
+                    className="btn-glass"
+                    style={{ marginTop: '0.4rem', padding: '0.4rem 0.6rem', fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.12)', borderColor: 'rgba(34, 197, 94, 0.3)', color: '#4ade80' }}
+                  >
+                    <CheckCircle2 size={13} /> Mark Paid (Admin)
+                  </button>
+                )}
               </div>
 
-              <div className="glass-panel" style={{ padding: '0.85rem' }}>
+              {/* TODA Endorsement Panel */}
+              <div className="glass-panel" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <Award size={14} /> TODA Endorsement
                 </span>
@@ -409,6 +595,17 @@ export function ApplicationReview() {
                   {(selectedApp.presidentEndorsed || selectedApp.todaApproval?.routeFeePaid) ? 'ENDORSED' : 'PENDING'}
                 </strong>
                 <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>{selectedApp.todaName}</span>
+                {!selectedApp.presidentEndorsed && !selectedApp.todaApproval?.routeFeePaid && (
+                  <button
+                    type="button"
+                    onClick={() => handleAdminEndorseToda(selectedApp.id)}
+                    disabled={loading}
+                    className="btn-glass"
+                    style={{ marginTop: '0.4rem', padding: '0.4rem 0.6rem', fontSize: '0.75rem', background: 'rgba(168, 85, 247, 0.12)', borderColor: 'rgba(168, 85, 247, 0.3)', color: '#d8b4fe' }}
+                  >
+                    <Award size={13} /> Admin Endorse TODA
+                  </button>
+                )}
               </div>
             </div>
 

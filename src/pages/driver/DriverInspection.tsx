@@ -1,34 +1,53 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import * as storage from '../../services/storageService';
+import * as supabaseService from '../../services/supabaseService';
 import type { Application } from '../../types';
-import { CheckCircle2, Clock, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Clock, ShieldCheck, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function DriverInspection() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [application, setApplication] = useState<Application | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      const apps = storage.getApplications();
-      const userApp = apps.find(a => a.applicantId === user.id || a.driverName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase());
-      if (userApp) setApplication(userApp);
+    async function loadApp() {
+      if (user) {
+        try {
+          const apps = await supabaseService.getApplicationsAsync();
+          const userApp = apps.find(a => 
+            a.driverId === user.id || 
+            a.applicantId === user.id || 
+            a.driverName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()
+          );
+          if (userApp) setApplication(userApp);
+        } catch (err) {
+          console.warn('Failed to load application:', err);
+        }
+      }
     }
+    loadApp();
   }, [user]);
 
-  const handleSimulatePassInspection = () => {
+  const handleSimulatePassInspection = async () => {
     if (!application) return;
-    const updated = storage.recordInspection(
-      application.id,
-      true,
-      true,
-      'Insp. Rodolfo Gonzales (City Stenciling Office)',
-      'Engine and chassis stenciling verified. All numbers verified against registered OR/CR.'
-    );
-    if (updated) {
-      setApplication(updated);
+    setIsUpdating(true);
+    try {
+      const updated = await supabaseService.recordInspectionAsync(
+        application.id,
+        true,
+        true,
+        'Insp. Rodolfo Gonzales (City Stenciling Office)',
+        'Engine and chassis stenciling verified. All numbers verified against registered OR/CR.'
+      );
+      if (updated) {
+        setApplication(updated);
+      }
+    } catch (err) {
+      console.warn('Failed to record inspection:', err);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -92,10 +111,15 @@ export function DriverInspection() {
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <button
                   onClick={handleSimulatePassInspection}
+                  disabled={isUpdating}
                   className="btn-glass btn-emerald-glass"
-                  style={{ flex: 1, padding: '1rem' }}
+                  style={{ flex: 1, padding: '1rem', opacity: isUpdating ? 0.7 : 1 }}
                 >
-                  <ShieldCheck size={20} /> Simulate Officer Stenciling Verification (Pass)
+                  {isUpdating ? (
+                    <><Loader2 size={20} className="spin-icon" /> Saving Stenciling Verification...</>
+                  ) : (
+                    <><ShieldCheck size={20} /> Simulate Officer Stenciling Verification (Pass)</>
+                  )}
                 </button>
               </div>
             ) : (
