@@ -132,9 +132,9 @@ export function Reports() {
     const todaFranchises = franchises.filter(f => (f.todaName || '').toUpperCase().includes(item.code));
     const active = todaFranchises.filter(f => f.status === 'active').length;
     const expired = todaFranchises.filter(f => f.status === 'expired').length;
-    const total = todaFranchises.length || (item.code === 'BASTODA' ? activeCount || 1 : item.code === 'TARTODA' ? 2 : 1);
-    const calculatedActive = active || (item.code === 'BASTODA' ? activeCount || 1 : item.code === 'TARTODA' ? 2 : 1);
-    const calculatedExpired = expired || (item.code === 'BASTODA' ? expiredCount || 0 : 0);
+    const total = todaFranchises.length;
+    const calculatedActive = active;
+    const calculatedExpired = expired;
     const rate = Math.round((calculatedActive / (calculatedActive + calculatedExpired || 1)) * 100);
 
     return {
@@ -151,6 +151,7 @@ export function Reports() {
     t.name.toLowerCase().includes(searchToda.toLowerCase()) || 
     t.code.toLowerCase().includes(searchToda.toLowerCase())
   );
+  const bastodaMembers = franchises.filter(franchise => (franchise.todaName || '').toUpperCase().includes('BASTODA'));
 
   const currentDateStr = new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -248,6 +249,14 @@ export function Reports() {
             Official Data Certified as of <strong>{currentDateStr}</strong>
           </div>
         </div>
+      </div>
+
+      <div className="glass-container no-print" style={{ padding: '1.75rem' }}>
+        <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>BASTODA roster ({bastodaMembers.length})</h3>
+        <p style={{ color: '#94a3b8', fontSize: '.85rem', margin: '.35rem 0 1rem' }}>Printable roster of all franchise holders and drivers assigned to BASTODA.</p>
+        <div className="glass-table-wrapper"><table className="glass-table"><thead><tr><th>MTOP No.</th><th>Operator</th><th>Driver</th><th>Plate</th><th>Status</th></tr></thead><tbody>
+          {bastodaMembers.length === 0 ? <tr><td colSpan={5} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>No BASTODA franchises recorded.</td></tr> : bastodaMembers.map(item => <tr key={item.id}><td>{item.mtopNumber}</td><td>{item.operatorName}</td><td>{item.driverName}</td><td>{item.plateNumber}</td><td>{item.status.toUpperCase()}</td></tr>)}
+        </tbody></table></div>
       </div>
 
       {/* WEB VIEW FINANCIAL SUMMARY CARDS */}
@@ -959,6 +968,11 @@ export function Reports() {
             ))}
           </tbody>
         </table>
+
+        <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', borderBottom: '1px solid #9ca3af', paddingBottom: '0.35rem', marginBottom: '0.75rem', color: '#111827' }}>
+          IV. BASTODA FRANCHISE ROSTER ({bastodaMembers.length})
+        </h4>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem', fontSize: '0.82rem' }}><thead><tr style={{ background: '#f3f4f6' }}><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>MTOP</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Operator</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Driver</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Plate</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Status</th></tr></thead><tbody>{bastodaMembers.map(item => <tr key={item.id}><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.mtopNumber}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.operatorName}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.driverName}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.plateNumber}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.status}</td></tr>)}</tbody></table>
 
         {/* Section IV: Signatures Block */}
         <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', borderBottom: '1px solid #9ca3af', paddingBottom: '0.35rem', marginBottom: '1.5rem', color: '#111827' }}>

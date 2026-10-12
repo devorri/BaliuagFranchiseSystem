@@ -17,6 +17,7 @@ import type {
   SMSNotification,
 } from '../types';
 import { FRANCHISE_FEES } from './fees';
+import { hasCompleteRequirements } from './applicationRules';
 
 // ================= USER & AUTH =================
 export async function getUsersAsync(): Promise<User[]> {
@@ -50,6 +51,9 @@ export async function loginAsync(username: string, password: string): Promise<{ 
       if (data.password_hash !== password) {
         return { user: null, error: 'Invalid username or password.' };
       }
+      if (data.role === 'driver') {
+        return { user: null, error: 'Drivers do not need a system account. Please coordinate with the franchise operator.' };
+      }
 
       if (data.account_status === 'rejected') {
         return { user: null, error: 'Your account application has been rejected by the administrator.' };
@@ -79,8 +83,8 @@ export async function loginAsync(username: string, password: string): Promise<{ 
 }
 
 export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>): Promise<{ user: User | null; error?: string }> {
-  if (userData.role !== 'driver' && userData.role !== 'operator') {
-    return { user: null, error: 'Registration is restricted to Tricycle Drivers and Franchise Operators only.' };
+  if (userData.role !== 'operator') {
+    return { user: null, error: 'Only franchise operators need a system account. Driver details are recorded in the operator application.' };
   }
 
   const users = await getUsersAsync();
@@ -284,6 +288,10 @@ export async function updateApplicationStatusAsync(
   const application = (await getApplicationsAsync()).find(item => item.id === id);
   if (!application) return null;
 
+  if (status === 'approved' && (!hasCompleteRequirements(application.documents || []) || application.inspection?.status !== 'passed' || !(application.presidentEndorsed || application.todaApproval?.routeFeePaid))) {
+    throw new Error('Hindi pa puwedeng i-grant ang franchise: kailangan ang kumpletong requirements, TODA endorsement, at personal na passed inspection.');
+  }
+
   const now = new Date().toISOString();
   const updated: Application = {
     ...application,
@@ -298,7 +306,9 @@ export async function updateApplicationStatusAsync(
   let franchiseToSave: Franchise | undefined;
 
   if (status === 'approved') {
-    const driverId = updated.driverId || (updated.applicantRole === 'driver' ? updated.applicantId : '') || updated.applicantId || `DRV-${id.slice(0, 8)}`;
+    // A driver is a person named in the operator's application; no Driver
+    // profile/account is required for an issued franchise.
+    const driverId = updated.driverId || '';
 
     const existing = (await getFranchisesAsync()).find(item => item.applicationId === id);
     const mtopNumber = existing?.mtopNumber || `MTOP-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -342,6 +352,8 @@ export async function endorseApplicationByPresidentAsync(
   presidentName: string, 
   remarks?: string
 ): Promise<Application | null> {
+  const application = (await getApplicationsAsync()).find(item => item.id === appId);
+  if (!application || !hasCompleteRequirements(application.documents || [])) return null;
   const result = storage.endorseApplicationByPresident(appId, presidentName, remarks);
   if (isSupabaseConfigured() && supabase && result) {
     try {

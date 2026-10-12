@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  CheckCircle2, Smartphone, ArrowLeft, ShieldCheck,
+  CheckCircle2, ArrowLeft, ShieldCheck,
   Loader2, ExternalLink, RefreshCw, Printer, QrCode
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -20,16 +20,22 @@ export function GCashPaymentModal() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const [refNumber, setRefNumber] = useState('');
+  const [amount, setAmount] = useState(450);
   const verifyingRef = useRef(false);
 
   // PayMongo session tracking
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
 
-  // Fallback simulation
-  const [simRef] = useState(`900${Math.floor(10000000 + Math.random() * 90000000)}`);
-
   const paymongoReady = isPayMongoConfigured();
+
+  useEffect(() => {
+    if (!user) return;
+    void supabaseService.getApplicationsAsync().then(applications => {
+      const current = applications.find(app => app.applicantId === user.id && !app.treasurerPayment?.paid);
+      if (current) setAmount(current.totalFee);
+    });
+  }, [user]);
 
   // Check for return from PayMongo
   useEffect(() => {
@@ -42,23 +48,12 @@ export function GCashPaymentModal() {
     }
   }, [searchParams]);
 
-  // Auto-verify on focus & interval while checkout session active
+  // A QR session is never treated as paid just because it was opened. Payment
+  // is recorded only after an explicit verification reports a paid status.
   useEffect(() => {
     if (!checkoutSessionId || isPaid) return;
 
-    const onFocus = () => {
-      verifyPayment(checkoutSessionId, false);
-    };
-
-    window.addEventListener('focus', onFocus);
-    const interval = setInterval(() => {
-      verifyPayment(checkoutSessionId, false);
-    }, 4000);
-
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      clearInterval(interval);
-    };
+    return undefined;
   }, [checkoutSessionId, isPaid]);
 
   const onPaymentConfirmed = async (ref: string) => {
@@ -75,7 +70,7 @@ export function GCashPaymentModal() {
         if (pendingApp) {
           await supabaseService.recordTreasurerPaymentAsync(
             pendingApp.id,
-            450,
+            pendingApp.totalFee,
             ref,
             'gcash',
             { id: user.id, name: `${user.firstName} ${user.lastName}` }
@@ -86,7 +81,7 @@ export function GCashPaymentModal() {
             applicationId: '',
             payerId: user.id,
             payerName: `${user.firstName} ${user.lastName}`,
-            amount: 450,
+            amount,
             description: `Operator GCash Payment - Ref: ${ref}`,
             status: 'completed',
             paymentMethod: 'gcash',
@@ -109,7 +104,7 @@ export function GCashPaymentModal() {
       const currentUrl = window.location.origin + window.location.pathname;
 
       const session = await createCheckoutSession({
-        amount: 450,
+        amount,
         name: 'MTOP Franchise Application Fee',
         description: 'Baliwag City Tricycle MTOP Permit & Inspection Fee',
         successUrl: `${currentUrl}?status=success&session_id={checkout_session_id}`,
@@ -124,7 +119,7 @@ export function GCashPaymentModal() {
       try {
         const currentUrl = window.location.origin + window.location.pathname;
         const source = await createGCashSource({
-          amount: 450,
+          amount,
           successUrl: `${currentUrl}?status=success&source_id={source_id}`,
           failedUrl: `${currentUrl}?status=failed`,
         });
@@ -162,7 +157,7 @@ export function GCashPaymentModal() {
         const source = await getGCashSource(sid);
         const status = source.attributes.status;
 
-        if (status === 'chargeable' || status === 'paid' || status === 'pending') {
+        if (status === 'paid') {
           const ref = `PM-${sid.slice(-8).toUpperCase()}`;
           await onPaymentConfirmed(ref);
         } else if (isManual) {
@@ -177,11 +172,6 @@ export function GCashPaymentModal() {
       verifyingRef.current = false;
       setIsVerifying(false);
     }
-  };
-
-  const handleSimulatePayment = async () => {
-    const ref = `GCASH-REF-${simRef}`;
-    await onPaymentConfirmed(ref);
   };
 
   return (
@@ -219,14 +209,6 @@ export function GCashPaymentModal() {
             color: '#fca5a5', fontSize: '0.88rem', display: 'flex', flexDirection: 'column', gap: '0.75rem'
           }}>
             <div>{error}</div>
-            <button
-              type="button"
-              onClick={handleSimulatePayment}
-              className="btn-glass btn-emerald-glass"
-              style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', alignSelf: 'flex-start' }}
-            >
-              <Smartphone size={16} /> Instant Simulated GCash Payment Confirmation
-            </button>
           </div>
         )}
 
@@ -278,7 +260,7 @@ export function GCashPaymentModal() {
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <span style={{ color: '#94a3b8', fontSize: '0.78rem', display: 'block' }}>Total Amount Paid</span>
                 <strong style={{ color: '#4ade80', fontSize: '1.2rem', fontWeight: 800 }}>
-                  ₱450.00
+                  ₱{amount.toFixed(2)}
                 </strong>
               </div>
 
@@ -326,7 +308,7 @@ export function GCashPaymentModal() {
 
                 <div className="glass-panel" style={{ padding: '1.5rem', width: '100%', textAlign: 'center' }}>
                   <p style={{ fontSize: '0.95rem', color: '#cbd5e1', marginBottom: '1.25rem' }}>
-                    Click the button below to generate your <strong>PayMongo dynamic QR Ph Code & GCash Checkout</strong> for the resident franchise fee of <strong>₱450.00</strong>. Non-resident applications are billed at ₱550.00 through the application workflow.
+                    Click the button below to generate your <strong>PayMongo dynamic QR Ph Code & GCash Checkout</strong> for the fixed amount based on the address in your application: <strong>₱{amount.toFixed(2)}</strong>.
                   </p>
 
                   <div style={{
@@ -334,7 +316,7 @@ export function GCashPaymentModal() {
                     borderRadius: '12px', marginBottom: '1.25rem'
                   }}>
                     <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', display: 'block', color: '#94a3b8' }}>Total Amount</span>
-                    <strong style={{ fontSize: '1.6rem', color: '#22c55e' }}>₱450.00</strong>
+                    <strong style={{ fontSize: '1.6rem', color: '#22c55e' }}>₱{amount.toFixed(2)}</strong>
                   </div>
                 </div>
 
@@ -347,18 +329,10 @@ export function GCashPaymentModal() {
                   {isLoading ? (
                     <><Loader2 size={20} className="spin-icon" /> Generating QR Ph & GCash Session...</>
                   ) : (
-                    <><QrCode size={20} /> Pay ₱450.00 via QR Ph / GCash</>
+                    <><QrCode size={20} /> Pay ₱{amount.toFixed(2)} via QR Ph / GCash</>
                   )}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleSimulatePayment}
-                  className="btn-glass btn-emerald-glass"
-                  style={{ width: '100%', padding: '0.85rem', fontSize: '0.9rem' }}
-                >
-                  <Smartphone size={18} /> Quick Test Simulation (Instant Approval)
-                </button>
               </>
             ) : (
               /* ── Checkout Created ── */
@@ -403,7 +377,7 @@ export function GCashPaymentModal() {
             )}
           </div>
         ) : (
-          /* ═══ Simulated Flow (No PayMongo Keys) ═══ */
+          /* ═══ Payment unavailable until a verified gateway is configured ═══ */
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
             <div style={{
               background: 'linear-gradient(135deg, #005ce6 0%, #003b99 100%)',
@@ -413,31 +387,23 @@ export function GCashPaymentModal() {
               border: '2px solid rgba(255, 255, 255, 0.2)'
             }}>
               <div style={{ color: '#ffffff', fontWeight: 800, fontSize: '1.3rem', marginBottom: '0.25rem' }}>
-                GCash Scan to Pay
+                GCash QR Payment
               </div>
               <span style={{ color: '#93c5fd', fontSize: '0.8rem', display: 'block', marginBottom: '1.25rem' }}>
                 Lungsod ng Baliwag MTOP Treasury
               </span>
               <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '16px', display: 'inline-block' }}>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BALIUAG-GCASH-PAYMENT-REF-${simRef}`}
-                  alt="GCash QR Code"
-                  style={{ width: '200px', height: '200px' }}
-                />
+                <QrCode size={200} color="#003b99" aria-label="GCash QR payment requires gateway configuration" />
               </div>
               <div style={{ marginTop: '1rem', background: 'rgba(255,255,255,0.15)', padding: '0.75rem', borderRadius: '12px', color: '#ffffff' }}>
                 <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', display: 'block' }}>Total Amount</span>
-                <strong style={{ fontSize: '1.4rem' }}>₱450.00</strong>
+                <strong style={{ fontSize: '1.4rem' }}>₱{amount.toFixed(2)}</strong>
               </div>
             </div>
 
-            <button
-              onClick={handleSimulatePayment}
-              className="btn-glass btn-emerald-glass"
-              style={{ width: '100%', padding: '1rem', fontSize: '1.05rem' }}
-            >
-              <Smartphone size={20} /> Simulate GCash Payment Confirmation
-            </button>
+            <p style={{ maxWidth: '500px', textAlign: 'center', color: '#facc15', fontSize: '0.9rem' }}>
+              QR payments cannot be marked paid from this page. Configure PayMongo, then payment is recorded only after the gateway confirms a successful transaction.
+            </p>
           </div>
         )}
       </div>

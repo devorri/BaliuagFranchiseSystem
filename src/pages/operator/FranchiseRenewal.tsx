@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as supabaseService from '../../services/supabaseService';
 import type { Application, Franchise } from '../../types';
-import { FRANCHISE_FEES } from '../../services/fees';
+import { FRANCHISE_FEES, franchiseFeeFor } from '../../services/fees';
+import { feeForAddress } from '../../services/applicationRules';
 import { RefreshCw, CheckCircle2 } from 'lucide-react';
 
 export function FranchiseRenewal() {
@@ -17,18 +18,19 @@ export function FranchiseRenewal() {
 
   const handleInitiateRenewal = async (franchise: Franchise) => {
     if (!user || renewedId) return;
-    const isExpired = franchise.status === 'expired' || new Date(franchise.expiresAt).getTime() < Date.now();
-    const latePenalty = isExpired ? FRANCHISE_FEES.expiredFranchisePenalty : 0;
     const now = new Date().toISOString();
+    const isExpired = franchise.status === 'expired' || new Date(franchise.expiresAt).getTime() < new Date(now).getTime();
+    const latePenalty = isExpired ? FRANCHISE_FEES.expiredFranchisePenalty : 0;
+    const addressFee = feeForAddress(user.address);
     const renewal: Application = {
       id: crypto.randomUUID(), applicantId: user.id, applicantName: `${user.firstName} ${user.lastName}`,
       applicantRole: 'operator', driverId: franchise.driverId, driverName: franchise.driverName,
-      type: 'renewal', residency: 'baliwag_resident', status: 'pending_driver_requirements',
+      type: 'renewal', residency: addressFee.residency, status: 'pending_driver_requirements',
       vehicleMake: franchise.vehicleMake, vehicleModel: franchise.vehicleModel, plateNumber: franchise.plateNumber,
       motorNumber: franchise.motorNumber, chassisNumber: franchise.chassisNumber, vehicleColor: franchise.vehicleColor,
       todaName: franchise.todaName, routeArea: franchise.routeArea, documents: [],
-      baseFee: FRANCHISE_FEES.baliwagResident, todaFee: 0, latePenalty,
-      totalFee: FRANCHISE_FEES.baliwagResident + latePenalty, submittedAt: now, updatedAt: now,
+      baseFee: franchiseFeeFor(addressFee.residency), todaFee: 0, latePenalty,
+      totalFee: franchiseFeeFor(addressFee.residency) + latePenalty, submittedAt: now, updatedAt: now,
     };
     await supabaseService.saveApplicationAsync(renewal, true);
     setRenewedId(franchise.id);
@@ -61,7 +63,7 @@ export function FranchiseRenewal() {
 
               <div>
                 {renewedId === f.id ? (
-                  <span className="pill-badge pill-emerald"><CheckCircle2 size={16} /> Renewal sent to assigned driver</span>
+                  <span className="pill-badge pill-emerald"><CheckCircle2 size={16} /> Renewal record created; submit the complete operator packet</span>
                 ) : (
                   <button
                     onClick={() => void handleInitiateRenewal(f)}

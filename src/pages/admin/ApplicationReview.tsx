@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import * as supabaseService from '../../services/supabaseService';
 import type { Application, Document, DocumentType, TreasurerPayment } from '../../types';
+import { hasCompleteRequirements } from '../../services/applicationRules';
 import { 
   CheckCircle2, ShieldCheck, XCircle, FileText, Calendar, 
   Eye, FileCheck, AlertCircle, Award, CreditCard, Wrench, RefreshCw
@@ -63,40 +64,9 @@ export function ApplicationReview() {
 
     setLoading(true);
     try {
-      // Auto-complete and verify any remaining steps under Admin authority
-      let appToSave = selectedApp;
-      if (appToSave) {
-        const updatedDocs = (appToSave.documents || []).map(d => ({ ...d, status: 'verified' as const }));
-        const updatedInspection = appToSave.inspection?.status === 'passed' ? appToSave.inspection : {
-          id: appToSave.inspection?.id || crypto.randomUUID(),
-          applicationId: appId,
-          engineNumber: appToSave.motorNumber || 'N/A',
-          chassisNumber: appToSave.chassisNumber || 'N/A',
-          engineVerified: true,
-          chassisVerified: true,
-          inspectorName: reviewerName,
-          inspectedAt: new Date().toISOString(),
-          status: 'passed' as const,
-          notes: 'Engine and chassis stenciling verified and passed by Licensing Office.'
-        };
-        const updatedPayment: TreasurerPayment = appToSave.treasurerPayment?.paid ? appToSave.treasurerPayment : {
-          paid: true,
-          amount: appToSave.treasurerPayment?.amount || appToSave.totalFee || 670,
-          orNumber: appToSave.treasurerPayment?.orNumber || `OR-ADM-${Date.now().toString().slice(-6)}`,
-          paymentMethod: 'gcash' as const,
-          paidAt: new Date().toISOString()
-        };
-
-        appToSave = {
-          ...appToSave,
-          documents: updatedDocs,
-          inspection: updatedInspection,
-          treasurerPayment: updatedPayment,
-          presidentEndorsed: true,
-          presidentEndorsedBy: appToSave.presidentEndorsedBy || reviewerName,
-          presidentEndorsedAt: appToSave.presidentEndorsedAt || new Date().toISOString()
-        };
-        await supabaseService.saveApplicationAsync(appToSave, true);
+      if (!selectedApp || !hasCompleteRequirements(selectedApp.documents) || selectedApp.inspection?.status !== 'passed' || !selectedApp.presidentEndorsed) {
+        showToast('Hindi puwedeng mag-grant: kumpletuhin ang requirements, TODA endorsement, at personal na passed inspection.', 'error');
+        return;
       }
 
       const updated = await supabaseService.updateApplicationStatusAsync(

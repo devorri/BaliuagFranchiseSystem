@@ -106,6 +106,7 @@ export interface Application {
   id: string;
   applicantId: string;
   applicantName: string;
+  applicantAddress?: string;
   applicantRole: 'driver' | 'operator';
   driverId?: string;
   type: ApplicationType;

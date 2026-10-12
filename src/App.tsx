@@ -9,12 +9,6 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { FeedbackPage } from './pages/FeedbackPage';
 
-// Driver pages
-import { DriverDashboard } from './pages/driver/DriverDashboard';
-import { DriverRequirements } from './pages/driver/DriverRequirements';
-import { DriverInspection } from './pages/driver/DriverInspection';
-import { DriverPayment } from './pages/driver/DriverPayment';
-import { DriverTodaStatus } from './pages/driver/DriverTodaStatus';
 
 // TODA President pages
 import { TodaDashboard } from './pages/toda/TodaDashboard';
@@ -34,6 +28,7 @@ import { OperatorDashboard } from './pages/operator/OperatorDashboard';
 import { SubmitRequirements } from './pages/operator/SubmitRequirements';
 import { GCashPaymentModal } from './pages/operator/GCashPaymentModal';
 import { FranchiseRenewal } from './pages/operator/FranchiseRenewal';
+import { FranchiseCertification } from './pages/operator/FranchiseCertification';
 import { SMSNotifications } from './pages/operator/SMSNotifications';
 
 function App() {
@@ -47,16 +42,6 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/feedback" element={<FeedbackPage />} />
-
-            {/* Driver Routes */}
-            <Route path="/driver" element={<DashboardLayout requiredRole="driver" />}>
-              <Route index element={<DriverDashboard />} />
-              <Route path="requirements" element={<DriverRequirements />} />
-              <Route path="notifications" element={<SMSNotifications />} />
-              <Route path="inspection" element={<DriverInspection />} />
-              <Route path="payment" element={<DriverPayment />} />
-              <Route path="toda-status" element={<DriverTodaStatus />} />
-            </Route>
 
             {/* TODA President Routes */}
             <Route path="/toda" element={<DashboardLayout requiredRole="toda_president" />}>
@@ -82,6 +67,7 @@ function App() {
               <Route path="requirements" element={<SubmitRequirements />} />
               <Route path="gcash-payment" element={<GCashPaymentModal />} />
               <Route path="renewal" element={<FranchiseRenewal />} />
+              <Route path="certification" element={<FranchiseCertification />} />
               <Route path="sms-notifications" element={<SMSNotifications />} />
             </Route>
 

@@ -1,10 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  LayoutDashboard, FileText, FilePlus, CreditCard, Shield,
+  LayoutDashboard, FileText, FilePlus, Shield,
   ChevronLeft, ChevronRight, LogOut, QrCode, AlertTriangle,
-  CheckCircle2, BellRing, RefreshCw, BarChart3, Wrench,
-  Users, Megaphone
+  CheckCircle2, BellRing, RefreshCw, BarChart3,
+  Users, Megaphone, Award
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -17,15 +17,6 @@ export function Sidebar() {
     logout();
     navigate('/login');
   };
-
-  const driverLinks = [
-    { to: '/driver', icon: LayoutDashboard, label: 'Dashboard & QR' },
-    { to: '/driver/requirements', icon: FilePlus, label: 'Submit Requirements' },
-    { to: '/driver/notifications', icon: BellRing, label: 'Renewal & Penalty Alerts' },
-    { to: '/driver/inspection', icon: Wrench, label: 'Inspection & Stenciling' },
-    { to: '/driver/payment', icon: CreditCard, label: 'Payment of Fees (GCash/Cash)' },
-    { to: '/driver/toda-status', icon: CheckCircle2, label: 'TODA Line Status' },
-  ];
 
   const todaLinks = [
     { to: '/toda', icon: LayoutDashboard, label: 'TODA Overview' },
@@ -48,11 +39,12 @@ export function Sidebar() {
     { to: '/dashboard/requirements', icon: FilePlus, label: 'Franchise Application' },
     { to: '/dashboard/gcash-payment', icon: QrCode, label: 'GCash QR Payment' },
     { to: '/dashboard/renewal', icon: RefreshCw, label: 'Franchise Renewal' },
+    { to: '/dashboard/certification', icon: Award, label: 'Franchise Certification' },
     { to: '/dashboard/sms-notifications', icon: BellRing, label: 'SMS Notifications' },
   ];
 
-  let links = driverLinks;
-  let roleTitle = 'Tricycle Driver';
+  let links = operatorLinks;
+  let roleTitle = 'Franchise Operator';
 
   if (isAdmin) {
     links = adminLinks;

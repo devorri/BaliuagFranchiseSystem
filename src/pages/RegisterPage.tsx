@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import * as supabaseService from '../services/supabaseService';
-import type { UserRole } from '../types';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -22,7 +21,7 @@ export function RegisterPage() {
     username: '',
     password: '',
     confirmPassword: '',
-    role: 'driver' as UserRole,
+    role: 'operator' as const,
   });
 
   const updateField = (field: string, value: string) => {
@@ -31,11 +30,6 @@ export function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (form.role !== 'driver' && form.role !== 'operator') {
-      showToast('Registration is only permitted for Tricycle Drivers and Franchise Operators.', 'error');
-      return;
-    }
 
     if (form.password !== form.confirmPassword) {
       showToast('Passwords do not match.', 'error');
@@ -64,7 +58,7 @@ export function RegisterPage() {
 
       if (res.user) {
         setSubmitted(true);
-        showToast('Account successfully created! Awaiting Security Admin approval before login.', 'success');
+        showToast('Operator account successfully created! Awaiting Security Admin approval before login.', 'success');
       } else {
         showToast(res.error || 'Failed to process registration.', 'error');
       }
@@ -86,7 +80,7 @@ export function RegisterPage() {
             Registration Submitted Successfully!
           </h2>
           <p style={{ color: '#cbd5e1', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
-            Your account request for <strong style={{ color: '#38bdf8' }}>{form.role === 'driver' ? 'Tricycle Driver' : 'Franchise Operator'}</strong> is under verification by the Local Government <strong>Security Admin</strong>.
+            Your account request for <strong style={{ color: '#38bdf8' }}>Franchise Operator</strong> is under verification by the Local Government <strong>Security Admin</strong>.
           </p>
           <div style={{ padding: '1rem', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: '10px', marginBottom: '1.75rem', textAlign: 'left', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
             <ShieldAlert size={20} color="#facc15" style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -120,16 +114,10 @@ export function RegisterPage() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-              Register As * <span style={{ color: '#64748b', fontSize: '0.75rem' }}>(Driver or Operator only)</span>
+              Registration type
             </label>
-            <select
-              className="glass-input glass-select"
-              value={form.role}
-              onChange={e => updateField('role', e.target.value)}
-            >
-              <option value="driver">Tricycle Driver</option>
-              <option value="operator">Franchise Operator</option>
-            </select>
+            <input className="glass-input" value="Franchise Operator" disabled />
+            <small style={{ color: '#94a3b8' }}>Drivers do not need a system account. Their details and requirements are submitted by the operator.</small>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
