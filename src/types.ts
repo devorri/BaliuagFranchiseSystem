@@ -3,7 +3,7 @@
 // Type Definitions
 // ============================================
 
-export type UserRole = 'driver' | 'toda_president' | 'admin' | 'operator' | 'president';
+export type UserRole = 'driver' | 'toda_president' | 'admin' | 'operator' | 'president' | 'franchise_officer';
 
 export type AdminPermission = 'security' | 'requirements' | 'payment' | 'analytics' | 'president';
 
@@ -119,6 +119,7 @@ export interface Application {
   vehicleMake: string;
   vehicleModel: string;
   plateNumber: string;
+  bodyNumber?: string;
   motorNumber: string;
   chassisNumber: string;
   vehicleColor: string;
@@ -175,6 +176,7 @@ export interface Franchise {
   vehicleMake: string;
   vehicleModel: string;
   plateNumber: string;
+  bodyNumber?: string;
   motorNumber: string;
   chassisNumber: string;
   vehicleColor: string;
@@ -280,3 +282,16 @@ export interface InformationItem {
   publishedDate: string;
   updatedAt?: string;
 }
+
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  details: string;
+  targetId?: string;
+  ipAddress?: string;
+  timestamp: string;
+}
+

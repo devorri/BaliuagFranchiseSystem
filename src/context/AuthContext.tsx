@@ -14,6 +14,7 @@ interface AuthContextType {
   isPresident: boolean;
   isTodaPresident: boolean;
   isAdmin: boolean;
+  isFranchiseOfficer: boolean;
   isOperator: boolean;
   hasPermission: (perm: AdminPermission) => boolean;
   sessionError: string | null;
@@ -63,6 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await supabaseService.loginAsync(username, password);
       if (result.user) {
         setUser(result.user);
+        void supabaseService.recordAuditLogAsync({
+          userId: result.user.id,
+          userName: `${result.user.firstName} ${result.user.lastName}`,
+          userRole: result.user.role,
+          action: 'USER_LOGIN',
+          details: `User @${result.user.username} successfully authenticated into system.`,
+        });
         return { success: true, user: result.user };
       }
       return { success: false, error: result.error || 'Invalid username or password.' };
@@ -71,6 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = storage.login(username, password);
       if (res.user) {
         setUser(res.user);
+        void supabaseService.recordAuditLogAsync({
+          userId: res.user.id,
+          userName: `${res.user.firstName} ${res.user.lastName}`,
+          userRole: res.user.role,
+          action: 'USER_LOGIN',
+          details: `User @${res.user.username} authenticated (local storage mode).`,
+        });
         return { success: true, user: res.user };
       }
       return { success: false, error: res.error || 'Hindi ma-proseso ang login.' };
@@ -78,6 +93,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    if (user) {
+      void supabaseService.recordAuditLogAsync({
+        userId: user.id,
+        userName: `${user.firstName} ${user.lastName}`,
+        userRole: user.role,
+        action: 'USER_LOGOUT',
+        details: `User @${user.username} logged out.`,
+      });
+    }
     storage.logout();
     setUser(null);
   };
@@ -91,9 +115,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isPresident = user?.role === 'president' || user?.role === 'toda_president';
   const isAdmin = user?.role === 'admin';
+  const isFranchiseOfficer = user?.role === 'franchise_officer';
 
   const hasPermission = (perm: AdminPermission): boolean => {
     if (!user) return false;
+    if (user.role === 'franchise_officer') {
+      return perm !== 'security';
+    }
     if (user.role !== 'admin') {
       if (user.role === 'president' || user.role === 'toda_president') {
         return perm === 'president';
@@ -119,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isPresident,
       isTodaPresident: isPresident,
       isAdmin,
+      isFranchiseOfficer,
       isOperator: user?.role === 'operator',
       hasPermission,
       sessionError,

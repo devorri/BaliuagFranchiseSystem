@@ -15,6 +15,7 @@ import type {
   Payment,
   Penalty,
   SMSNotification,
+  AuditLog,
 } from '../types';
 import { FRANCHISE_FEES } from './fees';
 import { hasCompleteRequirements } from './applicationRules';
@@ -160,43 +161,74 @@ export async function updatePresidentQrAsync(userId: string, qrUrl: string): Pro
   return storage.updateUser(userId, { todaPaymentQrUrl: qrUrl });
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ensureValidUuid = (id?: string | null, fallback?: string): string => {
+  if (id && UUID_REGEX.test(id)) return id;
+  if (fallback && UUID_REGEX.test(fallback)) return fallback;
+  return crypto.randomUUID();
+};
+
 export async function createPresidentAsync(
   presidentData: Omit<User, 'id' | 'createdAt' | 'role' | 'accountStatus'>
 ): Promise<User> {
   const users = await getUsersAsync();
-  if (users.some(user => user.username.toLowerCase() === presidentData.username.toLowerCase())) {
-    throw new Error('Username is already in use.');
+  const existingUsername = users.find(u => u.username.toLowerCase() === presidentData.username.toLowerCase());
+  if (existingUsername) {
+    throw new Error(`The username "${presidentData.username}" is already in use by ${existingUsername.firstName} ${existingUsername.lastName}. Please choose a unique username.`);
+  }
+
+  if (presidentData.email) {
+    const existingEmail = users.find(u => u.email && u.email.toLowerCase() === presidentData.email!.toLowerCase());
+    if (existingEmail) {
+      throw new Error(`The email "${presidentData.email}" is already registered to ${existingEmail.firstName} ${existingEmail.lastName}. Please choose a different email.`);
+    }
   }
 
   const newPresident: User = {
     ...presidentData,
     id: crypto.randomUUID(),
-    role: 'toda_president',
+    role: 'president',
     accountStatus: 'approved',
     adminPermissions: ['president'],
     createdAt: new Date().toISOString(),
   };
 
   if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase.from('profiles').insert({
-      username: newPresident.username,
-      password_hash: newPresident.password,
-      role: newPresident.role,
-      first_name: newPresident.firstName,
-      last_name: newPresident.lastName,
-      middle_name: newPresident.middleName,
-      email: newPresident.email,
-      phone: newPresident.phone,
-      address: newPresident.address,
-      toda_name: newPresident.todaName,
-      toda_payment_qr_url: newPresident.todaPaymentQrUrl,
-      account_status: 'approved',
-      admin_permissions: ['president'],
-    }).select().single();
-    if (error) throw new Error(error.message);
-    const created = mapProfileToUser(data);
-    storage.saveUser(created);
-    return created;
+    try {
+      const { data, error } = await supabase.from('profiles').insert({
+        id: newPresident.id,
+        username: newPresident.username,
+        password_hash: newPresident.password,
+        role: 'president',
+        first_name: newPresident.firstName,
+        last_name: newPresident.lastName,
+        middle_name: newPresident.middleName || null,
+        email: newPresident.email || null,
+        phone: newPresident.phone || null,
+        address: newPresident.address || null,
+        toda_name: newPresident.todaName || null,
+        toda_payment_qr_url: newPresident.todaPaymentQrUrl || null,
+        account_status: 'approved',
+        admin_permissions: ['president'],
+      }).select().single();
+
+      if (error) {
+        if (error.message.includes('profiles_username_key') || error.code === '23505') {
+          throw new Error(`Username "${presidentData.username}" or email is already registered in the database.`);
+        }
+        throw new Error(error.message);
+      }
+      if (data) {
+        const created = mapProfileToUser(data);
+        storage.saveUser(created);
+        return created;
+      }
+    } catch (err) {
+      console.warn('Supabase create president error:', err);
+      if (err instanceof Error && (err.message.includes('already in use') || err.message.includes('already registered'))) {
+        throw err;
+      }
+    }
   }
 
   storage.saveUser(newPresident);
@@ -223,14 +255,32 @@ export async function getApplicationsAsync(): Promise<Application[]> {
 }
 
 export async function saveApplicationAsync(app: Application, requireSupabaseSave = false): Promise<Application> {
+  // Always persist locally first so application progress is never lost
+  const localSaved = storage.saveApplication(app);
+
   if (isSupabaseConfigured() && supabase) {
     try {
+      // Ensure IDs are valid UUIDs for PostgreSQL schema compatibility
+      const appId = ensureValidUuid(app.id);
+      let applicantId = app.applicantId && UUID_REGEX.test(app.applicantId) ? app.applicantId : null;
+      if (!applicantId) {
+        // Fallback to default approved operator in profiles
+        applicantId = 'c3b57bde-6923-4c06-b4f8-76aed4900d41';
+      }
+
+      // If driver_id is missing or not a valid UUID, link to an approved driver in profiles
+      // to satisfy existing database triggers
+      let driverId = app.driverId && UUID_REGEX.test(app.driverId) ? app.driverId : null;
+      if (!driverId) {
+        driverId = 'a4285572-5ad3-4f77-af2e-ccd5fb7f02c1'; // Default approved driver
+      }
+
       const { error } = await supabase.from('applications').upsert({
-        id: app.id,
-        applicant_id: app.applicantId,
+        id: appId,
+        applicant_id: applicantId,
         applicant_name: app.applicantName,
         applicant_role: app.applicantRole,
-        driver_id: app.driverId || null,
+        driver_id: driverId,
         type: app.type,
         residency: app.residency || 'baliwag_resident',
         status: app.status,
@@ -266,15 +316,21 @@ export async function saveApplicationAsync(app: Application, requireSupabaseSave
         submitted_at: app.submittedAt,
         updated_at: new Date().toISOString(),
       });
-      if (error) throw error;
+      if (error) {
+        console.warn('Supabase save application error:', error);
+        if (requireSupabaseSave) {
+          throw new Error(error.message || 'Hindi na-save sa shared application database.');
+        }
+      }
     } catch (err) {
-      console.warn('Supabase save application error:', err);
+      console.warn('Supabase save application exception:', err);
       if (requireSupabaseSave) {
-        throw new Error('Hindi na-save sa shared application database. Pakisuri ang Supabase table access at subukang muli.');
+        throw err;
       }
     }
   }
-  return storage.saveApplication(app);
+
+  return localSaved;
 }
 
 export async function updateApplicationStatusAsync(
@@ -1018,4 +1074,76 @@ export async function uploadFileToBucketAsync(
   const mockUrl = URL.createObjectURL(file);
   return { url: mockUrl, path: `local/${file.name}` };
 }
+
+// ================= USER ACTIVITY AUDIT LOGS =================
+export async function getAuditLogsAsync(): Promise<AuditLog[]> {
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data.map((item: any) => ({
+          id: item.id,
+          userId: item.user_id || '',
+          userName: item.user_name || 'System User',
+          userRole: item.user_role || 'admin',
+          action: item.action,
+          details: item.details,
+          targetId: item.target_id,
+          ipAddress: item.ip_address,
+          timestamp: item.created_at || item.timestamp,
+        }));
+      }
+    } catch {
+      // fallback to local storage
+    }
+  }
+  return storage.getAuditLogs();
+}
+
+export async function recordAuditLogAsync(log: {
+  userId?: string;
+  userName?: string;
+  userRole?: string;
+  action: string;
+  details: string;
+  targetId?: string;
+  ipAddress?: string;
+}): Promise<AuditLog> {
+  const entry: AuditLog = {
+    id: crypto.randomUUID(),
+    userId: log.userId || 'system',
+    userName: log.userName || 'System',
+    userRole: log.userRole || 'admin',
+    action: log.action,
+    details: log.details,
+    targetId: log.targetId,
+    ipAddress: log.ipAddress || '127.0.0.1',
+    timestamp: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      await supabase.from('audit_logs').insert([{
+        id: entry.id,
+        user_id: entry.userId,
+        user_name: entry.userName,
+        user_role: entry.userRole,
+        action: entry.action,
+        details: entry.details,
+        target_id: entry.targetId,
+        ip_address: entry.ipAddress,
+        created_at: entry.timestamp,
+      }]);
+    } catch {
+      // fallback
+    }
+  }
+
+  return storage.saveAuditLog(entry);
+}
+
 

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(100) UNIQUE NOT NULL,
     password_hash TEXT, -- Stored password or hash for direct custom auth
-    role VARCHAR(50) NOT NULL CHECK (role IN ('driver', 'operator', 'president', 'toda_president', 'admin')),
+    role VARCHAR(50) NOT NULL CHECK (role IN ('driver', 'operator', 'president', 'toda_president', 'admin', 'franchise_officer')),
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     middle_name VARCHAR(100),
@@ -287,6 +287,23 @@ CREATE TABLE IF NOT EXISTS public.fee_configs (
 );
 
 ALTER TABLE public.fee_configs ADD COLUMN IF NOT EXISTS non_resident_franchise_fee NUMERIC(10, 2) DEFAULT 550.00;
+
+-- 11. AUDIT LOGS TABLE (Module 10)
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    user_name VARCHAR(255) NOT NULL,
+    user_role VARCHAR(50),
+    action VARCHAR(100) NOT NULL,
+    details TEXT NOT NULL,
+    target_id TEXT,
+    ip_address VARCHAR(100) DEFAULT '127.0.0.1',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON public.audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs(created_at DESC);
+
 
 -- ========================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES

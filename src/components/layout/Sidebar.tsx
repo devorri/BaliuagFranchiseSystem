@@ -49,6 +49,15 @@ export function Sidebar() {
   if (isAdmin) {
     links = adminLinks;
     roleTitle = 'City Administrator';
+  } else if (user?.role === 'franchise_officer') {
+    links = [
+      { to: '/admin/applications', icon: FileText, label: 'Review Applications' },
+      { to: '/admin/franchises', icon: Shield, label: 'Franchise Registry' },
+      { to: '/admin/overview', icon: LayoutDashboard, label: 'Admin Dashboard' },
+      { to: '/admin/reports', icon: BarChart3, label: 'Reports & Analytics' },
+      { to: '/admin/penalties', icon: AlertTriangle, label: 'Penalty Management' },
+    ];
+    roleTitle = 'Franchise Officer';
   } else if (isPresident || isTodaPresident) {
     links = todaLinks;
     roleTitle = 'TODA President';

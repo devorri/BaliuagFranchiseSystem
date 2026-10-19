@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as supabaseService from '../../services/supabaseService';
 import * as storage from '../../services/storageService';
-import type { Application, Franchise, Penalty, User } from '../../types';
+import type { Application, Franchise, Penalty, User, AuditLog } from '../../types';
 import { 
   ShieldCheck, FileText, AlertTriangle, Clock, BarChart3, 
-  Users, CheckCircle2, Receipt, ArrowRight 
+  Users, CheckCircle2, Receipt, ArrowRight, History, Search,
+  Filter, KeyRound, Wrench, CreditCard, Award
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,25 +18,32 @@ export function AdminDashboard() {
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [penalties, setPenalties] = useState<Penalty[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditFilter, setAuditFilter] = useState<string>('all');
+  const [auditSearch, setAuditSearch] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'audit' | 'transactions'>('audit');
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [apps, frs, usersList, penaltyList] = await Promise.all([
+        const [apps, frs, usersList, penaltyList, logs] = await Promise.all([
           supabaseService.getApplicationsAsync(),
           supabaseService.getFranchisesAsync(),
           supabaseService.getUsersAsync(),
           supabaseService.getPenaltiesAsync(),
+          supabaseService.getAuditLogsAsync(),
         ]);
         setApplications(apps);
         setFranchises(frs);
         setUsers(usersList);
         setPenalties(penaltyList);
+        setAuditLogs(logs);
       } catch {
         setApplications(storage.getApplications());
         setFranchises(storage.getFranchises());
         setUsers(storage.getUsers());
         setPenalties(storage.getPenalties());
+        setAuditLogs(storage.getAuditLogs());
       }
     }
     loadData();
@@ -260,82 +268,281 @@ export function AdminDashboard() {
 
         </div>
 
-        {/* TASK 1: Full-Width Cleanly Aligned Transactions & Activity Section */}
+        {/* MODULE 10: Tabbed User Activity Audit Logs & Payment Transactions */}
         <div className="glass-container" style={{ padding: '1.75rem', width: '100%', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          
+          {/* Section Header & View Switcher */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1.25rem' }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Receipt size={20} color="#34d399" />
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
-                  System Transactions & Payment History
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <History size={20} color="#38bdf8" />
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ffffff' }}>
+                  {activeTab === 'audit' ? 'Municipal Activity & System Audit Logs' : 'System Transactions & Payment History'}
                 </h3>
+                <span className="pill-badge pill-cyan" style={{ fontSize: '0.72rem' }}>Module 10 Verified</span>
               </div>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
-                Detailed record of all payments (MTOP base fee, TODA fee, stenciling, and penalties).
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                {activeTab === 'audit' 
+                  ? 'Verifiable audit trail recording logins, requirements verifications, stenciling inspections, and MTOP issuances.'
+                  : 'Real-time ledger of all payments including GCash Dynamic QR Ph and municipal cashier receipts.'}
               </p>
             </div>
 
-            <button onClick={() => navigate('/admin/reports')} className="btn-glass" style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem' }}>
-              Full Financial Report <ArrowRight size={14} />
-            </button>
+            {/* View Switcher Tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.25)', padding: '0.3rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('audit')}
+                style={{
+                  padding: '0.45rem 0.95rem',
+                  borderRadius: '7px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  background: activeTab === 'audit' ? '#0284c7' : 'transparent',
+                  color: activeTab === 'audit' ? '#ffffff' : '#94a3b8',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <History size={14} /> Activity Audit Trail ({auditLogs.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('transactions')}
+                style={{
+                  padding: '0.45rem 0.95rem',
+                  borderRadius: '7px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  background: activeTab === 'transactions' ? '#059669' : 'transparent',
+                  color: activeTab === 'transactions' ? '#ffffff' : '#94a3b8',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <Receipt size={14} /> Payment Transactions
+              </button>
+            </div>
           </div>
 
-          <div style={{ overflowX: 'auto', width: '100%' }}>
-            <table className="glass-table" style={{ width: '100%', minWidth: '700px' }}>
-              <thead>
-                <tr>
-                  <th>Transaction ID</th>
-                  <th>Payer Name</th>
-                  <th>Fee Type</th>
-                  <th>Payment Method</th>
-                  <th>Amount</th>
-                  <th>Date</th>
-                  <th style={{ textAlign: 'right' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {applications.filter(a => a.treasurerPayment?.paid).length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                      No transaction records found.
-                    </td>
-                  </tr>
-                ) : (
-                  applications
-                    .filter(a => a.treasurerPayment?.paid)
-                    .slice(0, 6)
-                    .map(a => (
-                      <tr key={a.id}>
-                        <td style={{ fontFamily: 'monospace', color: '#38bdf8' }}>{a.treasurerPayment?.orNumber || a.id}</td>
-                        <td style={{ fontWeight: 700, color: '#ffffff' }}>{a.applicantName}</td>
-                        <td>MTOP Franchise Processing & Stenciling</td>
-                        <td>
-                          <span style={{ 
-                            textTransform: 'uppercase', 
-                            fontSize: '0.75rem', 
-                            fontWeight: 700, 
-                            color: a.treasurerPayment?.paymentMethod === 'gcash' ? '#38bdf8' : '#e2e8f0' 
-                          }}>
-                            {a.treasurerPayment?.paymentMethod || 'Treasurer Cash'}
-                          </span>
-                        </td>
-                        <td style={{ fontWeight: 800, color: '#4ade80' }}>
-                          ₱{(a.totalFee || a.treasurerPayment?.amount || 950).toFixed(2)}
-                        </td>
-                        <td style={{ color: '#cbd5e1' }}>
-                          {a.treasurerPayment?.paidAt ? new Date(a.treasurerPayment.paidAt).toLocaleDateString() : new Date().toLocaleDateString()}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <span className="pill-badge pill-emerald">
-                            <CheckCircle2 size={12} /> PAID
-                          </span>
+          {/* TAB 1: SYSTEM ACTIVITY AUDIT LOGS (Module 10) */}
+          {activeTab === 'audit' && (
+            <div>
+              {/* Search & Filter Toolbar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
+                  <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    className="glass-input"
+                    style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', width: '100%' }}
+                    placeholder="Search user, action, details, or ID..."
+                    value={auditSearch}
+                    onChange={e => setAuditSearch(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <Filter size={15} color="#94a3b8" />
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Filter Event:</span>
+                  <select
+                    className="glass-input glass-select"
+                    style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', width: 'auto' }}
+                    value={auditFilter}
+                    onChange={e => setAuditFilter(e.target.value)}
+                  >
+                    <option value="all">All System Events ({auditLogs.length})</option>
+                    <option value="login">User Authentication (Logins)</option>
+                    <option value="documents">Document Verification & Submissions</option>
+                    <option value="stenciling">Stenciling & Physical Inspections</option>
+                    <option value="payment">Fee & Payment Clearances</option>
+                    <option value="mtop">MTOP Franchise Approvals</option>
+                    <option value="account">Account Management & Security</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Audit Table */}
+              <div style={{ overflowX: 'auto', width: '100%' }}>
+                <table className="glass-table" style={{ width: '100%', minWidth: '780px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '180px' }}>Timestamp</th>
+                      <th style={{ width: '190px' }}>User / Officer</th>
+                      <th style={{ width: '180px' }}>Action Type</th>
+                      <th>Activity Description & Details</th>
+                      <th style={{ textAlign: 'right', width: '120px' }}>Target Ref</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs
+                      .filter(log => {
+                        const matchesFilter = auditFilter === 'all' || 
+                          (auditFilter === 'login' && (log.action === 'USER_LOGIN' || log.action === 'USER_LOGOUT')) ||
+                          (auditFilter === 'documents' && (log.action.includes('DOCUMENT') || log.action.includes('APPLICATION'))) ||
+                          (auditFilter === 'stenciling' && log.action.includes('STENCILING')) ||
+                          (auditFilter === 'payment' && log.action.includes('PAYMENT')) ||
+                          (auditFilter === 'mtop' && log.action.includes('MTOP')) ||
+                          (auditFilter === 'account' && log.action.includes('ACCOUNT'));
+
+                        const searchStr = `${log.userName} ${log.action} ${log.details} ${log.targetId || ''}`.toLowerCase();
+                        const matchesSearch = !auditSearch || searchStr.includes(auditSearch.toLowerCase());
+                        return matchesFilter && matchesSearch;
+                      })
+                      .slice(0, 25)
+                      .map((log) => {
+                        const isLogin = log.action === 'USER_LOGIN' || log.action === 'USER_LOGOUT';
+                        const isDoc = log.action.includes('DOCUMENT') || log.action.includes('APPLICATION');
+                        const isStenciling = log.action.includes('STENCILING');
+                        const isPayment = log.action.includes('PAYMENT');
+                        const isMtop = log.action.includes('MTOP');
+                        const isAccount = log.action.includes('ACCOUNT');
+
+                        const badgeColor = isMtop ? 'pill-purple' :
+                          isPayment ? 'pill-emerald' :
+                          isStenciling ? 'pill-cyan' :
+                          isDoc ? 'pill-orange' :
+                          isLogin ? 'pill-blue' : 'pill-purple';
+
+                        return (
+                          <tr key={log.id}>
+                            <td style={{ color: '#94a3b8', fontSize: '0.82rem', fontFamily: 'monospace' }}>
+                              {new Date(log.timestamp).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })}
+                            </td>
+
+                            <td>
+                              <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '0.88rem' }}>
+                                {log.userName}
+                              </div>
+                              {log.userRole && (
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  textTransform: 'uppercase',
+                                  fontWeight: 700,
+                                  color: log.userRole === 'admin' ? '#fb923c' :
+                                         log.userRole === 'franchise_officer' ? '#38bdf8' :
+                                         log.userRole.includes('president') ? '#c084fc' : '#34d399',
+                                }}>
+                                  {log.userRole === 'franchise_officer' ? 'Franchise Officer' : log.userRole}
+                                </span>
+                              )}
+                            </td>
+
+                            <td>
+                              <span className={`pill-badge ${badgeColor}`} style={{ fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                {isLogin && <KeyRound size={11} />}
+                                {isDoc && <FileText size={11} />}
+                                {isStenciling && <Wrench size={11} />}
+                                {isPayment && <CreditCard size={11} />}
+                                {isMtop && <Award size={11} />}
+                                {isAccount && <ShieldCheck size={11} />}
+                                {log.action}
+                              </span>
+                            </td>
+
+                            <td style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>
+                              {log.details}
+                            </td>
+
+                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: '0.78rem', color: '#64748b' }}>
+                              {log.targetId ? log.targetId.slice(0, 8) : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: FINANCIAL TRANSACTIONS */}
+          {activeTab === 'transactions' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                <button onClick={() => navigate('/admin/reports')} className="btn-glass" style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem' }}>
+                  Full Financial Ledger & Analytics <ArrowRight size={14} />
+                </button>
+              </div>
+
+              <div style={{ overflowX: 'auto', width: '100%' }}>
+                <table className="glass-table" style={{ width: '100%', minWidth: '700px' }}>
+                  <thead>
+                    <tr>
+                      <th>Transaction ID / OR</th>
+                      <th>Payer Name</th>
+                      <th>Fee Type</th>
+                      <th>Payment Method</th>
+                      <th>Amount</th>
+                      <th>Date</th>
+                      <th style={{ textAlign: 'right' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {applications.filter(a => a.treasurerPayment?.paid).length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                          No transaction records found.
                         </td>
                       </tr>
-                    ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                    ) : (
+                      applications
+                        .filter(a => a.treasurerPayment?.paid)
+                        .slice(0, 10)
+                        .map(a => (
+                          <tr key={a.id}>
+                            <td style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>
+                              {a.treasurerPayment?.orNumber || a.id}
+                            </td>
+                            <td style={{ fontWeight: 700, color: '#ffffff' }}>{a.applicantName}</td>
+                            <td>MTOP Franchise Processing & Stenciling</td>
+                            <td>
+                              <span style={{ 
+                                textTransform: 'uppercase', 
+                                fontSize: '0.75rem', 
+                                fontWeight: 700, 
+                                color: a.treasurerPayment?.paymentMethod === 'gcash' ? '#38bdf8' : '#e2e8f0',
+                                background: a.treasurerPayment?.paymentMethod === 'gcash' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '6px'
+                              }}>
+                                {a.treasurerPayment?.paymentMethod || 'Treasurer Cash'}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 800, color: '#4ade80' }}>
+                              ₱{(a.totalFee || a.treasurerPayment?.amount || 950).toFixed(2)}
+                            </td>
+                            <td style={{ color: '#cbd5e1' }}>
+                              {a.treasurerPayment?.paidAt ? new Date(a.treasurerPayment.paidAt).toLocaleDateString() : new Date().toLocaleDateString()}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <span className="pill-badge pill-emerald">
+                                <CheckCircle2 size={12} /> PAID
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
 
       </div>

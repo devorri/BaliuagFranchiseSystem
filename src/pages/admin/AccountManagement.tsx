@@ -19,6 +19,7 @@ export function AccountManagement() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [showPresidentForm, setShowPresidentForm] = useState(false);
   const [creatingPresident, setCreatingPresident] = useState(false);
+  const [presidentError, setPresidentError] = useState<string | null>(null);
   const [presidentForm, setPresidentForm] = useState({
     firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: '',
   });
@@ -51,6 +52,13 @@ export function AccountManagement() {
     try {
       const updated = await supabaseService.updateAccountStatusAsync(userId, newStatus);
       if (updated) {
+        void supabaseService.recordAuditLogAsync({
+          userName: 'Security Administrator',
+          userRole: 'admin',
+          action: newStatus === 'approved' ? 'ACCOUNT_APPROVED' : 'ACCOUNT_REJECTED',
+          details: `Account for ${userName} was marked as ${newStatus.toUpperCase()}`,
+          targetId: userId,
+        });
         showToast(`Account for ${userName} has been ${newStatus === 'approved' ? 'APPROVED' : 'REJECTED'}.`, 'success');
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, accountStatus: newStatus } : u));
       } else {
@@ -65,7 +73,15 @@ export function AccountManagement() {
 
   const handleCreatePresident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canManageSecurity || presidentForm.password.length < 6) return;
+    setPresidentError(null);
+    if (!canManageSecurity) {
+      setPresidentError('Only administrators with security authorization can create TODA President accounts.');
+      return;
+    }
+    if (presidentForm.password.length < 6) {
+      setPresidentError('Password must be at least 6 characters.');
+      return;
+    }
     setCreatingPresident(true);
     try {
       const created = await supabaseService.createPresidentAsync({
@@ -78,7 +94,9 @@ export function AccountManagement() {
       setPresidentForm({ firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: '' });
       showToast('TODA President account created.', 'success');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Could not create the President account.', 'error');
+      const message = error instanceof Error ? error.message : 'Could not create the President account.';
+      setPresidentError(message);
+      showToast(message, 'error');
     } finally {
       setCreatingPresident(false);
     }
@@ -93,7 +111,15 @@ export function AccountManagement() {
 
     const status = u.accountStatus || 'approved'; // default legacy to approved
     const matchesStatus = statusFilter === 'all' || status === statusFilter;
-    const matchesRole = roleFilter === 'all' || u.role === roleFilter || (roleFilter === 'president' && u.role === 'toda_president');
+    const isOperatorDriverRole = u.role === 'operator' || u.role === 'driver';
+    const isPresidentRole = u.role === 'president' || u.role === 'toda_president';
+    const matchesRole = 
+      roleFilter === 'all' ||
+      (roleFilter === 'operator_driver' && isOperatorDriverRole) ||
+      (roleFilter === 'president' && isPresidentRole) ||
+      (roleFilter === 'franchise_officer' && u.role === 'franchise_officer') ||
+      (roleFilter === 'admin' && u.role === 'admin') ||
+      u.role === roleFilter;
 
     return matchesSearch && matchesStatus && matchesRole;
   });
@@ -130,7 +156,7 @@ export function AccountManagement() {
           </p>
         </div>
         {canManageSecurity && (
-          <button type="button" onClick={() => setShowPresidentForm(true)} className="btn-glass btn-primary-glass">
+          <button type="button" onClick={() => { setPresidentError(null); setShowPresidentForm(true); }} className="btn-glass btn-primary-glass">
             <Plus size={18} /> Create President Account
           </button>
         )}
@@ -212,10 +238,9 @@ export function AccountManagement() {
             onChange={e => setRoleFilter(e.target.value)}
           >
             <option value="all">All Roles</option>
-            <option value="driver">Driver</option>
-            <option value="operator">Operator</option>
+            <option value="operator_driver">Operator / Driver</option>
+            <option value="franchise_officer">Franchise Officer</option>
             <option value="president">TODA President</option>
-            <option value="toda_president">TODA President (Legacy)</option>
             <option value="admin">Administrator</option>
           </select>
         </div>
@@ -264,21 +289,37 @@ export function AccountManagement() {
                     </td>
 
                     <td style={{ padding: '1rem' }}>
-                      <span style={{
-                        padding: '0.2rem 0.6rem',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        background: u.role === 'admin' ? 'rgba(249, 115, 22, 0.2)' :
-                                   u.role === 'president' || u.role === 'toda_president' ? 'rgba(168, 85, 247, 0.2)' :
-                                   u.role === 'operator' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(56, 189, 248, 0.2)',
-                        color: u.role === 'admin' ? '#fb923c' :
-                               u.role === 'president' || u.role === 'toda_president' ? '#c084fc' :
-                               u.role === 'operator' ? '#34d399' : '#38bdf8',
-                      }}>
-                        {u.role === 'toda_president' ? 'President' : u.role}
-                      </span>
+                      {(() => {
+                        const isOperatorOrDriver = u.role === 'operator' || u.role === 'driver';
+                        const isPresidentRole = u.role === 'president' || u.role === 'toda_president';
+                        const isFranchiseOfficer = u.role === 'franchise_officer';
+                        const isAdminRole = u.role === 'admin';
+
+                        const roleLabel = isOperatorOrDriver ? 'Operator / Driver' :
+                                          isPresidentRole ? 'TODA President' :
+                                          isFranchiseOfficer ? 'Franchise Officer' :
+                                          isAdminRole ? 'Administrator' : u.role;
+
+                        return (
+                          <span style={{
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            background: isAdminRole ? 'rgba(249, 115, 22, 0.2)' :
+                                       isFranchiseOfficer ? 'rgba(6, 182, 212, 0.2)' :
+                                       isPresidentRole ? 'rgba(168, 85, 247, 0.2)' :
+                                       'rgba(52, 211, 153, 0.2)',
+                            color: isAdminRole ? '#fb923c' :
+                                   isFranchiseOfficer ? '#38bdf8' :
+                                   isPresidentRole ? '#c084fc' :
+                                   '#34d399',
+                          }}>
+                            {roleLabel}
+                          </span>
+                        );
+                      })()}
                     </td>
 
                     <td style={{ padding: '1rem' }}>
@@ -375,6 +416,22 @@ export function AccountManagement() {
           <div className="glass-container modal-glass-content animate-fade-in" onClick={event => event.stopPropagation()}>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '1rem' }}>Create TODA President Account</h2>
             <form onSubmit={handleCreatePresident} style={{ display: 'grid', gap: '0.85rem' }}>
+              {presidentError && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.45)',
+                  color: '#fca5a5',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  fontSize: '0.84rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <ShieldAlert size={18} style={{ flexShrink: 0 }} />
+                  <span>{presidentError}</span>
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <input aria-label="First name" className="glass-input" placeholder="First name" value={presidentForm.firstName} onChange={e => setPresidentForm({ ...presidentForm, firstName: e.target.value })} required />
                 <input aria-label="Last name" className="glass-input" placeholder="Last name" value={presidentForm.lastName} onChange={e => setPresidentForm({ ...presidentForm, lastName: e.target.value })} required />

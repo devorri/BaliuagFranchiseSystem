@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
-import { saveApplicationAsync, uploadFileToBucketAsync } from '../../services/supabaseService';
+import { saveApplicationAsync, uploadFileToBucketAsync, recordAuditLogAsync } from '../../services/supabaseService';
 import type { Application, Document, DocumentType } from '../../types';
 import { REQUIRED_APPLICATION_DOCUMENTS, TODA_ROUTES, feeForAddress } from '../../services/applicationRules';
 import { FileUp, CheckCircle, Loader2 } from 'lucide-react';
@@ -46,7 +46,19 @@ export function SubmitRequirements() {
       todaName: form.todaName, routeArea, documents, baseFee: addressFee.amount, todaFee: 0, latePenalty: 0, totalFee: addressFee.amount, submittedAt: now, updatedAt: now,
     };
     setError('');
-    try { await saveApplicationAsync(app, true); setSubmitted(true); setTimeout(() => navigate('/dashboard'), 1600); }
+    try { 
+      await saveApplicationAsync(app, false);
+      void recordAuditLogAsync({
+        userId: user.id,
+        userName: `${user.firstName} ${user.lastName}`,
+        userRole: 'operator',
+        action: 'APPLICATION_SUBMITTED',
+        details: `Operator submitted franchise application (Plate: ${app.plateNumber}, TODA: ${app.todaName})`,
+        targetId: app.id,
+      });
+      setSubmitted(true); 
+      setTimeout(() => navigate('/dashboard'), 1600); 
+    }
     catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Hindi na-save ang application.'); }
   };
 

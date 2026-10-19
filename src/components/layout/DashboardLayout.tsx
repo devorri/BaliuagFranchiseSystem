@@ -23,6 +23,7 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
 
   const roleMatches = !requiredRole || 
     user.role === requiredRole ||
+    (requiredRole === 'admin' && (user.role === 'admin' || user.role === 'franchise_officer')) ||
     ((requiredRole === 'toda_president' || requiredRole === 'president') && 
      (user.role === 'toda_president' || user.role === 'president'));
 
@@ -34,6 +35,8 @@ export function DashboardLayout({ requiredRole }: DashboardLayoutProps) {
       case 'president':
       case 'toda_president':
         return <Navigate to="/toda" replace />;
+      case 'franchise_officer':
+        return <Navigate to="/admin/applications" replace />;
       case 'admin':
         return <Navigate to="/admin/accounts" replace />;
       case 'operator':

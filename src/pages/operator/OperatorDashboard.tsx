@@ -134,7 +134,7 @@ export function OperatorDashboard() {
             <table className="glass-table">
               <thead>
                 <tr>
-                  <th>MTOP Permit #</th>
+                  <th>Body Number (MTOP #)</th>
                   <th>Assigned Driver</th>
                   <th>Driver Account</th>
                   <th>Plate Number</th>

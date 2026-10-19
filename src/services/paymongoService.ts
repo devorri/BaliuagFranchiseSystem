@@ -8,7 +8,6 @@
  */
 
 const BASE_URL = '/api/paymongo';
-const PAYMONGO_ENABLED = import.meta.env.VITE_PAYMONGO_ENABLED === 'true';
 
 function getHeaders(): Record<string, string> {
   return {
@@ -204,6 +203,61 @@ export async function getGCashSource(sourceId: string): Promise<PayMongoSourceRe
   return data.data as PayMongoSourceResponse;
 }
 
-export function isPayMongoConfigured(): boolean {
-  return PAYMONGO_ENABLED;
+export interface DynamicQrResponse {
+  success: boolean;
+  payment_intent_id: string;
+  client_key: string;
+  qr_image: string;
+  expires_at?: number;
 }
+
+export interface CheckPaymentIntentResponse {
+  status: string;
+  paid: boolean;
+  payments: Array<any>;
+}
+
+/**
+ * Generate Real PayMongo Dynamic QR Ph Code
+ */
+export async function generateDynamicQrPh(params: {
+  amount: number;
+  description?: string;
+  applicantName?: string;
+}): Promise<DynamicQrResponse> {
+  const res = await fetch('/api/paymongo/generate-qrph', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.qr_image) {
+    throw new Error(data.error || 'Failed to generate dynamic QR Ph code');
+  }
+  return data;
+}
+
+/**
+ * Live Poll PayMongo Payment Intent Status
+ */
+export async function checkPaymentIntentStatus(paymentIntentId: string): Promise<CheckPaymentIntentResponse> {
+  const res = await fetch('/api/paymongo/check-payment-intent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentIntentId }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to check payment status');
+  }
+  return data;
+}
+
+export function isPayMongoConfigured(): boolean {
+  return Boolean(
+    import.meta.env.VITE_PAYMONGO_SECRET_KEY ||
+    import.meta.env.VITE_PAYMONGO_PUBLIC_KEY ||
+    import.meta.env.VITE_PAYMONGO_ENABLED === 'true'
+  );
+}
+

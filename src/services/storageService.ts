@@ -2,8 +2,8 @@
 // Storage Service - LocalStorage Persistence
 // ============================================
 
-import type { User, Application, Document, Franchise, Penalty, SMSNotification, FeeConfig, ApplicationStatus, Advertisement, InformationItem, Payment } from '../types';
-import { seedUsers, seedApplications, seedFranchises, seedPenalties, seedSMSNotifications, seedFeeConfig, seedAdvertisements, seedInformationItems } from './seedData';
+import type { User, Application, Document, Franchise, Penalty, SMSNotification, FeeConfig, ApplicationStatus, Advertisement, InformationItem, Payment, AuditLog } from '../types';
+import { seedUsers, seedApplications, seedFranchises, seedPenalties, seedSMSNotifications, seedFeeConfig, seedAdvertisements, seedInformationItems, seedAuditLogs } from './seedData';
 import { sendSMS, isSMSConfigured } from './smsService';
 
 const KEYS = {
@@ -19,7 +19,9 @@ const KEYS = {
   FEE_CONFIG: 'baliuag_fee_config',
   ADVERTISEMENTS: 'baliuag_advertisements',
   INFORMATION_ITEMS: 'baliuag_information_items',
+  AUDIT_LOGS: 'baliuag_audit_logs',
 };
+
 
 export function initializeData(): void {
   if (!localStorage.getItem(KEYS.USERS)) {
@@ -585,4 +587,38 @@ export function deleteInformationItem(id: string): boolean {
   }
   return false;
 }
+
+// ================= USER ACTIVITY AUDIT LOGS =================
+export function getAuditLogs(): AuditLog[] {
+  initializeData();
+  const raw = localStorage.getItem(KEYS.AUDIT_LOGS);
+  if (!raw) {
+    localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify(seedAuditLogs));
+    return seedAuditLogs;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return seedAuditLogs;
+  }
+}
+
+export function saveAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'> & { id?: string; timestamp?: string }): AuditLog {
+  const current = getAuditLogs();
+  const entry: AuditLog = {
+    id: log.id || `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    userId: log.userId,
+    userName: log.userName,
+    userRole: log.userRole,
+    action: log.action,
+    details: log.details,
+    targetId: log.targetId,
+    ipAddress: log.ipAddress || '127.0.0.1',
+    timestamp: log.timestamp || new Date().toISOString(),
+  };
+  const updated = [entry, ...current].slice(0, 500);
+  localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify(updated));
+  return entry;
+}
+
 

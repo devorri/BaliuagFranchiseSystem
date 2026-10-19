@@ -85,7 +85,7 @@ export function FranchiseRegistry() {
               type="text"
               className="glass-input"
               style={{ paddingLeft: '2.75rem' }}
-              placeholder="Search by MTOP #, Driver Name, Plate #, or TODA..."
+              placeholder="Search by Body Number (MTOP #), Plate Number, Driver, or TODA..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
@@ -113,7 +113,7 @@ export function FranchiseRegistry() {
           <table className="glass-table">
             <thead>
               <tr>
-                <th>MTOP Number</th>
+                <th>Body Number (MTOP #)</th>
                 <th>Driver / Operator</th>
                 <th>Plate Number</th>
                 <th>TODA Route</th>

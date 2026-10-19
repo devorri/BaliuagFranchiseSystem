@@ -64,8 +64,8 @@ export function ApplicationReview() {
 
     setLoading(true);
     try {
-      if (!selectedApp || !hasCompleteRequirements(selectedApp.documents) || selectedApp.inspection?.status !== 'passed' || !selectedApp.presidentEndorsed) {
-        showToast('Hindi puwedeng mag-grant: kumpletuhin ang requirements, TODA endorsement, at personal na passed inspection.', 'error');
+      if (!selectedApp || !hasCompleteRequirements(selectedApp.documents) || selectedApp.inspection?.status !== 'passed' || !selectedApp.presidentEndorsed || !selectedApp.treasurerPayment?.paid) {
+        showToast('Hindi puwedeng mag-grant: kumpletuhin ang requirements, TODA endorsement, personal na passed inspection, at beripikadong bayad sa Treasurer/GCash.', 'error');
         return;
       }
 
@@ -79,6 +79,14 @@ export function ApplicationReview() {
       );
 
       if (updated) {
+        void supabaseService.recordAuditLogAsync({
+          userId: user?.id,
+          userName: reviewerName,
+          userRole: user?.role || 'admin',
+          action: 'MTOP_GRANTED',
+          details: `Granted MTOP #${updated.mtopNumber || 'Approved'} for plate ${selectedApp.plateNumber} (Effectivity: ${finalStartDate} to ${finalEndDate})`,
+          targetId: appId,
+        });
         showToast(`MTOP Granted! Official MTOP #: ${updated.mtopNumber || 'Approved'}. Effectivity: ${finalStartDate} hanggang ${finalEndDate}.`, 'success');
         setSelectedApp(null);
         await loadApplications();
@@ -143,6 +151,14 @@ export function ApplicationReview() {
       const updatedApp = { ...selectedApp, documents: updatedDocs };
       const saved = await supabaseService.saveApplicationAsync(updatedApp, true);
       setSelectedApp(saved);
+      void supabaseService.recordAuditLogAsync({
+        userId: user?.id,
+        userName: user ? `${user.firstName} ${user.lastName}` : 'Franchise Officer',
+        userRole: user?.role || 'franchise_officer',
+        action: 'DOCUMENT_VERIFIED',
+        details: `Verified all requirements for applicant ${selectedApp.applicantName} (Plate: ${selectedApp.plateNumber})`,
+        targetId: selectedApp.id,
+      });
       showToast('Lahat ng dokumento ay matagumpay na na-verify!', 'success');
       await loadApplications();
     } catch (error) {
@@ -166,6 +182,14 @@ export function ApplicationReview() {
         notes
       );
       if (updated) {
+        void supabaseService.recordAuditLogAsync({
+          userId: user?.id,
+          userName: inspectorName,
+          userRole: user?.role || 'franchise_officer',
+          action: 'STENCILING_PASSED',
+          details: `Passed engine & chassis stenciling for Motor #${updated.motorNumber} / Plate ${updated.plateNumber}`,
+          targetId: appId,
+        });
         showToast('Nai-record na pumasa ang makina at chassis stenciling!', 'success');
         setSelectedApp(updated);
         await loadApplications();
@@ -204,7 +228,7 @@ export function ApplicationReview() {
     try {
       const orNumber = `OR-ADM-${Date.now().toString().slice(-6)}`;
       const updatedPayment: TreasurerPayment = {
-        amount: selectedApp.treasurerPayment?.amount || selectedApp.totalFee || 670,
+        amount: selectedApp.treasurerPayment?.amount || selectedApp.totalFee || 450,
         paid: true,
         paidAt: new Date().toISOString(),
         orNumber: selectedApp.treasurerPayment?.orNumber || orNumber,
@@ -213,6 +237,14 @@ export function ApplicationReview() {
       const updatedApp = { ...selectedApp, treasurerPayment: updatedPayment };
       const saved = await supabaseService.saveApplicationAsync(updatedApp, true);
       setSelectedApp(saved);
+      void supabaseService.recordAuditLogAsync({
+        userId: user?.id,
+        userName: `${user.firstName} ${user.lastName}`,
+        userRole: user.role,
+        action: 'PAYMENT_VERIFIED',
+        details: `Treasurer fee marked cleared: ₱${updatedPayment.amount.toFixed(2)} (OR: ${updatedPayment.orNumber})`,
+        targetId: appId,
+      });
       showToast('Nai-record na bayad na ang Treasurer Fee!', 'success');
       await loadApplications();
     } catch {
@@ -310,7 +342,7 @@ export function ApplicationReview() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <div>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>{app.driverName || app.applicantName}</h3>
-                    <span style={{ fontSize: '0.8rem', color: '#38bdf8' }}>Ref #: {app.id} | Plate: {app.plateNumber}</span>
+                    <span style={{ fontSize: '0.8rem', color: '#38bdf8' }}>Plate / Body No. (MTOP): <strong>{app.plateNumber}</strong> {app.mtopNumber ? `• MTOP #${app.mtopNumber}` : ''}</span>
                   </div>
                   {isApproved ? (
                     <span className="pill-badge pill-emerald"><CheckCircle2 size={14} /> MTOP GRANTED</span>
@@ -410,7 +442,7 @@ export function ApplicationReview() {
                   Aplikasyon para sa MTOP Approval
                 </h3>
                 <p style={{ fontSize: '0.88rem', color: '#94a3b8' }}>
-                  Applicant: <strong style={{ color: '#38bdf8' }}>{selectedApp.driverName || selectedApp.applicantName}</strong> | Plate: <strong style={{ color: '#ffffff' }}>{selectedApp.plateNumber}</strong> ({selectedApp.todaName})
+                  Applicant: <strong style={{ color: '#38bdf8' }}>{selectedApp.driverName || selectedApp.applicantName}</strong> | Plate / Body No. (MTOP): <strong style={{ color: '#ffffff' }}>{selectedApp.plateNumber}</strong> ({selectedApp.todaName})
                 </p>
               </div>
               <button onClick={() => setSelectedApp(null)} className="btn-glass" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
@@ -534,6 +566,50 @@ export function ApplicationReview() {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* LGU Official Fee Assessment Sheet (Step 6) */}
+            <div style={{
+              background: 'rgba(56, 189, 248, 0.08)',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
+              borderRadius: '12px',
+              padding: '1.25rem',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <CreditCard size={18} color="#38bdf8" />
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#38bdf8', margin: 0 }}>
+                    LGU Official Fee Assessment Sheet (Step 6 Assessment)
+                  </h4>
+                </div>
+                <span className={`pill-badge ${selectedApp.treasurerPayment?.paid ? 'pill-emerald' : 'pill-orange'}`}>
+                  {selectedApp.treasurerPayment?.paid ? 'PAYMENT CLEARED' : 'AWAITING PAYMENT'}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>Base MTOP Franchise Fee</span>
+                  <strong style={{ color: '#ffffff' }}>₱450.00</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>Residency Assessment</span>
+                  <strong style={{ color: selectedApp.residency === 'baliwag_resident' ? '#4ade80' : '#fb923c' }}>
+                    {selectedApp.residency === 'baliwag_resident' ? 'Baliwag Resident (₱0)' : 'Non-Resident (+₱500.00)'}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>Mechanical Stenciling</span>
+                  <strong style={{ color: '#ffffff' }}>Included in Assessment</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>Total Assessed Fee</span>
+                  <strong style={{ color: '#4ade80', fontSize: '1.2rem' }}>
+                    ₱{(selectedApp.totalFee || 450).toFixed(2)}
+                  </strong>
+                </div>
+              </div>
             </div>
 
             {/* Workflow Progress Details Grid — with Admin Action Buttons */}
@@ -685,11 +761,17 @@ export function ApplicationReview() {
                   <button
                     type="button"
                     onClick={() => handleGrantMtop(selectedApp.id)}
-                    disabled={loading}
+                    disabled={loading || !selectedApp.treasurerPayment?.paid}
                     className="btn-glass btn-emerald-glass"
-                    style={{ padding: '0.75rem 1.75rem', fontWeight: 700, fontSize: '0.95rem', cursor: loading ? 'not-allowed' : 'pointer' }}
+                    style={{
+                      padding: '0.75rem 1.75rem',
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      cursor: (loading || !selectedApp.treasurerPayment?.paid) ? 'not-allowed' : 'pointer',
+                      opacity: (!selectedApp.treasurerPayment?.paid) ? 0.6 : 1
+                    }}
                   >
-                    <ShieldCheck size={18} /> {loading ? 'Nino-proseso...' : 'Aprubahan at Igawad ang MTOP'}
+                    <ShieldCheck size={18} /> {loading ? 'Nino-proseso...' : !selectedApp.treasurerPayment?.paid ? 'Payment Clearance Required' : 'Aprubahan at Igawad ang MTOP'}
                   </button>
                 </div>
               </div>
