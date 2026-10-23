@@ -16,6 +16,7 @@ import type {
   Penalty,
   SMSNotification,
   AuditLog,
+  Document,
 } from '../types';
 import { FRANCHISE_FEES } from './fees';
 import { hasCompleteRequirements } from './applicationRules';
