@@ -4,6 +4,7 @@ import { useToast } from '../../components/ui/Toast';
 import * as supabaseService from '../../services/supabaseService';
 import type { Application, Document, DocumentType, TreasurerPayment } from '../../types';
 import { hasCompleteRequirements } from '../../services/applicationRules';
+import { sendMtopCertificateEmail } from '../../services/emailService';
 import { 
   CheckCircle2, ShieldCheck, XCircle, FileText, Calendar, 
   Eye, FileCheck, AlertCircle, Award, CreditCard, Wrench, RefreshCw
@@ -109,6 +110,23 @@ export function ApplicationReview() {
           details: `Granted MTOP #${updated.mtopNumber || 'Approved'} for plate ${selectedApp.plateNumber} (Effectivity: ${finalStartDate} to ${finalEndDate})`,
           targetId: appId,
         });
+
+        // Dispatch official EmailJS MTOP Certificate Release email
+        void supabaseService.getUsersAsync().then(allUsers => {
+          const applicantUser = allUsers.find(u => u.id === selectedApp.applicantId || u.id === selectedApp.driverId);
+          if (applicantUser?.email) {
+            void sendMtopCertificateEmail({
+              toEmail: applicantUser.email,
+              applicantName: updated.applicantName || `${applicantUser.firstName} ${applicantUser.lastName}`,
+              mtopNumber: updated.mtopNumber || 'MTOP-APPROVED',
+              plateNumber: updated.plateNumber,
+              todaName: updated.todaName || 'Baliwag TODA Association',
+              validUntil: `${finalStartDate} to ${finalEndDate}`,
+              certificateUrl: window.location.origin + '/operator/certification',
+            });
+          }
+        }).catch(e => console.warn('Certificate email dispatch notice:', e));
+
         showToast(`MTOP Granted! Official MTOP #: ${updated.mtopNumber || 'Approved'}. Effectivity: ${finalStartDate} to ${finalEndDate}.`, 'success');
         setSelectedApp(null);
         await loadApplications();

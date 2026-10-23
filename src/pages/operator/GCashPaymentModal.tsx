@@ -16,6 +16,7 @@ import {
   sanitizeGcashReference,
   generateStandardGcashReference
 } from '../../services/applicationRules';
+import { sendPaymentReceiptEmail } from '../../services/emailService';
 import type { Application } from '../../types';
 
 export function GCashPaymentModal() {
@@ -167,6 +168,22 @@ export function GCashPaymentModal() {
           details: `Digital QR Ph payment confirmed: ₱${amount.toFixed(2)} (OR/Ref: ${ref})`,
           targetId: pendingApp?.id,
         });
+
+        // Dispatch official EmailJS electronic receipt
+        if (user.email) {
+          void sendPaymentReceiptEmail({
+            toEmail: user.email,
+            applicantName: pendingApp?.applicantName || `${user.firstName} ${user.lastName}`,
+            orNumber: ref,
+            amount: pendingApp?.totalFee || amount,
+            paymentMethod: 'gcash',
+            plateNumber: pendingApp?.plateNumber || 'Unit under Review',
+            mtopNumber: pendingApp?.id,
+            todaName: pendingApp?.todaName,
+            applicationType: pendingApp?.type || 'new',
+            paidAt: new Date().toISOString(),
+          });
+        }
       } catch (err) {
         console.warn('Payment recording sync warning:', err);
       }

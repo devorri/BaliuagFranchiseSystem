@@ -7,6 +7,7 @@ import {
   createGCashSource, getGCashSource, isPayMongoConfigured 
 } from '../../services/paymongoService';
 import { generateStandardGcashReference } from '../../services/applicationRules';
+import { sendPaymentReceiptEmail } from '../../services/emailService';
 import {
   CheckCircle2, Building, Receipt, Smartphone, QrCode,
   ArrowRight, ShieldCheck, X, Loader2, ExternalLink, RefreshCw, Printer
@@ -152,6 +153,22 @@ export function DriverPayment() {
     }
   };
 
+  const sendEmailReceipt = (app: Application, ref: string, method: 'gcash' | 'cash') => {
+    if (!user?.email) return;
+    void sendPaymentReceiptEmail({
+      toEmail: user.email,
+      applicantName: app.applicantName || app.driverName || `${user.firstName} ${user.lastName}`,
+      orNumber: ref,
+      amount: payableAmount,
+      paymentMethod: method,
+      plateNumber: app.plateNumber || 'Unit under Review',
+      mtopNumber: app.id,
+      todaName: app.todaName,
+      applicationType: app.type,
+      paidAt: new Date().toISOString(),
+    });
+  };
+
   const handleVerifyPayment = async (
     sourceId?: string, 
     targetApp?: Application | null, 
@@ -182,6 +199,7 @@ export function DriverPayment() {
             setIsPaid(true);
             setCheckoutUrl(null);
             sessionStorage.removeItem(`pm_session_${currentApp.id}`);
+            sendEmailReceipt(updated, refNum, 'gcash');
           }
           return;
         } else if (isManual) {
@@ -206,6 +224,7 @@ export function DriverPayment() {
             setIsPaid(true);
             setCheckoutUrl(null);
             sessionStorage.removeItem(`pm_session_${currentApp.id}`);
+            sendEmailReceipt(updated, refNum, 'gcash');
           }
         } else if (isManual) {
           setError(`GCash Source Status: ${status}. If authorized in GCash app, click "Verify Payment" again.`);
@@ -241,6 +260,7 @@ export function DriverPayment() {
         setApplication(updated);
         setIsPaid(true);
         setShowSimulatedModal(false);
+        sendEmailReceipt(updated, gcashRef, 'gcash');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to record simulated payment.');
@@ -269,6 +289,7 @@ export function DriverPayment() {
       if (updated) {
         setApplication(updated);
         setIsPaid(true);
+        sendEmailReceipt(updated, orNumber.trim(), 'cash');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to record cash payment.');

@@ -3,8 +3,8 @@
 // Uses Semaphore (https://semaphore.co) for Philippine SMS
 // ============================================
 
-const SMS_ENABLED = import.meta.env.VITE_SMS_ENABLED === 'true';
-const SEMAPHORE_SENDER_NAME = import.meta.env.VITE_SEMAPHORE_SENDER_NAME as string || '';
+const SMS_ENABLED = import.meta.env.VITE_SMS_ENABLED === 'true' || Boolean(import.meta.env.VITE_SEMAPHORE_API_KEY) || true;
+const SEMAPHORE_SENDER_NAME = (import.meta.env.VITE_SEMAPHORE_SENDER_NAME as string || 'SinagsCater').trim();
 const BASE_PROXY_URL = '/api/semaphore/api/v4';
 
 /**
@@ -18,10 +18,6 @@ export function isSMSConfigured(): boolean {
  * Check Semaphore account balance and details
  */
 export async function getSMSAccount(): Promise<{ success: boolean; balance?: number; accountName?: string; error?: string }> {
-  if (!isSMSConfigured()) {
-    return { success: false, error: 'SMS API key not configured' };
-  }
-
   try {
     const response = await fetch(`${BASE_PROXY_URL}/account`);
     if (!response.ok) return { success: false, error: `Semaphore HTTP ${response.status}` };
@@ -38,10 +34,7 @@ export async function getSMSAccount(): Promise<{ success: boolean; balance?: num
  */
 function formatPhoneNumber(phone: string): string {
   let digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('63') && digits.length === 12) {
-    digits = '0' + digits.substring(2);
-  }
-  if (digits.startsWith('63') && digits.length === 11) {
+  if (digits.startsWith('63') && (digits.length === 12 || digits.length === 11)) {
     digits = '0' + digits.substring(2);
   }
   return digits;
@@ -63,11 +56,6 @@ export async function sendSMS(
   recipientPhone: string,
   message: string,
 ): Promise<SMSSendResult> {
-  if (!isSMSConfigured()) {
-    console.warn('[SMS] Semaphore API key not configured. SMS not sent.');
-    return { success: false, error: 'SMS API key not configured.' };
-  }
-
   const formattedNumber = formatPhoneNumber(recipientPhone);
   
   if (formattedNumber.length < 10 || formattedNumber.length > 13) {
@@ -75,11 +63,11 @@ export async function sendSMS(
     return { success: false, error: `Invalid phone number: ${recipientPhone}` };
   }
 
-  const postMessage = async (url: string) => {
+  const postMessage = async (url: string, withSender = true) => {
     const formData = new URLSearchParams();
     formData.append('number', formattedNumber);
     formData.append('message', message);
-    if (SEMAPHORE_SENDER_NAME) {
+    if (withSender && SEMAPHORE_SENDER_NAME && SEMAPHORE_SENDER_NAME !== 'SEMAPHORE') {
       formData.append('sendername', SEMAPHORE_SENDER_NAME);
     }
     return fetch(url, {
@@ -90,16 +78,39 @@ export async function sendSMS(
   };
 
   try {
-    const response = await postMessage(`${BASE_PROXY_URL}/messages`);
-    const text = await response.text();
-    if (!response.ok) return { success: false, error: `Semaphore HTTP ${response.status}`, recipient: formattedNumber };
-    const result = JSON.parse(text);
+    let response = await postMessage(`${BASE_PROXY_URL}/messages`, true);
+    let text = await response.text();
+
+    // Auto-retry without sender name if custom sender name is rejected by Semaphore
+    if (!response.ok && SEMAPHORE_SENDER_NAME) {
+      try {
+        const retry = await postMessage(`${BASE_PROXY_URL}/messages`, false);
+        if (retry.ok) {
+          response = retry;
+          text = await retry.text();
+        }
+      } catch {
+        // preserve original
+      }
+    }
+
+    if (!response.ok) {
+      return { success: false, error: `Semaphore HTTP ${response.status}: ${text}`, recipient: formattedNumber };
+    }
+
+    let result: any;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      result = text;
+    }
+
     if (Array.isArray(result) && result.length > 0) {
       return { success: true, messageId: String(result[0].message_id), recipient: formattedNumber };
     }
-    return { success: false, error: result.error || result.message || 'Semaphore did not confirm the message.', recipient: formattedNumber };
-  } catch {
-    return { success: false, error: 'Network error communicating with Semaphore SMS API', recipient: formattedNumber };
+    return { success: false, error: result?.error || result?.message || 'Semaphore did not confirm the message.', recipient: formattedNumber };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Network error communicating with Semaphore SMS API', recipient: formattedNumber };
   }
 }
 

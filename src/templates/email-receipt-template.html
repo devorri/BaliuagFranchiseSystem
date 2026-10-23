@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Official Electronic Payment Receipt - City of Baliwag</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; -webkit-font-smoothing: antialiased;">
+
+  <!-- Outer Container -->
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f1f5f9; padding: 24px 12px;">
+    <tr>
+      <td align="center">
+        
+        <!-- Main Card (600px Max) -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;">
+          
+          <!-- Top Accent Banner -->
+          <tr>
+            <td style="background-color: #15803d; height: 6px; font-size: 0; line-height: 0;">&nbsp;</td>
+          </tr>
+
+          <!-- Official Header -->
+          <tr>
+            <td style="padding: 24px 28px 20px 28px; border-bottom: 1px solid #f1f5f9;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #15803d; margin-bottom: 2px;">
+                      Republic of the Philippines &bull; Province of Bulacan
+                    </div>
+                    <div style="font-size: 18px; font-weight: 800; color: #0f172a; margin: 0 0 4px 0;">
+                      City Government of Baliwag
+                    </div>
+                    <div style="font-size: 12px; color: #64748b; font-weight: 500;">
+                      Tricycle Franchising &amp; Regulatory Board (TFRB) &bull; City Treasurer's Office
+                    </div>
+                  </td>
+                  <td align="right" style="vertical-align: middle;">
+                    <span style="display: inline-block; padding: 6px 12px; background-color: #dcfce7; border: 1px solid #86efac; color: #166534; font-size: 11px; font-weight: 800; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em;">
+                      e-OR Official
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Receipt Title & Greeting Banner -->
+          <tr>
+            <td style="background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%); padding: 24px 28px 12px 28px;">
+              <div style="font-size: 20px; font-weight: 800; color: #14532d; margin-bottom: 6px;">
+                Official Payment Receipt
+              </div>
+              <p style="font-size: 14px; line-height: 1.5; color: #334155; margin: 0;">
+                Dear <strong>{{applicant_name}}</strong>, your payment for the MTOP Tricycle Franchise fee has been successfully cleared and officially recorded in the City of Baliwag registry.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Receipt Details Card -->
+          <tr>
+            <td style="padding: 12px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px;">
+                <tr>
+                  <td width="50%" style="padding: 6px 12px; vertical-align: top;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600;">Official Receipt / Ref No.</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #0f172a; font-family: monospace; margin-top: 3px;">
+                      {{or_number}}
+                    </div>
+                  </td>
+                  <td width="50%" style="padding: 6px 12px; vertical-align: top;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600;">Payment Date &amp; Time</div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 3px;">
+                      {{payment_date}}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td width="50%" style="padding: 8px 12px 4px 12px; vertical-align: top;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600;">Payment Method</div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0369a1; margin-top: 3px;">
+                      {{payment_method}}
+                    </div>
+                  </td>
+                  <td width="50%" style="padding: 8px 12px 4px 12px; vertical-align: top;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600;">Verification Status</div>
+                    <div style="font-size: 13px; font-weight: 800; color: #15803d; margin-top: 3px;">
+                      &#10003; {{status}}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Franchise Unit Information -->
+          <tr>
+            <td style="padding: 8px 28px 16px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 10px 0 6px 0; border-bottom: 2px solid #e2e8f0;">
+                    <span style="font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;">
+                      Franchise Unit &amp; Permit Details
+                    </span>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 10px;">
+                <tr>
+                  <td width="50%" style="padding: 6px 0; font-size: 13px; color: #475569;">Plate / Body Number:</td>
+                  <td width="50%" align="right" style="padding: 6px 0; font-size: 13px; font-weight: 800; color: #0f172a;">{{plate_number}}</td>
+                </tr>
+                <tr>
+                  <td width="50%" style="padding: 6px 0; font-size: 13px; color: #475569;">Application Type:</td>
+                  <td width="50%" align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #0f172a;">{{application_type}}</td>
+                </tr>
+                <tr>
+                  <td width="50%" style="padding: 6px 0; font-size: 13px; color: #475569;">MTOP Reference ID:</td>
+                  <td width="50%" align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #0f172a; font-family: monospace;">{{mtop_number}}</td>
+                </tr>
+                <tr>
+                  <td width="50%" style="padding: 6px 0; font-size: 13px; color: #475569;">TODA Route Association:</td>
+                  <td width="50%" align="right" style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #0f172a;">{{toda_name}}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Itemized Municipal Assessment Breakdown -->
+          <tr>
+            <td style="padding: 8px 28px 20px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
+                <thead>
+                  <tr style="border-bottom: 2px solid #cbd5e1; background-color: #f8fafc;">
+                    <th align="left" style="padding: 10px 8px; font-size: 11px; text-transform: uppercase; color: #475569; letter-spacing: 0.05em;">Fee Description</th>
+                    <th align="center" style="padding: 10px 8px; font-size: 11px; text-transform: uppercase; color: #475569; letter-spacing: 0.05em;">Qty</th>
+                    <th align="right" style="padding: 10px 8px; font-size: 11px; text-transform: uppercase; color: #475569; letter-spacing: 0.05em;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 12px 8px;">
+                      <div style="font-weight: 700; font-size: 13px; color: #0f172a;">MTOP Franchise Regulatory &amp; Filing Fee</div>
+                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Municipal franchise assessment and regulatory registration</div>
+                    </td>
+                    <td align="center" style="padding: 12px 8px; font-size: 12px; color: #64748b;">1 unit</td>
+                    <td align="right" style="padding: 12px 8px; font-size: 12px; font-weight: 700; color: #15803d;">Covered</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 12px 8px;">
+                      <div style="font-weight: 700; font-size: 13px; color: #0f172a;">Physical Safety Inspection &amp; Motor Stenciling</div>
+                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Chassis and engine physical safety verification</div>
+                    </td>
+                    <td align="center" style="padding: 12px 8px; font-size: 12px; color: #64748b;">1 unit</td>
+                    <td align="right" style="padding: 12px 8px; font-size: 12px; font-weight: 700; color: #15803d;">Covered</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 12px 8px;">
+                      <div style="font-weight: 700; font-size: 13px; color: #0f172a;">Official Registration Sticker &amp; Plate QR Seal</div>
+                      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">High-durability security identifier and digital verification tag</div>
+                    </td>
+                    <td align="center" style="padding: 12px 8px; font-size: 12px; color: #64748b;">1 unit</td>
+                    <td align="right" style="padding: 12px 8px; font-size: 12px; font-weight: 700; color: #15803d;">Covered</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Total Calculation -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 14px;">
+                <tr>
+                  <td width="55%"></td>
+                  <td width="25%" align="right" style="padding: 6px 8px; font-size: 13px; color: #64748b;">Assessment Subtotal:</td>
+                  <td width="20%" align="right" style="padding: 6px 8px; font-size: 13px; font-weight: 700; color: #0f172a;">{{amount_paid}}</td>
+                </tr>
+                <tr>
+                  <td width="55%"></td>
+                  <td width="25%" align="right" style="padding: 6px 8px; font-size: 13px; color: #64748b;">Convenience / Service Fee:</td>
+                  <td width="20%" align="right" style="padding: 6px 8px; font-size: 13px; font-weight: 700; color: #15803d;">PHP 0.00</td>
+                </tr>
+                <tr>
+                  <td width="55%"></td>
+                  <td width="25%" align="right" style="padding: 12px 8px; border-top: 2px solid #0f172a; font-size: 14px; font-weight: 800; color: #0f172a;">
+                    Total Amount Paid:
+                  </td>
+                  <td width="20%" align="right" style="padding: 12px 8px; border-top: 2px solid #0f172a; font-size: 18px; font-weight: 900; color: #15803d; white-space: nowrap;">
+                    {{amount_paid}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Advisory / Notice Callout Box -->
+          <tr>
+            <td style="padding: 0 28px 24px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #ecfdf5; border-left: 4px solid #15803d; border-radius: 6px; padding: 14px 16px;">
+                <tr>
+                  <td>
+                    <div style="font-size: 12px; font-weight: 800; color: #065f46; text-transform: uppercase; margin-bottom: 4px;">
+                      Official Advisory &bull; Validity
+                    </div>
+                    <div style="font-size: 12px; line-height: 1.5; color: #047857;">
+                      This electronic receipt serves as official proof of payment pursuant to Baliwag City Municipal Ordinances. An electronic copy has been permanently stamped to your franchise record. Keep this receipt or save your Official Reference # <strong>{{or_number}}</strong>.
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer Divider -->
+          <tr>
+            <td style="border-top: 1px solid #e2e8f0; font-size: 0; line-height: 0;">&nbsp;</td>
+          </tr>
+
+          <!-- Official Sign-off & Contacts -->
+          <tr>
+            <td style="padding: 20px 28px; background-color: #fafafa; text-align: center;">
+              <div style="font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+                City Government of Baliwag &bull; Bulacan
+              </div>
+              <div style="font-size: 11px; color: #64748b; line-height: 1.6;">
+                Tanggapan ng Ingat-Yaman (City Treasurer's Office) &bull; Tricycle Regulatory Unit<br />
+                City Hall Complex, DRT Highway, Baliwag, Bulacan &bull; Tel: (044) 766-1000
+              </div>
+              <div style="margin-top: 12px; font-size: 11px; color: #94a3b8;">
+                This automated municipal electronic receipt was dispatched to <strong style="color: #64748b;">{{email}}</strong>.
+              </div>
+            </td>
+          </tr>
+
+        </table>
+        <!-- End Main Card -->
+
+        <!-- Bottom Subtext -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin-top: 14px;">
+          <tr>
+            <td align="center" style="font-size: 11px; color: #94a3b8; line-height: 1.5;">
+              Baliuag City Tricycle Franchise &amp; MTOP Regulatory System<br />
+              &copy; 2026 City of Baliwag. All rights reserved.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

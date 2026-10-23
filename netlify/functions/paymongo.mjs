@@ -1,11 +1,32 @@
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
+
 const json = (statusCode, body) => ({
   statusCode,
-  headers: { 'content-type': 'application/json' },
+  headers: {
+    'content-type': 'application/json',
+    ...CORS_HEADERS,
+  },
   body: JSON.stringify(body),
 });
 
 export const handler = async event => {
-  const secretKey = process.env.PAYMONGO_SECRET_KEY || process.env.VITE_PAYMONGO_SECRET_KEY || 'sk_test_c45YuqZKv46a1C22BDm5VbDB';
+  // 1. Handle CORS Preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
+      headers: CORS_HEADERS,
+      body: '',
+    };
+  }
+
+  const secretKey = process.env.PAYMONGO_SECRET_KEY || 
+                    process.env.VITE_PAYMONGO_SECRET_KEY || 
+                    'sk_test_s5HhvFkkvDJ873Meq6MjwKPV';
+
   const authHeader = `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`;
 
   const requestUrl = new URL(event.rawUrl || event.path, 'https://localhost');
@@ -24,11 +45,14 @@ export const handler = async event => {
     }
   }
 
+  // ──────────────────────────────────────────
   // 1. Generate QR Ph Dynamic Code
+  // ──────────────────────────────────────────
   if (endpoint === '/generate-qrph' && event.httpMethod === 'POST') {
     try {
       const amountMinor = Math.round((body.amount || 450) * 100);
 
+      // Step 1: Create Payment Intent
       const piRes = await fetch('https://api.paymongo.com/v1/payment_intents', {
         method: 'POST',
         headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
@@ -45,21 +69,27 @@ export const handler = async event => {
         }),
       });
       const piData = await piRes.json();
-      if (!piRes.ok) return json(piRes.status, { error: piData?.errors?.[0]?.detail || 'Failed to create payment intent' });
+      if (!piRes.ok) {
+        return json(piRes.status, { error: piData?.errors?.[0]?.detail || 'Failed to create payment intent' });
+      }
 
       const piId = piData.data.id;
       const clientKey = piData.data.attributes.client_key;
 
+      // Step 2: Create Payment Method for QR Ph
       const pmRes = await fetch('https://api.paymongo.com/v1/payment_methods', {
         method: 'POST',
         headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: { attributes: { type: 'qrph' } } }),
       });
       const pmData = await pmRes.json();
-      if (!pmRes.ok) return json(pmRes.status, { error: pmData?.errors?.[0]?.detail || 'Failed to create QR payment method' });
+      if (!pmRes.ok) {
+        return json(pmRes.status, { error: pmData?.errors?.[0]?.detail || 'Failed to create QR payment method' });
+      }
 
       const pmId = pmData.data.id;
 
+      // Step 3: Attach Payment Method to Payment Intent
       const attachRes = await fetch(`https://api.paymongo.com/v1/payment_intents/${piId}/attach`, {
         method: 'POST',
         headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
@@ -73,14 +103,18 @@ export const handler = async event => {
         }),
       });
       const attachData = await attachRes.json();
-      if (!attachRes.ok) return json(attachRes.status, { error: attachData?.errors?.[0]?.detail || 'Failed to attach QR payment method' });
+      if (!attachRes.ok) {
+        return json(attachRes.status, { error: attachData?.errors?.[0]?.detail || 'Failed to attach QR payment method' });
+      }
 
       const nextAction = attachData.data?.attributes?.next_action;
+      const qrImageUrl = nextAction?.code?.image_url || nextAction?.code?.url;
+
       return json(200, {
         success: true,
         payment_intent_id: piId,
         client_key: clientKey,
-        qr_image: nextAction?.code?.image_url,
+        qr_image: qrImageUrl,
         expires_at: nextAction?.code?.expires_at,
       });
     } catch (err) {
@@ -88,7 +122,9 @@ export const handler = async event => {
     }
   }
 
-  // 2. Check Payment Intent Status
+  // ──────────────────────────────────────────
+  // 2. Check Payment Intent Status (Live Polling)
+  // ──────────────────────────────────────────
   if (endpoint === '/check-payment-intent' && event.httpMethod === 'POST') {
     try {
       const piId = body.paymentIntentId;
@@ -111,9 +147,15 @@ export const handler = async event => {
     }
   }
 
-  // Fallback to upstream proxy for legacy routes
+  // ──────────────────────────────────────────
+  // 3. Fallback Upstream Proxy for PayMongo API
+  // (/v1/checkout_sessions, /v1/sources, etc.)
+  // ──────────────────────────────────────────
   try {
-    const upstream = await fetch(`https://api.paymongo.com${endpoint}${requestUrl.search}`, {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const upstreamUrl = `https://api.paymongo.com${cleanEndpoint}${requestUrl.search}`;
+
+    const upstream = await fetch(upstreamUrl, {
       method: event.httpMethod,
       headers: {
         Accept: 'application/json',
@@ -122,12 +164,20 @@ export const handler = async event => {
       },
       body: event.httpMethod === 'GET' ? undefined : event.body,
     });
+
+    const responseText = await upstream.text();
     return {
       statusCode: upstream.status,
-      headers: { 'content-type': upstream.headers.get('content-type') || 'application/json' },
-      body: await upstream.text(),
+      headers: {
+        'content-type': upstream.headers.get('content-type') || 'application/json',
+        ...CORS_HEADERS,
+      },
+      body: responseText,
     };
-  } catch {
-    return json(502, { message: 'Could not reach PayMongo.' });
+  } catch (err) {
+    return json(502, {
+      message: 'Could not reach PayMongo API gateway.',
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
-};
+};

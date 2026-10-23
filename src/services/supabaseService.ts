@@ -19,6 +19,7 @@ import type {
 } from '../types';
 import { FRANCHISE_FEES } from './fees';
 import { hasCompleteRequirements } from './applicationRules';
+import { sendSMS, isSMSConfigured } from './smsService';
 
 // ================= USER & AUTH =================
 export async function getUsersAsync(): Promise<User[]> {
@@ -677,18 +678,36 @@ export async function getSMSNotificationsAsync(userId?: string): Promise<SMSNoti
 
 export async function saveSMSNotificationAsync(notification: SMSNotification): Promise<SMSNotification> {
   if (isSupabaseConfigured() && supabase) {
-    const { error } = await supabase.from('sms_notifications').upsert({
-      id: notification.id,
-      user_id: notification.userId,
-      recipient_phone: notification.recipientPhone,
-      title: notification.title,
-      message: notification.message,
-      type: notification.type,
-      sent_at: notification.sentAt,
-      read: notification.read,
-    });
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await supabase.from('sms_notifications').upsert({
+        id: notification.id,
+        user_id: notification.userId,
+        recipient_phone: notification.recipientPhone,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        sent_at: notification.sentAt,
+        read: notification.read,
+      });
+      if (error) console.warn('Supabase save SMS warning:', error.message);
+    } catch (e) {
+      console.warn('Supabase save SMS exception:', e);
+    }
   }
+
+  // Dispatch real SMS via Semaphore API
+  if (isSMSConfigured() && notification.recipientPhone && notification.recipientPhone.length >= 10) {
+    void sendSMS(notification.recipientPhone, notification.message)
+      .then(res => {
+        if (res.success) {
+          console.log(`[SMS] ✅ Real SMS dispatched to ${notification.recipientPhone}`);
+        } else {
+          console.warn(`[SMS] ⚠️ Semaphore dispatch note:`, res.error);
+        }
+      })
+      .catch(err => console.warn('[SMS] Error sending SMS:', err));
+  }
+
   return storage.saveSMSNotification(notification);
 }
 

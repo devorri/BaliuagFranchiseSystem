@@ -1,0 +1,27 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# 1. PayMongo Gateway Proxy
+[[redirects]]
+  from = "/api/paymongo/*"
+  to = "/.netlify/functions/paymongo/:splat"
+  status = 200
+  force = true
+
+# 2. Semaphore SMS Proxy
+[[redirects]]
+  from = "/api/semaphore/*"
+  to = "/.netlify/functions/semaphore/:splat"
+  status = 200
+  force = true
+
+# 3. SPA Fallback for React Router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
