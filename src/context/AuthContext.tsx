@@ -5,6 +5,7 @@ import * as supabaseService from '../services/supabaseService';
 
 interface AuthContextType {
   user: User | null;
+  loading: boolean;
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
   logout: () => void;
   updateProfile: (updates: Partial<User>) => void;
@@ -24,7 +25,11 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    storage.initializeData();
+    return storage.getCurrentUser();
+  });
+  const [loading, setLoading] = useState<boolean>(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentUser) {
       setUser(currentUser);
     }
+    setLoading(false);
   }, []);
 
   // Single Session Enforcement check interval
@@ -138,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user,
+      loading,
       login,
       logout,
       updateProfile,

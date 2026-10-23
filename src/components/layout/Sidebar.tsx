@@ -12,8 +12,10 @@ export function Sidebar() {
   const { user, isPresident, isTodaPresident, isAdmin, isOperator, logout } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogout = () => {
+  const confirmLogout = () => {
+    setShowLogoutModal(false);
     logout();
     navigate('/login');
   };
@@ -124,11 +126,67 @@ export function Sidebar() {
             </div>
           </div>
         )}
-        <button className="sidebar__logout" onClick={handleLogout} title="Logout">
+        <button className="sidebar__logout" onClick={() => setShowLogoutModal(true)} title="Sign Out">
           <LogOut size={18} />
           {!collapsed && <span>Sign Out</span>}
         </button>
       </div>
+
+      {showLogoutModal && (
+        <div className="modal-overlay animate-fade-in" onClick={() => setShowLogoutModal(false)}>
+          <div
+            className="glass-container modal-glass-content"
+            style={{ maxWidth: '420px', padding: '2rem', textAlign: 'center' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem'
+            }}>
+              <LogOut size={26} color="#f87171" />
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
+              Sign Out Confirmation
+            </h3>
+            <p style={{ color: '#cbd5e1', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.75rem' }}>
+              Are you sure you want to log out of your Baliuag Franchise System account? You will need to enter your credentials again to log in.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="btn-glass"
+                style={{ padding: '0.75rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmLogout}
+                className="btn-glass"
+                style={{
+                  padding: '0.75rem',
+                  background: 'rgba(239, 68, 68, 0.25)',
+                  borderColor: 'rgba(239, 68, 68, 0.5)',
+                  color: '#fca5a5',
+                  fontWeight: 700
+                }}
+              >
+                Yes, Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

@@ -28,6 +28,12 @@ export function ApplicationReview() {
   );
   const [filterTab, setFilterTab] = useState<'needs_action' | 'pending_admin' | 'approved' | 'all'>('needs_action');
 
+  // Document Confirmation Modals State
+  const [docToVerify, setDocToVerify] = useState<Document | null>(null);
+  const [docToReject, setDocToReject] = useState<Document | null>(null);
+  const [rejectionPreset, setRejectionPreset] = useState<string>('Expired document / Needs latest renewal copy');
+  const [customRejectionNotes, setCustomRejectionNotes] = useState<string>('');
+
   const canManageRequirements = hasPermission('requirements');
   const requiredDocumentTypes: DocumentType[] = ['or_cr', 'barangay_clearance', 'drivers_license', 'toda_cert', 'id_photo'];
 
@@ -58,14 +64,30 @@ export function ApplicationReview() {
     const finalEndDate = endDate || nextYearStr;
 
     if (new Date(finalStartDate) >= new Date(finalEndDate)) {
-      showToast('Ang End Date ay kailangang mas huli kaysa sa Start Date.', 'error');
+      showToast('End Date must be after the Start Date.', 'error');
+      return;
+    }
+
+    if (!selectedApp) return;
+
+    // Check for any rejected documents
+    const hasRejectedDocs = (selectedApp.documents || []).some(d => d.status === 'rejected');
+    if (hasRejectedDocs) {
+      showToast('Cannot grant MTOP: One or more requirements are marked as rejected. The applicant must resubmit valid documents first.', 'error');
+      return;
+    }
+
+    // Check for unverified documents
+    const hasUnverifiedDocs = (selectedApp.documents || []).some(d => d.status !== 'verified');
+    if (hasUnverifiedDocs) {
+      showToast('Cannot grant MTOP: All submitted requirements must be verified first.', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      if (!selectedApp || !hasCompleteRequirements(selectedApp.documents) || selectedApp.inspection?.status !== 'passed' || !selectedApp.presidentEndorsed || !selectedApp.treasurerPayment?.paid) {
-        showToast('Hindi puwedeng mag-grant: kumpletuhin ang requirements, TODA endorsement, personal na passed inspection, at beripikadong bayad sa Treasurer/GCash.', 'error');
+      if (!hasCompleteRequirements(selectedApp.documents, selectedApp.type) || selectedApp.inspection?.status !== 'passed' || !selectedApp.presidentEndorsed || !selectedApp.treasurerPayment?.paid) {
+        showToast('Cannot grant MTOP: Ensure requirements, TODA endorsement, passed inspection, and verified payment are complete.', 'error');
         return;
       }
 
@@ -87,7 +109,7 @@ export function ApplicationReview() {
           details: `Granted MTOP #${updated.mtopNumber || 'Approved'} for plate ${selectedApp.plateNumber} (Effectivity: ${finalStartDate} to ${finalEndDate})`,
           targetId: appId,
         });
-        showToast(`MTOP Granted! Official MTOP #: ${updated.mtopNumber || 'Approved'}. Effectivity: ${finalStartDate} hanggang ${finalEndDate}.`, 'success');
+        showToast(`MTOP Granted! Official MTOP #: ${updated.mtopNumber || 'Approved'}. Effectivity: ${finalStartDate} to ${finalEndDate}.`, 'success');
         setSelectedApp(null);
         await loadApplications();
       }
@@ -119,34 +141,79 @@ export function ApplicationReview() {
     }
   };
 
-  const handleToggleDocStatus = async (docId: string, newStatus: 'verified' | 'rejected') => {
-    if (!canManageRequirements) {
-      showToast('Requirements Admin permission is required to verify documents.', 'error');
-      return;
-    }
-
-    if (!selectedApp) return;
-    const updatedDocs = (selectedApp.documents || []).map(d => 
-      d.id === docId ? { ...d, status: newStatus } : d
-    );
-    const updatedApp = { ...selectedApp, documents: updatedDocs };
-    setSelectedApp(updatedApp);
+  const confirmVerifyDoc = async () => {
+    if (!docToVerify || !selectedApp) return;
+    setLoading(true);
     try {
-      await supabaseService.saveApplicationAsync(updatedApp, true);
-      showToast(`Document marked as ${newStatus.toUpperCase()}.`, 'success');
+      const updatedDocs = (selectedApp.documents || []).map(d => 
+        d.id === docToVerify.id ? {
+          ...d,
+          status: 'verified' as const,
+          rejectionReason: undefined,
+          reviewedAt: new Date().toISOString()
+        } : d
+      );
+      const updatedApp = { ...selectedApp, documents: updatedDocs };
+      const saved = await supabaseService.saveApplicationAsync(updatedApp, true);
+      setSelectedApp(saved);
+      showToast(`Document "${docToVerify.name}" verified and accepted.`, 'success');
+      setDocToVerify(null);
+      await loadApplications();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Could not save document verification.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmRejectDoc = async () => {
+    if (!docToReject || !selectedApp) return;
+    setLoading(true);
+    try {
+      const finalReason = customRejectionNotes.trim()
+        ? `${rejectionPreset}: ${customRejectionNotes.trim()}`
+        : rejectionPreset || 'Document declined by municipal admin.';
+
+      const updatedDocs = (selectedApp.documents || []).map(d => 
+        d.id === docToReject.id ? {
+          ...d,
+          status: 'rejected' as const,
+          rejectionReason: finalReason,
+          reviewedAt: new Date().toISOString()
+        } : d
+      );
+      const updatedApp: Application = {
+        ...selectedApp,
+        status: 'requires_revision',
+        documents: updatedDocs,
+        adminNotes: `Requirement issue: ${docToReject.name} - ${finalReason}`
+      };
+      const saved = await supabaseService.saveApplicationAsync(updatedApp, true);
+      setSelectedApp(saved);
+      showToast(`Document "${docToReject.name}" declined with reason recorded.`, 'info');
+      setDocToReject(null);
+      setCustomRejectionNotes('');
       await loadApplications();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not save document rejection.', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleVerifyAllDocs = async () => {
     if (!selectedApp) return;
+    const hasRejectedDocs = (selectedApp.documents || []).some(d => d.status === 'rejected');
+    if (hasRejectedDocs) {
+      showToast('Cannot verify all: One or more documents are rejected. Please resolve rejected items first.', 'error');
+      return;
+    }
     setLoading(true);
     try {
       const updatedDocs = (selectedApp.documents || []).map(d => ({
         ...d,
-        status: 'verified' as const
+        status: 'verified' as const,
+        reviewedAt: new Date().toISOString()
       }));
       const updatedApp = { ...selectedApp, documents: updatedDocs };
       const saved = await supabaseService.saveApplicationAsync(updatedApp, true);
@@ -159,10 +226,10 @@ export function ApplicationReview() {
         details: `Verified all requirements for applicant ${selectedApp.applicantName} (Plate: ${selectedApp.plateNumber})`,
         targetId: selectedApp.id,
       });
-      showToast('Lahat ng dokumento ay matagumpay na na-verify!', 'success');
+      showToast('All documents have been verified successfully.', 'success');
       await loadApplications();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Hindi na-save ang beripikasyon ng dokumento.', 'error');
+      showToast(error instanceof Error ? error.message : 'Could not save document verification.', 'error');
     } finally {
       setLoading(false);
     }
@@ -504,6 +571,11 @@ export function ApplicationReview() {
                           <div style={{ fontSize: '0.72rem', color: '#94a3b8', wordBreak: 'break-all' }}>
                             {doc.fileName}
                           </div>
+                          {doc.status === 'rejected' && doc.rejectionReason && (
+                            <div style={{ marginTop: '0.5rem', padding: '0.45rem 0.65rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '6px', fontSize: '0.73rem', color: '#fca5a5' }}>
+                              <strong style={{ color: '#f87171' }}>Reason:</strong> {doc.rejectionReason}
+                            </div>
+                          )}
                         </div>
 
                         <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.4rem', justifyContent: 'space-between' }}>
@@ -513,26 +585,30 @@ export function ApplicationReview() {
                             className="btn-glass"
                             style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', flex: 1 }}
                           >
-                            <Eye size={13} /> Tingnan
+                            <Eye size={13} /> View
                           </button>
                           
                           {canManageRequirements && (
                             <>
                               <button
                                 type="button"
-                                onClick={() => handleToggleDocStatus(doc.id, 'verified')}
+                                onClick={() => setDocToVerify(doc)}
                                 className="btn-glass"
-                                style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80' }}
-                                title="Aprubahan ang dokumento"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', borderColor: 'rgba(34, 197, 94, 0.4)' }}
+                                title="Accept & Verify Document"
                               >
                                 ✓
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleToggleDocStatus(doc.id, 'rejected')}
+                                onClick={() => {
+                                  setDocToReject(doc);
+                                  setRejectionPreset('Expired document / Needs latest renewal copy');
+                                  setCustomRejectionNotes('');
+                                }}
                                 className="btn-glass"
-                                style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}
-                                title="Tanggihan ang dokumento"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                                title="Decline & Reject Requirement"
                               >
                                 ✕
                               </button>
@@ -745,7 +821,7 @@ export function ApplicationReview() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                  Awtomatikong bibigyan ng opisyal na <strong>MTOP Number</strong> at <strong>QR Code</strong> ang aplikante kapag naaprubahan.
+                  An official <strong>MTOP Number</strong> and <strong>QR Code</strong> will be automatically generated upon approval.
                 </span>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                   <button
@@ -755,26 +831,192 @@ export function ApplicationReview() {
                     className="btn-glass"
                     style={{ background: 'rgba(244, 63, 94, 0.15)', borderColor: 'rgba(244, 63, 94, 0.3)', color: '#fb7185', cursor: loading ? 'not-allowed' : 'pointer' }}
                   >
-                    <XCircle size={18} /> Tanggihan Aplikasyon
+                    <XCircle size={18} /> Reject Entire Application
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleGrantMtop(selectedApp.id)}
-                    disabled={loading || !selectedApp.treasurerPayment?.paid}
+                    disabled={
+                      loading || 
+                      !selectedApp.treasurerPayment?.paid ||
+                      selectedApp.documents?.some(d => d.status === 'rejected') ||
+                      !selectedApp.documents?.every(d => d.status === 'verified')
+                    }
                     className="btn-glass btn-emerald-glass"
                     style={{
                       padding: '0.75rem 1.75rem',
                       fontWeight: 700,
                       fontSize: '0.95rem',
-                      cursor: (loading || !selectedApp.treasurerPayment?.paid) ? 'not-allowed' : 'pointer',
-                      opacity: (!selectedApp.treasurerPayment?.paid) ? 0.6 : 1
+                      cursor: (loading || !selectedApp.treasurerPayment?.paid || selectedApp.documents?.some(d => d.status === 'rejected') || !selectedApp.documents?.every(d => d.status === 'verified')) ? 'not-allowed' : 'pointer',
+                      opacity: (!selectedApp.treasurerPayment?.paid || selectedApp.documents?.some(d => d.status === 'rejected') || !selectedApp.documents?.every(d => d.status === 'verified')) ? 0.6 : 1
                     }}
                   >
-                    <ShieldCheck size={18} /> {loading ? 'Nino-proseso...' : !selectedApp.treasurerPayment?.paid ? 'Payment Clearance Required' : 'Aprubahan at Igawad ang MTOP'}
+                    <ShieldCheck size={18} /> {
+                      loading ? 'Processing...' : 
+                      selectedApp.documents?.some(d => d.status === 'rejected') ? 'Requirements Have Rejections' :
+                      !selectedApp.documents?.every(d => d.status === 'verified') ? 'Verify All Requirements First' :
+                      !selectedApp.treasurerPayment?.paid ? 'Payment Clearance Required' : 
+                      'Approve & Issue MTOP Permit'
+                    }
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DOCUMENT ACCEPTANCE CONFIRMATION MODAL */}
+      {docToVerify && (
+        <div className="modal-overlay animate-fade-in" style={{ zIndex: 1100 }} onClick={() => setDocToVerify(null)}>
+          <div
+            className="glass-container modal-glass-content"
+            style={{ maxWidth: '440px', padding: '2rem', textAlign: 'center' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'rgba(34, 197, 94, 0.15)',
+              border: '1px solid rgba(34, 197, 94, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem'
+            }}>
+              <CheckCircle2 size={30} color="#4ade80" />
+            </div>
+
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
+              Accept & Verify Document
+            </h3>
+            <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '1.25rem' }}>
+              Are you sure you want to accept and verify this requirement? Please confirm that the uploaded file is authentic and clear.
+            </p>
+
+            <div className="glass-panel" style={{ padding: '0.85rem 1rem', textAlign: 'left', marginBottom: '1.5rem', fontSize: '0.82rem' }}>
+              <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Requirement Name:</div>
+              <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.4rem' }}>{docToVerify.name}</strong>
+              <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Attached File:</div>
+              <span style={{ color: '#38bdf8', wordBreak: 'break-all' }}>{docToVerify.fileName}</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setDocToVerify(null)}
+                className="btn-glass"
+                style={{ padding: '0.75rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmVerifyDoc}
+                className="btn-glass btn-emerald-glass"
+                style={{ padding: '0.75rem', fontWeight: 700 }}
+              >
+                Confirm & Verify
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DOCUMENT REJECTION CONFIRMATION & REASON MODAL */}
+      {docToReject && (
+        <div className="modal-overlay animate-fade-in" style={{ zIndex: 1100 }} onClick={() => setDocToReject(null)}>
+          <div
+            className="glass-container modal-glass-content"
+            style={{ maxWidth: '480px', padding: '2rem' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <XCircle size={26} color="#f87171" />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+                  Decline & Reject Requirement
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                  {docToReject.name}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ color: '#cbd5e1', fontSize: '0.86rem', lineHeight: '1.45', marginBottom: '1.2rem' }}>
+              Are you sure you want to decline this document? Please specify the reason below so the applicant knows what to correct and resubmit.
+            </p>
+
+            <div className="glass-panel" style={{ padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
+              <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>File to be rejected:</div>
+              <span style={{ color: '#fca5a5', wordBreak: 'break-all' }}>{docToReject.fileName}</span>
+            </div>
+
+            <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+              Select Rejection Reason:
+            </label>
+            <select
+              className="glass-input glass-select"
+              style={{ width: '100%', marginBottom: '1rem' }}
+              value={rejectionPreset}
+              onChange={e => setRejectionPreset(e.target.value)}
+            >
+              <option value="Expired document / Needs latest renewal copy">Expired document / Needs latest renewal copy</option>
+              <option value="Blurry, cropped, or unreadable scan / photo">Blurry, cropped, or unreadable scan / photo</option>
+              <option value="Incorrect document uploaded (does not match requirement)">Incorrect document uploaded (does not match requirement)</option>
+              <option value="Missing official signature, LTO stamp, or certification seal">Missing official signature, LTO stamp, or certification seal</option>
+              <option value="Custom remarks">Other (Provide custom notes below)</option>
+            </select>
+
+            <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 600 }}>
+              Additional Instructions for Applicant (Optional):
+            </label>
+            <textarea
+              className="glass-input"
+              rows={2}
+              placeholder="e.g. Please take a clearer photo under good lighting showing the entire certificate..."
+              value={customRejectionNotes}
+              onChange={e => setCustomRejectionNotes(e.target.value)}
+              style={{ width: '100%', marginBottom: '1.5rem' }}
+            />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setDocToReject(null)}
+                className="btn-glass"
+                style={{ padding: '0.75rem' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmRejectDoc}
+                className="btn-glass"
+                style={{
+                  padding: '0.75rem',
+                  background: 'rgba(239, 68, 68, 0.25)',
+                  borderColor: 'rgba(239, 68, 68, 0.5)',
+                  color: '#fca5a5',
+                  fontWeight: 700
+                }}
+              >
+                Confirm & Reject Document
+              </button>
             </div>
           </div>
         </div>

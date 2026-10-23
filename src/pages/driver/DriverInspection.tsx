@@ -62,7 +62,7 @@ export function DriverInspection() {
           Inspection & Stenciling
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '2rem' }}>
-          Sinusuri ng City Stenciling Officer ang iyong **Engine Number** at **Chassis Number** upang matiyak na tumutugma sa opisyal na papeles.
+          The City Stenciling Officer inspects your **Engine Number** and **Chassis Number** to ensure they match your official LTO OR/CR documentation.
         </p>
 
         {application ? (
@@ -134,7 +134,7 @@ export function DriverInspection() {
 
           </div>
         ) : (
-          <p style={{ color: '#94a3b8' }}>Kailangan munang magsumite ng **Driver Requirements** bago ang stenciling.</p>
+          <p style={{ color: '#94a3b8' }}>Please submit your **Driver Requirements** first before proceeding to physical stenciling.</p>
         )}
       </div>
     </div>

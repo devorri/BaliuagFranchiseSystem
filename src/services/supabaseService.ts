@@ -52,9 +52,6 @@ export async function loginAsync(username: string, password: string): Promise<{ 
       if (data.password_hash !== password) {
         return { user: null, error: 'Invalid username or password.' };
       }
-      if (data.role === 'driver') {
-        return { user: null, error: 'Drivers do not need a system account. Please coordinate with the franchise operator.' };
-      }
 
       if (data.account_status === 'rejected') {
         return { user: null, error: 'Your account application has been rejected by the administrator.' };
@@ -84,8 +81,8 @@ export async function loginAsync(username: string, password: string): Promise<{ 
 }
 
 export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>): Promise<{ user: User | null; error?: string }> {
-  if (userData.role !== 'operator') {
-    return { user: null, error: 'Only franchise operators need a system account. Driver details are recorded in the operator application.' };
+  if (userData.role !== 'operator' && userData.role !== 'driver') {
+    return { user: null, error: 'Only operators and drivers can register for a public account.' };
   }
 
   const users = await getUsersAsync();
@@ -344,8 +341,8 @@ export async function updateApplicationStatusAsync(
   const application = (await getApplicationsAsync()).find(item => item.id === id);
   if (!application) return null;
 
-  if (status === 'approved' && (!hasCompleteRequirements(application.documents || []) || application.inspection?.status !== 'passed' || !(application.presidentEndorsed || application.todaApproval?.routeFeePaid))) {
-    throw new Error('Hindi pa puwedeng i-grant ang franchise: kailangan ang kumpletong requirements, TODA endorsement, at personal na passed inspection.');
+  if (status === 'approved' && (!hasCompleteRequirements(application.documents || [], application.type) || application.inspection?.status !== 'passed' || !(application.presidentEndorsed || application.todaApproval?.routeFeePaid))) {
+    throw new Error('Franchise cannot be granted yet: Complete requirements, TODA endorsement, and passed physical inspection are required.');
   }
 
   const now = new Date().toISOString();
@@ -409,7 +406,7 @@ export async function endorseApplicationByPresidentAsync(
   remarks?: string
 ): Promise<Application | null> {
   const application = (await getApplicationsAsync()).find(item => item.id === appId);
-  if (!application || !hasCompleteRequirements(application.documents || [])) return null;
+  if (!application || !hasCompleteRequirements(application.documents || [], application.type)) return null;
   const result = storage.endorseApplicationByPresident(appId, presidentName, remarks);
   if (isSupabaseConfigured() && supabase && result) {
     try {
@@ -749,7 +746,7 @@ export async function processFranchiseLifecycleAsync(): Promise<void> {
       userId: driver.id,
       recipientPhone: driver.phone,
       title: 'Renewal due in 30 days',
-      message: `Paalala: mag-renew ng MTOP ${franchise.mtopNumber} para sa plate ${franchise.plateNumber}. Mag-e-expire ito sa ${new Date(franchise.expiresAt).toLocaleDateString()}.`,
+      message: `Reminder: Please renew MTOP ${franchise.mtopNumber} for plate ${franchise.plateNumber}. It is scheduled to expire on ${new Date(franchise.expiresAt).toLocaleDateString()}.`,
       type: 'renewal_reminder',
       sentAt: new Date().toISOString(),
       read: false,

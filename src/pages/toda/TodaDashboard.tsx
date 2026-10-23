@@ -68,13 +68,13 @@ export function TodaDashboard() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
               <span className="pill-badge pill-purple">TODA President Portal</span>
-              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{user?.todaName || 'BASTODA Baliuag'}</span>
+              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{user?.todaName || 'Baliwag TODA Association'}</span>
             </div>
             <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
-              Mabuhay, Pres. {user?.lastName}!
+              Welcome, Pres. {user?.lastName}!
             </h1>
             <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px' }}>
-              Tumatanggap ng bayad para sa **linya (route fee)**, nagbibigay ng **approval sa aplikasyon ng driver**, at **nagpapasa sa Admin** para sa final review.
+              Manage route fee collections, endorse applicant line eligibility, and forward verified drivers to the Municipal Admin for final MTOP grant.
             </p>
           </div>
 
@@ -124,7 +124,7 @@ export function TodaDashboard() {
       <div className="glass-container" style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', gap: '1.25rem' }}>
         <div>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Wallet size={18} /> TODA Payment QR</h3>
-          <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.35rem' }}>I-upload ang official GCash/QR Ph code ng inyong TODA. Ang payment references ay kukumpirmahin dito bago maisama sa collections.</p>
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '0.35rem' }}>Upload your association's official GCash / QR Ph code. Payment references can be verified here before marking as collected.</p>
           {error && <p role="alert" style={{ color: '#f87171', marginTop: '0.5rem' }}>{error}</p>}
           <label className="btn-glass" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', padding: '0.55rem 0.85rem', cursor: 'pointer' }}>
             <UploadCloud size={16} /> {qrUploading ? 'Uploading...' : 'Upload TODA QR'}
@@ -152,7 +152,7 @@ export function TodaDashboard() {
                   <tr key={payment.id}>
                     <td>{payment.payerName}</td><td>{app?.plateNumber || '—'}</td><td>{payment.referenceNumber}</td>
                     <td>₱{payment.amount.toFixed(2)}</td>
-                    <td><span className={`pill-badge ${payment.status === 'completed' ? 'pill-emerald' : payment.status === 'failed' ? 'pill-rose' : 'pill-orange'}`}>{payment.status.toUpperCase()}</span></td>
+                    <td><span className={`pill-badge ${payment.status === 'completed' ? 'pill-approved' : payment.status === 'failed' ? 'pill-rejected' : 'pill-pending'}`}>{payment.status.toUpperCase()}</span></td>
                     <td>{payment.status === 'pending' && <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <button type="button" onClick={() => void handlePaymentStatus(payment.id, 'completed')} className="btn-glass btn-emerald-glass" style={{ padding: '0.35rem 0.55rem' }}>Confirm</button>
                       <button type="button" onClick={() => void handlePaymentStatus(payment.id, 'failed')} className="btn-glass" style={{ padding: '0.35rem 0.55rem' }}>Reject</button>
@@ -168,7 +168,7 @@ export function TodaDashboard() {
       {/* Pending Applications Queue Card */}
       <div className="glass-container" style={{ padding: '1.75rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Mga Aplikasyong Naghihintay ng TODA Approval</h3>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Applications Awaiting TODA Line Endorsement</h3>
           <span className="pill-badge pill-purple">{pendingApprovals.length} Driver Applications</span>
         </div>
 
@@ -179,15 +179,15 @@ export function TodaDashboard() {
                 <th>Driver Name</th>
                 <th>Plate / Body No.</th>
                 <th>TODA Route</th>
-                <th>Treasurer Fee</th>
-                <th>Aksyon</th>
+                <th>Requirements</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {pendingApprovals.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                    Walang nakapilang aplikasyon para sa TODA approval.
+                    No pending driver applications in queue for TODA line approval.
                   </td>
                 </tr>
               ) : (

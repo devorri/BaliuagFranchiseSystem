@@ -55,6 +55,7 @@ export interface User {
   accountStatus?: AccountStatus;
   adminPermissions?: AdminPermission[];
   sessionId?: string;
+  documents?: Document[];
   createdAt: string;
 }
 
@@ -66,6 +67,8 @@ export interface Document {
   uploadedAt: string;
   status: 'uploaded' | 'verified' | 'rejected';
   fileUrl?: string;
+  rejectionReason?: string;
+  reviewedAt?: string;
 }
 
 export interface InspectionRecord {

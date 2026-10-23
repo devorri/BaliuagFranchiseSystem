@@ -25,7 +25,7 @@ export function FranchiseCertification() {
       return <div key={franchise.id} className="glass-container printable-official-document" style={{ padding: '2.5rem', marginBottom: '1.5rem', background: '#fff', color: '#111827' }}>
         <div style={{ textAlign: 'center', borderBottom: '2px solid #111827', paddingBottom: '1rem' }}>
           <img src="/baliuag-logo.png" alt="Baliwag Seal" style={{ height: '60px' }} />
-          <h2 style={{ margin: '.4rem 0', fontFamily: 'serif' }}>PAMAHALAANG LUNGSOD NG BALIWAG</h2>
+          <h2 style={{ margin: '.4rem 0', fontFamily: 'serif' }}>CITY GOVERNMENT OF BALIWAG</h2>
           <div style={{ fontWeight: 700 }}>TRICYCLE FRANCHISING BOARD</div>
         </div>
         <div style={{ textAlign: 'center', margin: '1.5rem 0' }}>

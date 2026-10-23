@@ -189,7 +189,7 @@ export function LandingPage() {
               Baliwag MTOP Portal
             </span>
             <span style={{ fontSize: '0.72rem', color: '#22c55e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Pamahalaang Lungsod ng Baliwag
+              City Government of Baliwag
             </span>
           </div>
         </div>
@@ -384,12 +384,12 @@ export function LandingPage() {
       {/* ABOUT US / SYSTEM OVERVIEW SECTION */}
       <section id="about-section" style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <span className="pill-badge pill-emerald" style={{ marginBottom: '0.75rem' }}>Sino Kami at Layunin</span>
+          <span className="pill-badge pill-emerald" style={{ marginBottom: '0.75rem' }}>Our Mission & Purpose</span>
           <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
-            Tungkol sa Baliwag MTOP System
+            About Baliwag MTOP System
           </h2>
           <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '700px', margin: '0 auto' }}>
-            Dinisenyo upang gawing mabilis, ligtas, at walang abala ang proseso ng pagkuha ng Motorized Tricycle Operator’s Permit (MTOP) sa Lungsod ng Baliwag.
+            Engineered to deliver a fast, transparent, and hassle-free Motorized Tricycle Operator’s Permit (MTOP) issuance process for the City of Baliwag.
           </p>
         </div>
 
@@ -400,7 +400,7 @@ export function LandingPage() {
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.6rem' }}>Stenciling & Inspection</h3>
             <p style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: '1.6' }}>
-              Direktang beripikasyon ng makina at chassis number sa City Stenciling Office upang matiyak ang kaligtasan at pagpapatunay ng OR/CR.
+              Direct physical verification of engine and chassis numbers at the City Stenciling Office to ensure passenger safety and OR/CR authenticity.
             </p>
           </div>
 
@@ -410,7 +410,7 @@ export function LandingPage() {
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.6rem' }}>Treasurer & GCash Payment</h3>
             <p style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: '1.6' }}>
-              Magbayad ng batayang MTOP fee sa Municipal Treasurer’s Office o sa pamamagitan ng mabilis at ligtas na GCash QR payment.
+              Settle prescribed MTOP fees directly at the Municipal Treasurer’s Office or via instant and secure GCash QR digital payment.
             </p>
           </div>
 
@@ -420,7 +420,7 @@ export function LandingPage() {
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.6rem' }}>TODA President Route Approval</h3>
             <p style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: '1.6' }}>
-              Online review at approval ng TODA President para sa route fee at membership ng driver bago ang pinal na pag-apruba ng Admin.
+              Online review and endorsement by the TODA President for route area authorization and driver membership before final Administrative grant.
             </p>
           </div>
 
@@ -430,7 +430,7 @@ export function LandingPage() {
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.6rem' }}>Instant QR Code Permit</h3>
             <p style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: '1.6' }}>
-              Awtomatikong pag-generate ng digital MTOP Franchise permit na may scannable QR Code para sa mabilis na pagberipika ng traffic enforcers.
+              Automated generation of official digital MTOP Franchise permits equipped with cryptographic scannable QR Codes for quick enforcer verification.
             </p>
           </div>
         </div>
@@ -441,22 +441,22 @@ export function LandingPage() {
         <div className="glass-container" style={{ padding: '3rem 2.5rem' }}>
 
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <span className="pill-badge pill-purple" style={{ marginBottom: '0.75rem' }}>Proseso ng Aplikasyon</span>
+            <span className="pill-badge pill-purple" style={{ marginBottom: '0.75rem' }}>Application Workflow</span>
             <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
-              5 Hakbang sa Pagkuha ng MTOP Franchise
+              5 Steps to Obtain an MTOP Franchise
             </h2>
             <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px', margin: '0 auto' }}>
-              Kumpletong workflow mula sa Driver application hanggang sa TODA at Admin MTOP approval.
+              Complete streamlined digital workflow from requirement submission to TODA endorsement and administrative MTOP issuance.
             </p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
             {[
-              { step: '01', title: 'Submit Requirements', text: 'I-upload ang OR/CR, Barangay Clearance, Lisensya, TODA Cert, at ID photo sa portal.', badge: 'Driver Role' },
-              { step: '02', title: 'Inspection & Stenciling', text: 'Sinusuri ang makina at chassis number sa Stenciling Office upang tumugma sa rehistro.', badge: 'Inspector Office' },
-              { step: '03', title: 'Payment of Fees', text: 'Binabayaran ang batayang MTOP fee sa Treasurer’s Office o GCash cashless option.', badge: 'Treasurer Office' },
-              { step: '04', title: 'TODA Line Approval', text: 'Aprobahan ng TODA President ang linya at tumatanggap ng route & membership fee.', badge: 'TODA President' },
-              { step: '05', title: 'Admin Review & QR Permit', text: 'Fina-finalize ng Municipal Admin at inaaprubahan ang MTOP QR Permit certificate.', badge: 'Admin Role' },
+              { step: '01', title: 'Submit Requirements', text: 'Upload OR/CR, Driver License, TODA Cert, and 2x2 Photo directly on the portal.', badge: 'Operator / Driver' },
+              { step: '02', title: 'Inspection & Stenciling', text: 'Physical inspection of engine and chassis serial numbers to match registration records.', badge: 'Stenciling Office' },
+              { step: '03', title: 'Payment of Fees', text: 'Pay prescribed franchise fees at the City Treasurer’s Office or via instant GCash QR.', badge: 'City Treasurer' },
+              { step: '04', title: 'TODA Line Approval', text: 'TODA President verifies route eligibility and confirms association line endorsement.', badge: 'TODA President' },
+              { step: '05', title: 'Admin Review & QR Permit', text: 'Municipal Licensing Administrator finalizes review and issues the official QR MTOP permit.', badge: 'Municipal Admin' },
             ].map((item, idx) => (
               <div key={idx} className="glass-panel" style={{ padding: '1.5rem', position: 'relative' }}>
                 <span style={{ fontSize: '2.5rem', fontWeight: 800, color: 'rgba(34, 197, 94, 0.4)', fontFamily: 'var(--font-heading)', display: 'block', lineHeight: 1, marginBottom: '0.5rem' }}>
@@ -473,7 +473,7 @@ export function LandingPage() {
 
           <div style={{ textAlign: 'center', marginTop: '3rem' }}>
             <button type="button" onClick={() => navigate('/register')} className="btn-glass btn-primary-glass" style={{ padding: '0.9rem 2.5rem', fontSize: '1rem' }}>
-              Magsimula Na Ngayon <ChevronRight size={18} />
+              Get Started Today <ChevronRight size={18} />
             </button>
           </div>
 
@@ -483,12 +483,12 @@ export function LandingPage() {
       {/* TODA DIRECTORY SECTION */}
       <section id="toda-directory" style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <span className="pill-badge pill-orange" style={{ marginBottom: '0.75rem' }}>Direktoryo ng Asosasyon</span>
+          <span className="pill-badge pill-orange" style={{ marginBottom: '0.75rem' }}>Association Directory</span>
           <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
-            Rehistradong TODA sa Lungsod ng Baliwag
+            Accredited TODAs in the City of Baliwag
           </h2>
           <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px', margin: '0 auto' }}>
-            Sumasang-ayon at kinikilala ng Pamahalaang Lungsod para sa proteksyon at pagsasaayos ng linya at pasahe.
+            Officially recognized tricycle associations cooperating with the City Government for organized route operations and standardized fares.
           </p>
         </div>
 
@@ -507,7 +507,7 @@ export function LandingPage() {
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff', marginBottom: '0.5rem' }}>{toda.name}</h3>
               <p style={{ fontSize: '0.88rem', color: '#cbd5e1', marginBottom: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
                 <MapPin size={16} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
-                <span><strong>Ruta:</strong> {toda.area}</span>
+                <span><strong>Route:</strong> {toda.area}</span>
               </p>
               <div style={{ fontSize: '0.82rem', color: '#94a3b8', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                 President: <strong style={{ color: '#ffffff' }}>{toda.pres}</strong>
@@ -521,12 +521,12 @@ export function LandingPage() {
       {informationItems.length > 0 && (
         <section style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-            <span className="pill-badge pill-emerald" style={{ marginBottom: '0.75rem' }}>Opisyal na Patnubay at Taripa</span>
+            <span className="pill-badge pill-emerald" style={{ marginBottom: '0.75rem' }}>Official Guidelines & Tariffs</span>
             <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
-              Impormasyon at Ordinansa ng Lungsod
+              City Ordinances & Public Advisories
             </h2>
             <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px', margin: '0 auto' }}>
-              Pinamamahalaan sa Admin Panel: pinakabagong taripa ng pamasahe, checklist ng mga requirements, at mga alituntunin ng pamahalaan.
+              Managed via Admin Panel: latest passenger fare matrices, requirement checklists, and municipal transport regulations.
             </p>
           </div>
 
@@ -536,9 +536,9 @@ export function LandingPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                     <span className="pill-badge pill-purple" style={{ fontSize: '0.75rem' }}>
-                      {item.category === 'fare_matrix' ? 'Taripa ng Pasahe' :
-                       item.category === 'guideline' ? 'Gabay sa Pagparehistro' :
-                       item.category === 'toda_info' ? 'TODA Info' : item.category.toUpperCase()}
+                      {item.category === 'fare_matrix' ? 'Fare Matrix' :
+                       item.category === 'guideline' ? 'Registration Guide' :
+                       item.category === 'toda_info' ? 'TODA Information' : item.category.toUpperCase()}
                     </span>
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                       {item.publishedDate}
@@ -564,10 +564,10 @@ export function LandingPage() {
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
             <span className="pill-badge pill-emerald" style={{ marginBottom: '0.75rem' }}>Public Verification</span>
             <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
-              Suriin ang Status ng MTOP Franchise / Plaka
+              Verify MTOP Franchise Status & Plate Number
             </h2>
             <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px', margin: '0 auto' }}>
-              I-type ang Plate Number (hal. <strong style={{ color: '#22c55e' }}>123-XYZ</strong> o <strong style={{ color: '#22c55e' }}>456-ABC</strong>) o MTOP Permit Number para suriin ang aktibong estado.
+              Enter Plate Number (e.g. <strong style={{ color: '#22c55e' }}>123-XYZ</strong> or <strong style={{ color: '#22c55e' }}>456-ABC</strong>) or MTOP Permit Number to verify registration status.
             </p>
           </div>
 
@@ -575,13 +575,13 @@ export function LandingPage() {
             <input
               type="text"
               className="glass-input"
-              placeholder="I-type ang Plate Number o MTOP # (hal. 456-ABC)..."
+              placeholder="Enter Plate Number or MTOP # (e.g. 456-ABC)..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{ flex: 1, padding: '0.9rem 1.25rem', fontSize: '1rem' }}
             />
             <button type="submit" className="btn-glass btn-primary-glass" style={{ padding: '0.9rem 1.75rem' }}>
-              <Search size={18} /> Suriin
+              <Search size={18} /> Verify
             </button>
           </form>
 
@@ -599,7 +599,7 @@ export function LandingPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.9rem', background: 'rgba(255,255,255,0.04)', padding: '1rem', borderRadius: '14px' }}>
                 <div>
-                  <span style={{ color: '#94a3b8', fontSize: '0.78rem', display: 'block' }}>Plaka ng Sasakyan</span>
+                  <span style={{ color: '#94a3b8', fontSize: '0.78rem', display: 'block' }}>Vehicle Plate Number</span>
                   <strong style={{ color: '#ffffff' }}>{searchResult.plateNumber}</strong>
                 </div>
                 <div>
@@ -607,7 +607,7 @@ export function LandingPage() {
                   <strong style={{ color: '#ffffff' }}>{searchResult.todaName}</strong>
                 </div>
                 <div>
-                  <span style={{ color: '#94a3b8', fontSize: '0.78rem', display: 'block' }}>Petsa ng Pag-expire</span>
+                  <span style={{ color: '#94a3b8', fontSize: '0.78rem', display: 'block' }}>Expiration Date</span>
                   <strong style={{ color: '#4ade80' }}>{new Date(searchResult.expiresAt).toLocaleDateString()}</strong>
                 </div>
                 <div>
@@ -620,7 +620,7 @@ export function LandingPage() {
 
           {searchResult === 'not_found' && (
             <div className="glass-card animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto', padding: '1.5rem', textAlign: 'center', border: '1px solid rgba(244, 63, 94, 0.4)', color: '#fca5a5' }}>
-              Walang nahanap na aktibong rehistro para sa query na <strong>"{searchQuery}"</strong>. Mangyaring suriin ang plaka at sumubok muli.
+              No active franchise records found matching <strong>"{searchQuery}"</strong>. Please verify the plate number and try again.
             </div>
           )}
 
@@ -630,12 +630,12 @@ export function LandingPage() {
       {/* CITIZEN REVIEWS & FEEDBACK SECTION */}
       <section id="feedback-section" style={{ padding: '4rem 1.25rem', maxWidth: '1320px', width: '100%', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <span className="pill-badge pill-purple" style={{ marginBottom: '0.75rem' }}>Mensahe ng Mamamayan</span>
+          <span className="pill-badge pill-purple" style={{ marginBottom: '0.75rem' }}>Citizen Voices</span>
           <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
-            Mga Komento at Feedback
+            Driver & Operator Testimonials
           </h2>
           <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px', margin: '0 auto' }}>
-            Tingnan ang karanasan ng mga driver at operator sa bagong digital MTOP portal.
+            Read experiences from tricycle operators and drivers utilizing the modern digital MTOP portal.
           </p>
         </div>
 
@@ -667,22 +667,22 @@ export function LandingPage() {
         {/* Leave Feedback Form Box */}
         <div className="glass-container" style={{ padding: '2.5rem', maxWidth: '750px', margin: '0 auto' }}>
           <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
-            Mag-iwan ng Komento o Feedback
+            Submit Your Feedback
           </h3>
           <p style={{ fontSize: '0.88rem', color: '#cbd5e1', marginBottom: '1.5rem' }}>
-            Nais mo bang magbahagi ng karanasan ukol sa online MTOP system?
+            Would you like to share your feedback or experience with the Baliwag MTOP System?
           </p>
 
           {feedbackSubmitted && (
             <div className="glass-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1.25rem', border: '1px solid rgba(34, 197, 94, 0.4)', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CheckCircle2 size={18} /> Maraming salamat! Ang inyong feedback ay matagumpay na naidagdag.
+              <CheckCircle2 size={18} /> Thank you! Your feedback has been successfully submitted.
             </div>
           )}
 
           <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Pangalan *</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Full Name *</label>
                 <input
                   type="text"
                   className="glass-input"
@@ -694,7 +694,7 @@ export function LandingPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Asosasyon / TODA</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Association / TODA</label>
                 <select
                   className="glass-input glass-select"
                   value={feedbackToda}
@@ -704,7 +704,7 @@ export function LandingPage() {
                   <option value="SMTODA">SMTODA (Sabang)</option>
                   <option value="TARTODA">TARCAN TODA</option>
                   <option value="TANGTOD">TANGOS TODA</option>
-                  <option value="COMMUTER">Pasahero / Mamamayan</option>
+                  <option value="COMMUTER">Commuter / Citizen</option>
                 </select>
               </div>
             </div>
@@ -725,11 +725,11 @@ export function LandingPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Inyong Komento / Mungkahi *</label>
+              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Your Comments / Feedback *</label>
               <textarea
                 className="glass-input"
                 rows={3}
-                placeholder="Ibahagi ang inyong karanasan sa paggamit ng Baliwag MTOP System..."
+                placeholder="Share your thoughts on the digital MTOP franchise experience..."
                 value={feedbackComment}
                 onChange={e => setFeedbackComment(e.target.value)}
                 required
@@ -737,7 +737,7 @@ export function LandingPage() {
             </div>
 
             <button type="submit" className="btn-glass btn-primary-glass" style={{ padding: '0.85rem' }}>
-              <Send size={18} /> I-post ang Feedback
+              <Send size={18} /> Submit Feedback
             </button>
           </form>
         </div>
@@ -748,25 +748,25 @@ export function LandingPage() {
         <div className="glass-container" style={{ padding: '3rem 2.5rem' }}>
 
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-            <span className="pill-badge pill-cyan" style={{ marginBottom: '0.75rem' }}>Direktang Pagtatanong</span>
+            <span className="pill-badge pill-cyan" style={{ marginBottom: '0.75rem' }}>Direct Inquiries</span>
             <h2 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.75rem' }}>
-              May Tanong Ukol sa Inyong MTOP Application?
+              Questions Regarding Your MTOP Application?
             </h2>
             <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px', margin: '0 auto' }}>
-              Magpadala ng direktang mensahe sa Municipal Franchise & License Office.
+              Send an official inquiry directly to the Municipal Franchise & Licensing Office.
             </p>
           </div>
 
           {inquirySubmitted && (
             <div className="glass-panel" style={{ maxWidth: '650px', margin: '0 auto 1.5rem auto', padding: '1rem 1.25rem', border: '1px solid rgba(34, 197, 94, 0.4)', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CheckCircle2 size={18} /> Maraming salamat! Ang inyong mensahe ay naipadala na sa Municipal Franchise Admin.
+              <CheckCircle2 size={18} /> Thank you! Your inquiry has been forwarded to the Municipal Licensing Administrator.
             </div>
           )}
 
           <form onSubmit={handleInquirySubmit} style={{ maxWidth: '650px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Buong Pangalan *</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Full Name *</label>
                 <input
                   type="text"
                   className="glass-input"
@@ -778,11 +778,11 @@ export function LandingPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Email o Telepono *</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Email or Phone Number *</label>
                 <input
                   type="text"
                   className="glass-input"
-                  placeholder="0918-123-4567 o email@gmail.com"
+                  placeholder="0918-123-4567 or email@gmail.com"
                   value={inquiryContact}
                   onChange={e => setInquiryContact(e.target.value)}
                   required
@@ -791,11 +791,11 @@ export function LandingPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Mensahe o Katanungan *</label>
+              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Message or Question *</label>
               <textarea
                 className="glass-input"
                 rows={4}
-                placeholder="Isulat dito ang inyong katanungan ukol sa franchise requirements, stenciling schedule, o iba pa..."
+                placeholder="Type your message regarding franchise requirements, stenciling schedule, etc..."
                 value={inquiryMessage}
                 onChange={e => setInquiryMessage(e.target.value)}
                 required
@@ -803,7 +803,7 @@ export function LandingPage() {
             </div>
 
             <button type="submit" className="btn-glass btn-primary-glass" style={{ padding: '0.9rem', fontSize: '1rem' }}>
-              <Send size={18} /> Ipadala ang Mensahe
+              <Send size={18} /> Send Message
             </button>
           </form>
         </div>
@@ -823,25 +823,25 @@ export function LandingPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1rem' }}>
               <img src="/baliuag-logo.png" alt="Baliwag Seal" style={{ height: '44px', width: 'auto' }} />
               <div>
-                <strong style={{ color: '#ffffff', fontSize: '1.1rem', display: 'block' }}>Lungsod ng Baliwag</strong>
+                <strong style={{ color: '#ffffff', fontSize: '1.1rem', display: 'block' }}>City of Baliwag</strong>
                 <span style={{ fontSize: '0.78rem', color: '#22c55e', fontWeight: 700 }}>Tricycle Franchise & MTOP Office</span>
               </div>
             </div>
             <p style={{ color: '#94a3b8', fontSize: '0.85rem', lineHeight: '1.6' }}>
-              Pinapadali at pinapabilis ang serbisyo publiko para sa lahat ng tricycle drivers, operators, at TODA associations sa Baliwag, Bulacan.
+              Streamlined, accessible public service for all tricycle operators, drivers, and TODA associations in Baliwag, Bulacan.
             </p>
           </div>
 
           <div>
             <h4 style={{ color: '#ffffff', fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Impormasyon sa Opisina
+              Office Information
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.85rem', color: '#cbd5e1' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <MapPin size={16} style={{ color: '#22c55e' }} /> Baliuag Municipal Hall, Bulacan
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Clock size={16} style={{ color: '#22c55e' }} /> Lunes - Biyernes: 8:00 AM - 5:00 PM
+                <Clock size={16} style={{ color: '#22c55e' }} /> Monday - Friday: 8:00 AM - 5:00 PM
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Phone size={16} style={{ color: '#22c55e' }} /> Hotlines: (044) 798-0234 / 0918-123-4567
@@ -851,20 +851,20 @@ export function LandingPage() {
 
           <div>
             <h4 style={{ color: '#ffffff', fontSize: '0.95rem', fontWeight: 700, marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Mabilis na Link
+              Quick Links
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>
-              <Link to="/login" style={{ color: '#cbd5e1', textDecoration: 'none' }}>→ Driver Portal Login</Link>
-              <Link to="/login" style={{ color: '#cbd5e1', textDecoration: 'none' }}>→ TODA President Approvals</Link>
-              <Link to="/login" style={{ color: '#cbd5e1', textDecoration: 'none' }}>→ Municipal Admin Review</Link>
-              <Link to="/register" style={{ color: '#cbd5e1', textDecoration: 'none' }}>→ Mag-rehistro ng Bagong Account</Link>
+              <Link to="/login" style={{ color: '#cbd5e1', textDecoration: 'none' }}>→ Operator & Driver Portal Login</Link>
+              <Link to="/login" style={{ color: '#cbd5e1', textDecoration: 'none' }}>→ TODA President Line Approvals</Link>
+              <Link to="/login" style={{ color: '#cbd5e1', textDecoration: 'none' }}>→ Municipal Administrator Review</Link>
+              <Link to="/register" style={{ color: '#cbd5e1', textDecoration: 'none' }}>→ Register New Account</Link>
             </div>
           </div>
 
         </div>
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
-          © 2026 Pamahalaang Lungsod ng Baliwag, Bulacan. All Rights Reserved. • Designed with Glassmorphism UI
+          © 2026 City Government of Baliwag, Bulacan. All Rights Reserved. • Designed with Glassmorphism UI
         </div>
       </footer>
 

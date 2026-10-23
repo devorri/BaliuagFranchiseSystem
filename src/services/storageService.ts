@@ -95,9 +95,6 @@ export function login(username: string, password: string): { user: User | null; 
   if (!found) {
     return { user: null, error: 'Invalid username or password.' };
   }
-  if (found.role === 'driver') {
-    return { user: null, error: 'Drivers do not need a system account. Please coordinate with the franchise operator.' };
-  }
 
   // Check account status if set
   if (found.accountStatus === 'rejected') {

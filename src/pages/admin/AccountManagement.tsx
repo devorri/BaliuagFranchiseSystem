@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
   Users, CheckCircle2, XCircle, Search, Filter, 
-  ShieldCheck, Clock, UserCheck, ShieldAlert, Plus
+  ShieldCheck, Clock, UserCheck, ShieldAlert, Plus,
+  FileText, Eye
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
@@ -20,6 +21,7 @@ export function AccountManagement() {
   const [showPresidentForm, setShowPresidentForm] = useState(false);
   const [creatingPresident, setCreatingPresident] = useState(false);
   const [presidentError, setPresidentError] = useState<string | null>(null);
+  const [viewingUserDocs, setViewingUserDocs] = useState<User | null>(null);
   const [presidentForm, setPresidentForm] = useState({
     firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: '',
   });
@@ -354,7 +356,28 @@ export function AccountManagement() {
                     </td>
 
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'inline-flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        {/* View Submitted Registration Requirements */}
+                        {(u.role === 'operator' || u.role === 'driver') && (
+                          <button
+                            onClick={() => setViewingUserDocs(u)}
+                            className="btn-glass"
+                            style={{
+                              padding: '0.4rem 0.65rem',
+                              fontSize: '0.78rem',
+                              color: '#38bdf8',
+                              borderColor: 'rgba(56, 189, 248, 0.4)',
+                              background: 'rgba(56, 189, 248, 0.1)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.35rem'
+                            }}
+                            title="View submitted requirements"
+                          >
+                            <FileText size={14} /> Requirements ({u.documents?.length || 0})
+                          </button>
+                        )}
+
                         {u.role !== 'admin' && (
                           <>
                             {status !== 'approved' && (
@@ -449,6 +472,98 @@ export function AccountManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* REQUIREMENTS PREVIEW MODAL */}
+      {viewingUserDocs && (
+        <div className="modal-overlay animate-fade-in" onClick={() => setViewingUserDocs(null)}>
+          <div 
+            className="glass-container modal-glass-content" 
+            style={{ maxWidth: '680px', width: '90%', padding: '2rem' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+                  Submitted Registration Requirements
+                </h3>
+                <span style={{ fontSize: '0.85rem', color: '#38bdf8' }}>
+                  Applicant: <strong>{viewingUserDocs.firstName} {viewingUserDocs.lastName}</strong> ({viewingUserDocs.role === 'driver' ? 'Driver' : 'Operator'})
+                </span>
+              </div>
+              <button onClick={() => setViewingUserDocs(null)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}>
+                ✕ Close
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              {(!viewingUserDocs.documents || viewingUserDocs.documents.length === 0) ? (
+                <div style={{ padding: '2rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
+                  <FileText size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.5 }} />
+                  <p style={{ margin: 0 }}>No documents were uploaded during account registration.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                  {viewingUserDocs.documents.map((doc, idx) => (
+                    <div 
+                      key={doc.id || idx}
+                      className="glass-panel"
+                      style={{ padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                          <FileText size={18} color="#38bdf8" />
+                          <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', fontWeight: 700 }}>
+                            SUBMITTED
+                          </span>
+                        </div>
+                        <strong style={{ color: '#ffffff', fontSize: '0.9rem', display: 'block', marginBottom: '0.2rem' }}>
+                          {doc.name}
+                        </strong>
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', wordBreak: 'break-all', display: 'block', marginBottom: '0.75rem' }}>
+                          {doc.fileName}
+                        </span>
+                      </div>
+
+                      {doc.fileUrl ? (
+                        <a 
+                          href={doc.fileUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="btn-glass"
+                          style={{ padding: '0.45rem', fontSize: '0.78rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#38bdf8' }}
+                        >
+                          <Eye size={13} /> View Attached Document
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>File uploaded locally</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
+              <button type="button" onClick={() => setViewingUserDocs(null)} className="btn-glass">
+                Close
+              </button>
+              {viewingUserDocs.accountStatus !== 'approved' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleUpdateStatus(viewingUserDocs.id, 'approved', `${viewingUserDocs.firstName} ${viewingUserDocs.lastName}`);
+                    setViewingUserDocs(null);
+                  }}
+                  className="btn-glass btn-emerald-glass"
+                  style={{ padding: '0.65rem 1.25rem', fontWeight: 700 }}
+                >
+                  <CheckCircle2 size={16} /> Approve Account
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -28,9 +28,9 @@ export function Header() {
   return (
     <header className="header-bar">
       <div className="header-brand">
-        <img src="/baliuag-logo.png" alt="Lungsod ng Baliwag Logo" className="header-logo-img" />
+        <img src="/baliuag-logo.png" alt="City of Baliwag Logo" className="header-logo-img" />
         <div>
-          <h2 className="header-title-text">Lungsod ng Baliwag</h2>
+          <h2 className="header-title-text">City of Baliwag</h2>
           <span className="header-sub-text">Tricycle Franchise & MTOP Management System</span>
         </div>
       </div>

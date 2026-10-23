@@ -142,29 +142,29 @@ export async function sendBulkSMS(
 export const SMSTemplates = {
   /** MTOP Application Approved */
   approvalNotice: (mtopNumber: string, driverName: string) =>
-    `BALIUAG CITY: Magandang balita, ${driverName}! Ang iyong MTOP application ay APRUBADO na. MTOP No: ${mtopNumber}. Kunin ang sticker sa BTTMO Office. - Lungsod ng Baliwag`,
+    `BALIUAG CITY: Great news, ${driverName}! Your MTOP application has been APPROVED. MTOP No: ${mtopNumber}. Please claim your official sticker at the BTTMO Office. - City of Baliwag`,
 
   /** Payment Confirmation */
   paymentConfirmed: (amount: number, orNumber: string) =>
-    `BALIUAG CITY: Natanggap na ang iyong bayad na PHP ${amount.toFixed(2)} para sa MTOP Registration. OR/Ref No: ${orNumber}. Salamat! - Lungsod ng Baliwag`,
+    `BALIUAG CITY: Your payment of PHP ${amount.toFixed(2)} for MTOP Registration has been received. OR/Ref No: ${orNumber}. Thank you! - City of Baliwag`,
 
   /** TODA President Endorsement */
   todaEndorsed: (todaName: string, presidentName: string) =>
-    `BALIUAG CITY: Ang iyong TODA Route Approval sa ${todaName} ay aprubado na ni ${presidentName}. Ipinasa na sa Admin para sa final MTOP approval. - Lungsod ng Baliwag`,
+    `BALIUAG CITY: Your TODA Route Approval for ${todaName} has been endorsed by ${presidentName} and forwarded to Municipal Admin for final approval. - City of Baliwag`,
 
   /** Penalty Notice */
   penaltyIssued: (violationType: string, amount: number, dueDate: string) =>
-    `BALIUAG CITY ABISO: May penalty ka para sa ${violationType} (PHP ${amount.toFixed(2)}). Bayaran bago ${dueDate} sa Treasurer's Office. - BTTMO Baliuag`,
+    `BALIUAG CITY NOTICE: A penalty has been issued for ${violationType} (PHP ${amount.toFixed(2)}). Please settle before ${dueDate} at the City Treasurer's Office. - BTTMO Baliuag`,
 
   /** Renewal Reminder */
   renewalReminder: (mtopNumber: string, expiryDate: string) =>
-    `BALIUAG CITY: Paalala - Ang iyong MTOP ${mtopNumber} ay mag-e-expire sa ${expiryDate}. Mag-renew na sa BTTMO portal. - Lungsod ng Baliwag`,
+    `BALIUAG CITY: Reminder - Your MTOP franchise ${mtopNumber} will expire on ${expiryDate}. Please renew early on the BTTMO portal. - City of Baliwag`,
 
   /** Inspection Passed */
   inspectionPassed: (plateNumber: string) =>
-    `BALIUAG CITY: Ang iyong sasakyan (${plateNumber}) ay PUMASA sa inspection/stenciling. Magbayad na sa Treasurer's Office para sa susunod na hakbang. - BTTMO`,
+    `BALIUAG CITY: Your vehicle (${plateNumber}) has PASSED physical stenciling inspection. Please proceed to payment at the City Treasurer's Office. - BTTMO`,
 
   /** Account Approved */
   accountApproved: (name: string) =>
-    `BALIUAG CITY: Magandang araw, ${name}! Ang iyong account sa Tricycle Registration System ay APRUBADO na. Mag-login na sa portal. - Lungsod ng Baliwag`,
+    `BALIUAG CITY: Welcome, ${name}! Your account in the Tricycle Registration System has been APPROVED. You may now log in to the portal. - City of Baliwag`,
 };

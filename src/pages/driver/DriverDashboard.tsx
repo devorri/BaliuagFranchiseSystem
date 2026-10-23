@@ -61,13 +61,13 @@ export function DriverDashboard() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
               <span className="pill-badge pill-cyan">Tricycle Driver Portal</span>
-              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Lungsod ng Baliwag</span>
+              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>City of Baliwag</span>
             </div>
             <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
-              Mabuhay, {user?.firstName}!
+              Welcome, {user?.firstName}!
             </h1>
             <p style={{ color: '#cbd5e1', fontSize: '1rem', maxWidth: '650px' }}>
-              Subaybayan ang iyong **MTOP Application Status**, magbayad ng **Treasurer Fees**, at tingnan ang **Digital QR Code**.
+              Track your **MTOP Application Status**, pay **Treasurer Fees**, and access your **Digital QR Code**.
             </p>
           </div>
 
@@ -129,7 +129,7 @@ export function DriverDashboard() {
       {franchises.length > 0 && (
         <div className="glass-container" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Mga Tricycle na Nakatalaga sa Iyo</h3>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Tricycles Assigned to You</h3>
             <span className="pill-badge pill-cyan">{franchises.length} Units</span>
           </div>
           {franchises.map(franchise => {
@@ -153,7 +153,7 @@ export function DriverDashboard() {
         {/* Application Status Card */}
         <div className="glass-container" style={{ padding: '1.75rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Aplikasyon ng MTOP</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>MTOP Application Status</h3>
             {getStatusPill(application?.status)}
           </div>
 
@@ -214,8 +214,8 @@ export function DriverDashboard() {
               {!application.treasurerPayment?.paid && (
                 <div style={{ marginTop: '0.75rem', padding: '1rem', borderRadius: '14px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div>
-                    <strong style={{ color: '#facc15', fontSize: '0.92rem', display: 'block' }}>Kailangan ng Bayad sa Treasurer (₱{application.totalFee.toFixed(2)})</strong>
-                    <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Maaaring magbayad via GCash o Cash sa Treasurer's Office.</span>
+                    <strong style={{ color: '#facc15', fontSize: '0.92rem', display: 'block' }}>Payment Required for Treasurer Fee (₱{application.totalFee.toFixed(2)})</strong>
+                    <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>You may pay via GCash or Cash at the City Treasurer's Office.</span>
                   </div>
                   <button
                     onClick={() => navigate('/driver/payment')}
@@ -228,14 +228,14 @@ export function DriverDashboard() {
               )}
             </div>
           ) : (
-            <p style={{ color: '#94a3b8' }}>Wala pang aktibong aplikasyon. Pumunta sa **Submit Requirements** para mag-apply.</p>
+            <p style={{ color: '#94a3b8' }}>No active application. Operator must submit requirements to begin.</p>
           )}
         </div>
 
         {/* Record of Penalties Card */}
         <div className="glass-container" style={{ padding: '1.75rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Record ng Penalties</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Record of Penalties & Violations</h3>
             <span className="pill-badge pill-rose">{penalties.length} Violations</span>
           </div>
 
@@ -244,8 +244,8 @@ export function DriverDashboard() {
               <thead>
                 <tr>
                   <th>Violation</th>
-                  <th>Halaga</th>
-                  <th>Petsa</th>
+                  <th>Amount</th>
+                  <th>Date</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -253,7 +253,7 @@ export function DriverDashboard() {
                 {penalties.length === 0 ? (
                   <tr>
                     <td colSpan={4} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                      Walang naitalang penalty. Malinis ang iyong rekor!
+                      No recorded penalties or traffic violations. Good standing!
                     </td>
                   </tr>
                 ) : (

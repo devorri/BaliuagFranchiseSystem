@@ -11,6 +11,11 @@ import {
   generateDynamicQrPh, checkPaymentIntentStatus,
   createCheckoutSession, isPayMongoConfigured
 } from '../../services/paymongoService';
+import {
+  isValidGcashReference,
+  sanitizeGcashReference,
+  generateStandardGcashReference
+} from '../../services/applicationRules';
 import type { Application } from '../../types';
 
 export function GCashPaymentModal() {
@@ -35,6 +40,8 @@ export function GCashPaymentModal() {
   // Manual reference entry for demo/test
   const [manualRef, setManualRef] = useState('');
   const [isConfirmingManual, setIsConfirmingManual] = useState(false);
+  const [refTouched, setRefTouched] = useState(false);
+  const isRefValid = isValidGcashReference(manualRef);
 
   // Hosted checkout fallback
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
@@ -168,7 +175,13 @@ export function GCashPaymentModal() {
 
   // Manual payment submission (for defense testing / simulation)
   const handleManualConfirm = async () => {
-    const ref = manualRef.trim() || `GCASH-BALIWAG-${Math.floor(10000000 + Math.random() * 90000000)}`;
+    setRefTouched(true);
+    if (!isValidGcashReference(manualRef)) {
+      setError('GCash reference number must be a 10- to 13-digit alphanumeric code (e.g. 902184918204).');
+      return;
+    }
+    setError('');
+    const ref = manualRef.trim();
     setIsConfirmingManual(true);
     try {
       await onPaymentConfirmed(ref);
@@ -266,7 +279,7 @@ export function GCashPaymentModal() {
                 Payment Successfully Cleared
               </h3>
               <p style={{ color: '#cbd5e1', fontSize: '0.9rem' }}>
-                Lungsod ng Baliwag — Tanggapan ng Ingat-Yaman
+                City of Baliwag — City Treasurer's Office
               </p>
             </div>
 
@@ -431,7 +444,7 @@ export function GCashPaymentModal() {
                     <Sparkles size={13} /> REAL DYNAMIC QR PH — AUTO GENERATED
                   </div>
                   <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>
-                    Lungsod ng Baliwag — MTOP Cashless Payment
+                    City of Baliwag — MTOP Cashless Payment
                   </h4>
                   <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
                     Open GCash, Maya, BDO, BPI, or any QR Ph app & scan below
@@ -571,32 +584,83 @@ export function GCashPaymentModal() {
             {/* TAB 3: REFERENCE / TEST BYPASS TAB */}
             {paymentMode === 'ref' && (
               <div className="glass-panel" style={{ padding: '2rem' }}>
-                <h4 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ffffff', marginBottom: '0.5rem' }}>
-                  GCash Reference Number Confirmation
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <h4 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ffffff' }}>
+                    GCash Reference Number Confirmation
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualRef(generateStandardGcashReference());
+                      setRefTouched(true);
+                      setError('');
+                    }}
+                    className="btn-glass"
+                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                  >
+                    <Sparkles size={13} style={{ marginRight: '0.35rem' }} /> Auto-Generate Demo Reference
+                  </button>
+                </div>
                 <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-                  If you paid at the municipal treasurer counter or have an existing GCash SMS transaction reference, enter it here to instantly record and verify the payment.
+                  Enter the <strong>10- to 13-digit alphanumeric code</strong> automatically generated for every successful transaction, serving as the primary proof of payment and tracking identifier.
                 </p>
 
                 <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.4rem' }}>
-                    GCash / Bank Reference Number (e.g. 902184918204)
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <label style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                      GCash / Bank Reference Number <span style={{ color: '#f87171' }}>*</span>
+                    </label>
+                    <span style={{
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      color: isRefValid ? '#4ade80' : manualRef.length > 0 ? '#facc15' : '#64748b'
+                    }}>
+                      {manualRef.length} / 10–13 digits {isRefValid ? '✓ Valid' : manualRef.length > 0 ? `(Requires ${10 - manualRef.length > 0 ? (10 - manualRef.length) + ' more' : 'max 13'})` : ''}
+                    </span>
+                  </div>
                   <input
                     type="text"
                     className="glass-input"
-                    placeholder="Enter reference number or leave blank for auto-generated"
+                    placeholder="e.g. 902184918204 (10 to 13 characters)"
                     value={manualRef}
-                    onChange={e => setManualRef(e.target.value)}
+                    maxLength={13}
+                    onChange={e => {
+                      setManualRef(sanitizeGcashReference(e.target.value));
+                      setRefTouched(true);
+                      if (error) setError('');
+                    }}
+                    style={{
+                      letterSpacing: '0.08em',
+                      fontFamily: 'monospace',
+                      fontSize: '1.05rem',
+                      borderColor: (refTouched && manualRef.length > 0 && !isRefValid) ? '#ef4444' : isRefValid ? '#22c55e' : undefined
+                    }}
                   />
+                  {refTouched && manualRef.length > 0 && !isRefValid && (
+                    <p style={{ color: '#f87171', fontSize: '0.78rem', marginTop: '0.4rem' }}>
+                      Must be 10 to 13 alphanumeric characters (currently {manualRef.length}). Single digits or short codes are not permitted.
+                    </p>
+                  )}
+                  {isRefValid && (
+                    <p style={{ color: '#4ade80', fontSize: '0.78rem', marginTop: '0.4rem' }}>
+                      ✓ Format accepted: 10- to 13-character tracking identifier.
+                    </p>
+                  )}
                 </div>
 
                 <button
                   type="button"
                   onClick={handleManualConfirm}
-                  disabled={isConfirmingManual}
+                  disabled={isConfirmingManual || !isRefValid}
                   className="btn-glass btn-emerald-glass"
-                  style={{ width: '100%', padding: '0.9rem', fontSize: '0.95rem', justifyContent: 'center' }}
+                  style={{
+                    width: '100%',
+                    padding: '0.9rem',
+                    fontSize: '0.95rem',
+                    justifyContent: 'center',
+                    opacity: (!isRefValid || isConfirmingManual) ? 0.5 : 1,
+                    cursor: (!isRefValid || isConfirmingManual) ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   {isConfirmingManual ? (
                     <><Loader2 size={18} className="spin-icon" /> Confirming...</>
