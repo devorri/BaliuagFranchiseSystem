@@ -397,6 +397,7 @@ export function AdminDashboard() {
                         const matchesSearch = !auditSearch || searchStr.includes(auditSearch.toLowerCase());
                         return matchesFilter && matchesSearch;
                       })
+                      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
                       .slice(0, 25)
                       .map((log) => {
                         const isLogin = log.action === 'USER_LOGIN' || log.action === 'USER_LOGOUT';
@@ -502,6 +503,7 @@ export function AdminDashboard() {
                     ) : (
                       applications
                         .filter(a => a.treasurerPayment?.paid)
+                        .sort((a, b) => new Date(b.treasurerPayment?.paidAt || b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.treasurerPayment?.paidAt || a.updatedAt || a.submittedAt || 0).getTime())
                         .slice(0, 10)
                         .map(a => (
                           <tr key={a.id}>

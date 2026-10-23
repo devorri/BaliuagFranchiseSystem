@@ -22,12 +22,24 @@ export function DriverDashboard() {
         supabaseService.getPenaltiesAsync(),
         supabaseService.getSMSNotificationsAsync(user.id),
       ]).then(([apps, allFranchises, allPenalties, userNotifications]) => {
-        const myApplications = apps.filter(app => app.driverId === user.id || app.applicantId === user.id);
-        myApplications.sort((left, right) => right.submittedAt.localeCompare(left.submittedAt));
+        const myApplications = apps
+          .filter(app => app.driverId === user.id || app.applicantId === user.id)
+          .sort((left, right) => new Date(right.updatedAt || right.submittedAt || 0).getTime() - new Date(left.updatedAt || left.submittedAt || 0).getTime());
         if (myApplications[0]) setApplication(myApplications[0]);
-        setFranchises(allFranchises.filter(franchise => franchise.driverId === user.id));
-        setPenalties(allPenalties.filter(penalty => penalty.driverId === user.id));
-        setNotifications(userNotifications);
+        setFranchises(
+          allFranchises
+            .filter(franchise => franchise.driverId === user.id)
+            .sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime())
+        );
+        setPenalties(
+          allPenalties
+            .filter(penalty => penalty.driverId === user.id)
+            .sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime())
+        );
+        setNotifications(
+          userNotifications
+            .sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime())
+        );
       });
     }
   }, [user]);

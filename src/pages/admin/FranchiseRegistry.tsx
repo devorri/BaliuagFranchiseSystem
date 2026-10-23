@@ -61,7 +61,7 @@ export function FranchiseRegistry() {
 
     const matchesStatus = filterStatus === 'all' || f.status === filterStatus;
     return matchesSearch && matchesStatus;
-  });
+  }).sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

@@ -64,7 +64,8 @@ export function initializeData(): void {
 export function getUsers(): User[] {
   initializeData();
   const data = localStorage.getItem(KEYS.USERS);
-  return data ? JSON.parse(data) : [];
+  const users: User[] = data ? JSON.parse(data) : [];
+  return users.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 }
 
 export function getCurrentUser(): User | null {
@@ -136,8 +137,9 @@ export function saveUser(user: User): User {
   if (index >= 0) {
     users[index] = user;
   } else {
-    users.push(user);
+    users.unshift(user);
   }
+  users.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   localStorage.setItem(KEYS.USERS, JSON.stringify(users));
   return user;
 }
@@ -162,10 +164,11 @@ export function getApplications(): Application[] {
   initializeData();
   const data = localStorage.getItem(KEYS.APPLICATIONS);
   const applications: Application[] = data ? JSON.parse(data) : [];
-  return applications.map(application => ({
+  const mapped = applications.map(application => ({
     ...application,
     documents: normalizeDocuments(application.documents),
   }));
+  return mapped.sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
 }
 
 /**
@@ -192,13 +195,15 @@ export function getApplicationById(id: string): Application | undefined {
 export function saveApplication(app: Application): Application {
   const apps = getApplications();
   const index = apps.findIndex(a => a.id === app.id);
+  const updatedApp = { ...app, updatedAt: new Date().toISOString() };
   if (index >= 0) {
-    apps[index] = { ...app, updatedAt: new Date().toISOString() };
+    apps[index] = updatedApp;
   } else {
-    apps.push(app);
+    apps.unshift(updatedApp);
   }
+  apps.sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
   localStorage.setItem(KEYS.APPLICATIONS, JSON.stringify(apps));
-  return app;
+  return updatedApp;
 }
 
 export function updateAccountStatus(userId: string, status: 'approved' | 'rejected'): User | null {
@@ -392,7 +397,8 @@ export function approveTodaLine(
 export function getFranchises(): Franchise[] {
   initializeData();
   const data = localStorage.getItem(KEYS.FRANCHISES);
-  return data ? JSON.parse(data) : [];
+  const list: Franchise[] = data ? JSON.parse(data) : [];
+  return list.sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
 }
 
 export function saveFranchise(franchise: Franchise): Franchise {
@@ -401,8 +407,9 @@ export function saveFranchise(franchise: Franchise): Franchise {
   if (index >= 0) {
     list[index] = franchise;
   } else {
-    list.push(franchise);
+    list.unshift(franchise);
   }
+  list.sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
   localStorage.setItem(KEYS.FRANCHISES, JSON.stringify(list));
   return franchise;
 }
@@ -410,7 +417,8 @@ export function saveFranchise(franchise: Franchise): Franchise {
 export function getPayments(): Payment[] {
   initializeData();
   const data = localStorage.getItem(KEYS.PAYMENTS);
-  return data ? JSON.parse(data) : [];
+  const list: Payment[] = data ? JSON.parse(data) : [];
+  return list.sort((a, b) => new Date(b.paidAt || b.createdAt || 0).getTime() - new Date(a.paidAt || a.createdAt || 0).getTime());
 }
 
 export function savePayment(payment: Payment): Payment {
@@ -418,6 +426,7 @@ export function savePayment(payment: Payment): Payment {
   const index = payments.findIndex(item => item.id === payment.id);
   if (index >= 0) payments[index] = payment;
   else payments.unshift(payment);
+  payments.sort((a, b) => new Date(b.paidAt || b.createdAt || 0).getTime() - new Date(a.paidAt || a.createdAt || 0).getTime());
   localStorage.setItem(KEYS.PAYMENTS, JSON.stringify(payments));
   return payment;
 }
@@ -426,7 +435,8 @@ export function savePayment(payment: Payment): Payment {
 export function getPenalties(): Penalty[] {
   initializeData();
   const data = localStorage.getItem(KEYS.PENALTIES);
-  return data ? JSON.parse(data) : [];
+  const list: Penalty[] = data ? JSON.parse(data) : [];
+  return list.sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime());
 }
 
 export function addPenalty(penalty: Penalty): Penalty {
@@ -474,11 +484,11 @@ export function payPenalty(penaltyId: string): Penalty | null {
 export function getSMSNotifications(userId?: string): SMSNotification[] {
   initializeData();
   const data = localStorage.getItem(KEYS.SMS);
-  const list: SMSNotification[] = data ? JSON.parse(data) : [];
+  let list: SMSNotification[] = data ? JSON.parse(data) : [];
   if (userId) {
-    return list.filter(n => n.userId === userId || n.userId === 'all');
+    list = list.filter(n => n.userId === userId || n.userId === 'all');
   }
-  return list;
+  return list.sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime());
 }
 
 export function addSMSNotification(notif: SMSNotification): SMSNotification {
@@ -531,7 +541,8 @@ export function getFeeConfig(): FeeConfig {
 export function getAdvertisements(): Advertisement[] {
   initializeData();
   const data = localStorage.getItem(KEYS.ADVERTISEMENTS);
-  return data ? JSON.parse(data) : [];
+  const list: Advertisement[] = data ? JSON.parse(data) : [];
+  return list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 }
 
 export function saveAdvertisement(ad: Advertisement): Advertisement {
@@ -540,8 +551,9 @@ export function saveAdvertisement(ad: Advertisement): Advertisement {
   if (index >= 0) {
     ads[index] = ad;
   } else {
-    ads.push(ad);
+    ads.unshift(ad);
   }
+  ads.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   localStorage.setItem(KEYS.ADVERTISEMENTS, JSON.stringify(ads));
   return ad;
 }
@@ -560,19 +572,22 @@ export function deleteAdvertisement(id: string): boolean {
 export function getInformationItems(): InformationItem[] {
   initializeData();
   const data = localStorage.getItem(KEYS.INFORMATION_ITEMS);
-  return data ? JSON.parse(data) : [];
+  const list: InformationItem[] = data ? JSON.parse(data) : [];
+  return list.sort((a, b) => new Date(b.updatedAt || b.publishedDate || 0).getTime() - new Date(a.updatedAt || a.publishedDate || 0).getTime());
 }
 
 export function saveInformationItem(item: InformationItem): InformationItem {
   const items = getInformationItems();
   const index = items.findIndex(i => i.id === item.id);
+  const updatedItem = { ...item, updatedAt: new Date().toISOString() };
   if (index >= 0) {
-    items[index] = { ...item, updatedAt: new Date().toISOString() };
+    items[index] = updatedItem;
   } else {
-    items.push(item);
+    items.unshift(updatedItem);
   }
+  items.sort((a, b) => new Date(b.updatedAt || b.publishedDate || 0).getTime() - new Date(a.updatedAt || a.publishedDate || 0).getTime());
   localStorage.setItem(KEYS.INFORMATION_ITEMS, JSON.stringify(items));
-  return item;
+  return updatedItem;
 }
 
 export function deleteInformationItem(id: string): boolean {
@@ -589,15 +604,15 @@ export function deleteInformationItem(id: string): boolean {
 export function getAuditLogs(): AuditLog[] {
   initializeData();
   const raw = localStorage.getItem(KEYS.AUDIT_LOGS);
-  if (!raw) {
-    localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify(seedAuditLogs));
-    return seedAuditLogs;
+  let logs: AuditLog[] = seedAuditLogs;
+  if (raw) {
+    try {
+      logs = JSON.parse(raw);
+    } catch {
+      logs = seedAuditLogs;
+    }
   }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return seedAuditLogs;
-  }
+  return logs.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
 }
 
 export function saveAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'> & { id?: string; timestamp?: string }): AuditLog {

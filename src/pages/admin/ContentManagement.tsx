@@ -45,6 +45,8 @@ export function ContentManagement() {
         supabaseService.getAdvertisementsAsync(),
         supabaseService.getInformationItemsAsync(),
       ]);
+      fetchedAds.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      fetchedInfo.sort((a, b) => new Date(b.updatedAt || b.publishedDate || 0).getTime() - new Date(a.updatedAt || a.publishedDate || 0).getTime());
       setAds(fetchedAds);
       setInfoItems(fetchedInfo);
     } catch {
@@ -232,7 +234,7 @@ export function ContentManagement() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
-            {ads.map(ad => (
+            {[...ads].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).map(ad => (
               <div 
                 key={ad.id} 
                 className="glass-container" 
@@ -314,7 +316,7 @@ export function ContentManagement() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
-            {infoItems.map(item => (
+            {[...infoItems].sort((a, b) => new Date(b.updatedAt || b.publishedDate || 0).getTime() - new Date(a.updatedAt || a.publishedDate || 0).getTime()).map(item => (
               <div 
                 key={item.id} 
                 className="glass-container" 

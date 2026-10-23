@@ -32,6 +32,7 @@ export function AccountManagement() {
     setLoading(true);
     try {
       const data = await supabaseService.getUsersAsync();
+      data.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       setUsers(data);
     } catch {
       showToast('Failed to load accounts.', 'error');
@@ -124,7 +125,7 @@ export function AccountManagement() {
       u.role === roleFilter;
 
     return matchesSearch && matchesStatus && matchesRole;
-  });
+  }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
   const pendingCount = users.filter(u => u.accountStatus === 'pending').length;
   const approvedCount = users.filter(u => !u.accountStatus || u.accountStatus === 'approved').length;

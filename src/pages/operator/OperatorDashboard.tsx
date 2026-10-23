@@ -42,12 +42,21 @@ export function OperatorDashboard() {
         supabaseService.getSMSNotificationsAsync(user.id),
       ]);
 
-      const owned = allFranchises.filter(franchise => franchise.operatorId === user.id);
+      const owned = allFranchises
+        .filter(franchise => franchise.operatorId === user.id)
+        .sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
       setFranchises(owned);
       setDriverSelections(Object.fromEntries(owned.map(franchise => [franchise.id, franchise.driverId])));
       setDrivers(allUsers.filter(account => account.role === 'driver' && account.accountStatus === 'approved'));
-      setMyApplications(allApplications.filter(app => app.applicantId === user.id));
-      setSmsNotifs(userNotifications);
+      setMyApplications(
+        allApplications
+          .filter(app => app.applicantId === user.id)
+          .sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime())
+      );
+      setSmsNotifs(
+        userNotifications
+          .sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime())
+      );
     } catch (err) {
       console.error('Error loading operator dashboard:', err);
     }

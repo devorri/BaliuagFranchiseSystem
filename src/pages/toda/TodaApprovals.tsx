@@ -32,6 +32,7 @@ export function TodaApprovals() {
   const loadApps = async () => {
     try {
       const apps = await supabaseService.getApplicationsAsync();
+      apps.sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
       setApplications(apps);
     } catch (err) {
       console.error('Error loading TODA applications:', err);
@@ -106,7 +107,7 @@ export function TodaApprovals() {
       }
 
       return matchesSearch && matchesFilter;
-    });
+    }).sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
   }, [assignedApplications, searchQuery, statusFilter]);
 
   // Reset page when filter/search changes

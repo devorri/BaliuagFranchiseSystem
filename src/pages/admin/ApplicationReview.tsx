@@ -45,6 +45,7 @@ export function ApplicationReview() {
   const loadApplications = async () => {
     try {
       const data = await supabaseService.getApplicationsAsync();
+      data.sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
       setApplications(data);
     } catch {
       showToast('Failed to load applications.', 'error');
@@ -403,7 +404,7 @@ export function ApplicationReview() {
           if (filterTab === 'pending_admin') return app.status === 'pending_admin_approval';
           if (filterTab === 'approved') return app.status === 'approved';
           return true; // 'all'
-        }).map(app => {
+        }).sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime()).map(app => {
           const isApproved = app.status === 'approved';
           const isRequirementsComplete = requiredDocumentTypes.every(type => app.documents?.some(doc => doc.type === type));
           const isRequirementsVerified = requiredDocumentTypes.every(type => app.documents?.some(doc => doc.type === type && doc.status === 'verified'));

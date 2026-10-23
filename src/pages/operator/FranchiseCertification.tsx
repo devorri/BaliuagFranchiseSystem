@@ -11,7 +11,11 @@ export function FranchiseCertification() {
 
   useEffect(() => {
     if (!user) return;
-    void supabaseService.getFranchisesAsync().then(items => setFranchises(items.filter(item => item.operatorId === user.id)));
+    void supabaseService.getFranchisesAsync().then(items => setFranchises(
+      items
+        .filter(item => item.operatorId === user.id)
+        .sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime())
+    ));
   }, [user]);
 
   return <div className="animate-fade-in" style={{ maxWidth: '900px', margin: '0 auto' }}>

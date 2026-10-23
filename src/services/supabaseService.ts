@@ -26,7 +26,7 @@ import { sendSMS, isSMSConfigured } from './smsService';
 export async function getUsersAsync(): Promise<User[]> {
   if (isSupabaseConfigured() && supabase) {
     try {
-      const { data, error } = await supabase.from('profiles').select('*');
+      const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
         const users = data.map(mapProfileToUser);
 
@@ -78,6 +78,7 @@ export async function getUsersAsync(): Promise<User[]> {
           }
         }
 
+        users.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         return users;
       }
     } catch (err) {
@@ -328,7 +329,7 @@ export async function getApplicationsAsync(): Promise<Application[]> {
         .order('submitted_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        return data.map(mapDbApplication);
+        return data.map(mapDbApplication).sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
       }
     } catch (err) {
       console.warn('Supabase getApplications error:', err);
@@ -605,9 +606,9 @@ export async function recordTreasurerPaymentAsync(
 export async function getFranchisesAsync(): Promise<Franchise[]> {
   if (isSupabaseConfigured() && supabase) {
     try {
-      const { data, error } = await supabase.from('franchises').select('*');
+      const { data, error } = await supabase.from('franchises').select('*').order('issued_at', { ascending: false });
       if (!error && data && data.length > 0) {
-        return data.map(mapDbFranchise);
+        return data.map(mapDbFranchise).sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
       }
     } catch (err) {
       console.warn('Supabase getFranchises error:', err);
@@ -653,7 +654,7 @@ export async function saveFranchiseAsync(franchise: Franchise, requireSupabaseSa
 export async function getPaymentsAsync(): Promise<Payment[]> {
   if (isSupabaseConfigured() && supabase) {
     const { data, error } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
-    if (!error && data) return data.map(mapDbPayment);
+    if (!error && data) return data.map(mapDbPayment).sort((a, b) => new Date(b.paidAt || b.createdAt || 0).getTime() - new Date(a.paidAt || a.createdAt || 0).getTime());
     if (error) console.warn('Supabase get payments error:', error.message);
   }
   return storage.getPayments();
@@ -692,7 +693,7 @@ export async function updatePaymentStatusAsync(paymentId: string, status: Paymen
 export async function getPenaltiesAsync(): Promise<Penalty[]> {
   if (isSupabaseConfigured() && supabase) {
     const { data, error } = await supabase.from('penalties').select('*').order('issued_date', { ascending: false });
-    if (!error && data) return data.map(mapDbPenalty);
+    if (!error && data) return data.map(mapDbPenalty).sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime());
     if (error) console.warn('Supabase get penalties error:', error.message);
   }
   return storage.getPenalties();
@@ -755,7 +756,7 @@ export async function getSMSNotificationsAsync(userId?: string): Promise<SMSNoti
     let query = supabase.from('sms_notifications').select('*').order('sent_at', { ascending: false });
     if (userId) query = query.eq('user_id', userId);
     const { data, error } = await query;
-    if (!error && data) return data.map(mapDbSMSNotification);
+    if (!error && data) return data.map(mapDbSMSNotification).sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime());
     if (error) console.warn('Supabase get notifications error:', error.message);
   }
   return storage.getSMSNotifications(userId);
@@ -865,9 +866,9 @@ export async function getAdvertisementsAsync(): Promise<Advertisement[]> {
       const { data, error } = await supabase
         .from('advertisements')
         .select('*')
-        .order('display_order', { ascending: true });
+        .order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
-        return data.map(mapDbAdvertisement);
+        return data.map(mapDbAdvertisement).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       }
     } catch (err) {
       console.warn('Supabase getAds error:', err);
@@ -919,7 +920,7 @@ export async function getInformationItemsAsync(): Promise<InformationItem[]> {
         .select('*')
         .order('published_date', { ascending: false });
       if (!error && data && data.length > 0) {
-        return data.map(mapDbInformationItem);
+        return data.map(mapDbInformationItem).sort((a, b) => new Date(b.updatedAt || b.publishedDate || 0).getTime() - new Date(a.updatedAt || a.publishedDate || 0).getTime());
       }
     } catch (err) {
       console.warn('Supabase getInformationItems error:', err);
@@ -1209,7 +1210,7 @@ export async function getAuditLogsAsync(): Promise<AuditLog[]> {
           targetId: item.target_id,
           ipAddress: item.ip_address,
           timestamp: item.created_at || item.timestamp,
-        }));
+        })).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
       }
     } catch {
       // fallback to local storage

@@ -13,7 +13,10 @@ export function SMSNotifications() {
     if (user) {
       setIsLoading(true);
       void supabaseService.getSMSNotificationsAsync(user.id)
-        .then(data => setNotifications(data))
+        .then(data => {
+          data.sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime());
+          setNotifications(data);
+        })
         .finally(() => setIsLoading(false));
     }
   }, [user]);

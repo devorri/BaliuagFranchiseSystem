@@ -18,7 +18,11 @@ export function FranchiseRenewal() {
     if (!user) return;
     setLoading(true);
     void supabaseService.getFranchisesAsync()
-      .then(items => setFranchises(items.filter(item => item.operatorId === user.id)))
+      .then(items => setFranchises(
+        items
+          .filter(item => item.operatorId === user.id)
+          .sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime())
+      ))
       .finally(() => setLoading(false));
   }, [user]);
 

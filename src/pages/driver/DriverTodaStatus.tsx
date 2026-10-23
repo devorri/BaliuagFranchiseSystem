@@ -21,14 +21,20 @@ export function DriverTodaStatus() {
   useEffect(() => {
     if (user) {
       Promise.all([getApplicationsAsync(), getUsersAsync(), getPaymentsAsync()]).then(([apps, users, allPayments]) => {
-        const userApp = apps.find(app => app.driverId === user.id || app.applicantId === user.id);
+        const userApp = apps
+          .filter(app => app.driverId === user.id || app.applicantId === user.id)
+          .sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime())[0];
         if (!userApp) return;
         setApplication(userApp);
         setPresident(users.find(account =>
           (account.role === 'president' || account.role === 'toda_president')
           && belongsToToda(userApp.todaName, account.todaName)
         ) || null);
-        setPayments(allPayments.filter(payment => payment.applicationId === userApp.id));
+        setPayments(
+          allPayments
+            .filter(payment => payment.applicationId === userApp.id)
+            .sort((a, b) => new Date(b.paidAt || b.createdAt || 0).getTime() - new Date(a.paidAt || a.createdAt || 0).getTime())
+        );
       });
     }
   }, [user]);

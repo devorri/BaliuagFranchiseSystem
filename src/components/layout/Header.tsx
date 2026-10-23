@@ -7,7 +7,7 @@ export function Header() {
   const { user } = useAuth();
   const [showNotifs, setShowNotifs] = useState(false);
 
-  const notifications = user ? storage.getSMSNotifications(user.id) : [];
+  const notifications = user ? storage.getSMSNotifications(user.id).sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime()) : [];
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const getRoleBadge = () => {

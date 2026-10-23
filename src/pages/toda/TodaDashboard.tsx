@@ -22,10 +22,16 @@ export function TodaDashboard() {
       supabaseService.getApplicationsAsync(),
       supabaseService.getPaymentsAsync(),
     ]);
-    const assigned = allApplications.filter(app => app.todaName.trim().toLowerCase() === user?.todaName?.trim().toLowerCase());
+    const assigned = allApplications
+      .filter(app => app.todaName.trim().toLowerCase() === user?.todaName?.trim().toLowerCase())
+      .sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
     const appIds = new Set(assigned.map(app => app.id));
     setApplications(assigned);
-    setPayments(allPayments.filter(payment => appIds.has(payment.applicationId)));
+    setPayments(
+      allPayments
+        .filter(payment => appIds.has(payment.applicationId))
+        .sort((a, b) => new Date(b.paidAt || b.createdAt || 0).getTime() - new Date(a.paidAt || a.createdAt || 0).getTime())
+    );
   };
 
   const pendingApprovals = applications.filter(app => app.status === 'pending_toda_approval');

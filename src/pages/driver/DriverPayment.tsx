@@ -46,11 +46,13 @@ export function DriverPayment() {
       setIsLoading(true);
       try {
         const apps = await supabaseService.getApplicationsAsync();
-        const userApp = apps.find(
-          a => a.driverId === user.id ||
-            a.applicantId === user.id ||
-            a.driverName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()
-        );
+        const userApp = apps
+          .filter(
+            a => a.driverId === user.id ||
+              a.applicantId === user.id ||
+              a.driverName?.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()
+          )
+          .sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime())[0];
         if (userApp && isMounted) {
           setApplication(userApp);
           if (userApp.treasurerPayment?.paid) {

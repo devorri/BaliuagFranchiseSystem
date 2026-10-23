@@ -23,7 +23,10 @@ export function PenaltyManagement() {
   const isExpiredFranchisePenalty = formData.violationType === 'Expired MTOP';
 
   useEffect(() => {
-    void supabaseService.getPenaltiesAsync().then(setPenalties);
+    void supabaseService.getPenaltiesAsync().then(list => {
+      list.sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime());
+      setPenalties(list);
+    });
     Promise.all([supabaseService.getUsersAsync(), supabaseService.getFranchisesAsync()]).then(([accounts, units]) => {
       setDrivers(accounts.filter(account => account.role === 'driver' && account.accountStatus === 'approved'));
       setFranchises(units);
@@ -31,7 +34,9 @@ export function PenaltyManagement() {
   }, []);
 
   const loadPenalties = async () => {
-    setPenalties(await supabaseService.getPenaltiesAsync());
+    const list = await supabaseService.getPenaltiesAsync();
+    list.sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime());
+    setPenalties(list);
   };
 
   const handleCreatePenalty = (e: React.FormEvent) => {
@@ -125,7 +130,7 @@ export function PenaltyManagement() {
                   </td>
                 </tr>
               ) : (
-                penalties.map(p => (
+                penalties.slice().sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime()).map(p => (
                   <tr key={p.id}>
                     <td style={{ fontWeight: 800, color: '#38bdf8' }}>{p.id}</td>
                     <td>

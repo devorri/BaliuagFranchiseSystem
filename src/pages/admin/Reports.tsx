@@ -125,8 +125,12 @@ export function Reports() {
   const penaltyPct = totalGrossCollections > 0 ? (100 - treasuryPct - todaPct) : 5;
 
   // Module 9: Dedicated Unpaid Fees & Municipal Receivables
-  const unpaidApplications = applications.filter(a => !a.treasurerPayment?.paid && a.status !== 'rejected');
-  const unpaidPenalties = penalties.filter(p => p.status === 'unpaid');
+  const unpaidApplications = applications
+    .filter(a => !a.treasurerPayment?.paid && a.status !== 'rejected')
+    .sort((a, b) => new Date(b.submittedAt || b.updatedAt || 0).getTime() - new Date(a.submittedAt || a.updatedAt || 0).getTime());
+  const unpaidPenalties = penalties
+    .filter(p => p.status === 'unpaid')
+    .sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime());
   const totalUnpaidAppFees = unpaidApplications.reduce((acc, curr) => acc + (curr.totalFee || curr.baseFee || 450), 0);
   const totalUnpaidPenaltyFees = unpaidPenalties.reduce((acc, curr) => acc + curr.amount, 0);
   const totalOutstandingReceivables = totalUnpaidAppFees + totalUnpaidPenaltyFees;
@@ -138,14 +142,16 @@ export function Reports() {
   const expiringSoonFranchises = franchises.filter(f => {
     const expiresAtMs = new Date(f.expiresAt || f.endDate || '').getTime();
     return expiresAtMs >= nowMs && expiresAtMs - nowMs <= thirtyDaysMs;
-  });
+  }).sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
 
   const overdueExpiredFranchises = franchises.filter(f => {
     const expiresAtMs = new Date(f.expiresAt || f.endDate || '').getTime();
     return expiresAtMs < nowMs || f.status === 'expired';
-  });
+  }).sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
 
-  const renewalApplications = applications.filter(a => a.type === 'renewal');
+  const renewalApplications = applications
+    .filter(a => a.type === 'renewal')
+    .sort((a, b) => new Date(b.submittedAt || b.updatedAt || 0).getTime() - new Date(a.submittedAt || a.updatedAt || 0).getTime());
 
   const handleSendRenewalReminder = async (franchise: Franchise) => {
     setSmsSendingId(franchise.id);
