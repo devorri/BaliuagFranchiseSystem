@@ -27,7 +27,57 @@ export async function getUsersAsync(): Promise<User[]> {
     try {
       const { data, error } = await supabase.from('profiles').select('*');
       if (!error && data && data.length > 0) {
-        return data.map(mapProfileToUser);
+        const users = data.map(mapProfileToUser);
+
+        // Enhance with registration documents from audit_logs for users that don't have documents from profiles table
+        const needsDocs = users.filter(u => (!u.documents || u.documents.length === 0) && (u.role === 'operator' || u.role === 'driver'));
+        if (needsDocs.length > 0) {
+          try {
+            const { data: docLogs } = await supabase
+              .from('audit_logs')
+              .select('*')
+              .eq('action', 'REGISTRATION_DOCUMENTS')
+              .order('created_at', { ascending: false });
+
+            if (docLogs && docLogs.length > 0) {
+              const docMap = new Map<string, Document[]>();
+              for (const log of docLogs) {
+                const key = log.target_id || log.user_id;
+                if (key && log.details && !docMap.has(key)) {
+                  try {
+                    const parsed = JSON.parse(log.details);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                      docMap.set(key, parsed);
+                    }
+                  } catch {
+                    // ignore JSON parse error
+                  }
+                }
+              }
+
+              for (const u of users) {
+                if ((!u.documents || u.documents.length === 0) && docMap.has(u.id)) {
+                  u.documents = docMap.get(u.id);
+                }
+              }
+            }
+          } catch (docErr) {
+            console.warn('Failed to load registration documents from audit_logs:', docErr);
+          }
+        }
+
+        // Also check local storage fallback for documents
+        const localUsers = storage.getUsers();
+        for (const u of users) {
+          if (!u.documents || u.documents.length === 0) {
+            const local = localUsers.find(lu => lu.id === u.id || lu.username.toLowerCase() === u.username.toLowerCase());
+            if (local && local.documents && local.documents.length > 0) {
+              u.documents = local.documents;
+            }
+          }
+        }
+
+        return users;
       }
     } catch (err) {
       console.warn('Supabase fetch profiles error, using storage fallback:', err);
@@ -101,28 +151,62 @@ export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>
 
   if (isSupabaseConfigured() && supabase) {
     try {
-      const { data, error } = await supabase
+      const basePayload: any = {
+        username: newUser.username,
+        password_hash: newUser.password,
+        role: newUser.role,
+        first_name: newUser.firstName,
+        last_name: newUser.lastName,
+        middle_name: newUser.middleName,
+        email: newUser.email,
+        phone: newUser.phone,
+        address: newUser.address,
+        toda_name: newUser.todaName,
+        toda_payment_qr_url: newUser.todaPaymentQrUrl,
+        account_status: 'pending',
+        admin_permissions: newUser.adminPermissions || [],
+      };
+
+      // Try inserting with documents column first
+      let insertResult = await supabase
         .from('profiles')
         .insert([{
-          username: newUser.username,
-          password_hash: newUser.password,
-          role: newUser.role,
-          first_name: newUser.firstName,
-          last_name: newUser.lastName,
-          middle_name: newUser.middleName,
-          email: newUser.email,
-          phone: newUser.phone,
-          address: newUser.address,
-          toda_name: newUser.todaName,
-          toda_payment_qr_url: newUser.todaPaymentQrUrl,
-          account_status: 'pending',
-          admin_permissions: newUser.adminPermissions || [],
+          ...basePayload,
+          documents: newUser.documents || [],
         }])
         .select()
         .single();
 
-      if (!error && data) {
-        const created = mapProfileToUser(data);
+      // If documents column does not exist yet in Supabase profiles table, fallback to insert without it
+      if (insertResult.error && (insertResult.error.code === '42703' || insertResult.error.message?.includes('documents'))) {
+        insertResult = await supabase
+          .from('profiles')
+          .insert([basePayload])
+          .select()
+          .single();
+      }
+
+      if (!insertResult.error && insertResult.data) {
+        const created = mapProfileToUser(insertResult.data);
+        if (newUser.documents && newUser.documents.length > 0) {
+          created.documents = newUser.documents;
+
+          // Always record documents to audit_logs as durable fallback and audit trail
+          try {
+            await supabase.from('audit_logs').insert([{
+              user_id: created.id,
+              user_name: `${created.firstName} ${created.lastName}`,
+              user_role: created.role,
+              action: 'REGISTRATION_DOCUMENTS',
+              details: JSON.stringify(newUser.documents),
+              target_id: created.id,
+              ip_address: '127.0.0.1'
+            }]);
+          } catch (logErr) {
+            console.warn('Failed to record registration documents audit log:', logErr);
+          }
+        }
+
         storage.saveUser(created);
         return { user: created };
       }
@@ -876,6 +960,18 @@ export async function deleteInformationItemAsync(id: string): Promise<boolean> {
 
 // ================= MAPPER HELPERS =================
 function mapProfileToUser(p: any): User {
+  let docs: Document[] = [];
+  if (Array.isArray(p.documents)) {
+    docs = p.documents;
+  } else if (typeof p.documents === 'string') {
+    try {
+      const parsed = JSON.parse(p.documents);
+      if (Array.isArray(parsed)) docs = parsed;
+    } catch {
+      docs = [];
+    }
+  }
+
   return {
     id: p.id,
     username: p.username,
@@ -893,6 +989,7 @@ function mapProfileToUser(p: any): User {
     accountStatus: p.account_status,
     adminPermissions: p.admin_permissions || [],
     sessionId: p.current_session_id,
+    documents: docs,
     createdAt: p.created_at,
   };
 }

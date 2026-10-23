@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     profile_photo TEXT,
     account_status VARCHAR(50) DEFAULT 'approved' CHECK (account_status IN ('pending', 'approved', 'rejected')),
     admin_permissions JSONB DEFAULT '["security", "requirements", "payment", "analytics", "president"]'::jsonb,
+    documents JSONB DEFAULT '[]'::jsonb,
     current_session_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -151,6 +152,7 @@ CREATE INDEX IF NOT EXISTS idx_franchises_status ON public.franchises(status);
 
 -- Upgrade-safe additions for existing deployments.
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS toda_payment_qr_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS residency VARCHAR(30) DEFAULT 'baliwag_resident'
     CHECK (residency IN ('baliwag_resident', 'non_resident'));
