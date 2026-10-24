@@ -16,11 +16,10 @@ export function PenaltyManagement() {
   const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
-    violationType: 'Out of Route Operation' as Penalty['violationType'],
-    amount: 500,
+    violationType: 'Overdue MTOP' as Penalty['violationType'],
+    amount: 125,
     remarks: '',
   });
-  const isExpiredFranchisePenalty = formData.violationType === 'Expired MTOP';
 
   useEffect(() => {
     void supabaseService.getPenaltiesAsync().then(list => {
@@ -51,12 +50,12 @@ export function PenaltyManagement() {
       driverName: `${driver.firstName} ${driver.lastName}`,
       plateNumber: franchise.plateNumber,
       todaName: franchise.todaName,
-      violationType: formData.violationType,
-      amount: Number(formData.amount),
+      violationType: 'Overdue MTOP',
+      amount: 125,
       status: 'unpaid',
       issuedDate: new Date().toISOString(),
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      remarks: formData.remarks,
+      remarks: formData.remarks || 'Fixed overdue MTOP franchise penalty.',
       issuedBy: `${user.firstName} ${user.lastName} (Municipal Admin)`,
     };
 
@@ -64,7 +63,7 @@ export function PenaltyManagement() {
     setError('');
     void supabaseService.savePenaltyAsync(newPenalty, true).then(() => {
       setShowModal(false);
-      setFormData({ ...formData, remarks: '' });
+      setFormData({ violationType: 'Overdue MTOP', amount: 125, remarks: '' });
       return loadPenalties();
     }).catch(saveError => {
       setError(saveError instanceof Error ? saveError.message : 'Could not save the penalty.');
@@ -88,19 +87,19 @@ export function PenaltyManagement() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              <span className="pill-badge pill-rose">Penalty Management</span>
-              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Traffic & Route Compliance</span>
+              <span className="pill-badge pill-rose">Overdue Penalties</span>
+              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>MTOP Compliance & Late Renewals</span>
             </div>
             <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              Penalty Records & Management
+              Overdue Franchise Penalties
             </h2>
             <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-              Record penalties for violations such as **Expired MTOP**, **Out of Route Operation**, **Overcharging**, and **No License**.
+              Record and manage fixed <strong>₱125.00</strong> penalties for overdue MTOP franchise permits (regardless of months late).
             </p>
           </div>
 
           <button onClick={() => setShowModal(true)} className="btn-glass btn-orange-glass">
-            <PlusCircle size={20} /> Record New Penalty Violation
+            <PlusCircle size={20} /> Record Overdue Penalty
           </button>
         </div>
       </div>
@@ -115,8 +114,8 @@ export function PenaltyManagement() {
               <tr>
                 <th>Penalty ID</th>
                 <th>Driver / Plate</th>
-                <th>Violation Type</th>
-                <th>Fine Amount</th>
+                <th>Penalty Type</th>
+                <th>Penalty Amount</th>
                 <th>Date Issued</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -126,13 +125,13 @@ export function PenaltyManagement() {
               {penalties.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                    No recorded violations found.
+                    No recorded overdue penalties found.
                   </td>
                 </tr>
               ) : (
                 penalties.slice().sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime()).map(p => (
                   <tr key={p.id}>
-                    <td style={{ fontWeight: 800, color: '#38bdf8' }}>{p.id}</td>
+                    <td style={{ fontWeight: 800, color: '#38bdf8' }}>{p.id.slice(0, 8)}</td>
                     <td>
                       <strong style={{ color: '#ffffff', display: 'block' }}>{p.driverName}</strong>
                       <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Plate: {p.plateNumber}</span>
@@ -171,10 +170,10 @@ export function PenaltyManagement() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="glass-container modal-glass-content animate-fade-in" onClick={e => e.stopPropagation()}>
             <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              Record New Violation Penalty
+              Record Overdue Franchise Penalty
             </h3>
             <p style={{ fontSize: '0.88rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
-              Fill out the information below to issue an official penalty citation.
+              Record an overdue MTOP penalty citation (Fixed: ₱125.00).
             </p>
 
             <form onSubmit={handleCreatePenalty} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -196,48 +195,44 @@ export function PenaltyManagement() {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Violation Type
-                </label>
-                <select
-                  className="glass-input glass-select"
-                  value={formData.violationType}
-                  onChange={e => {
-                    const violationType = e.target.value as Penalty['violationType'];
-                    setFormData({ ...formData, violationType, amount: violationType === 'Expired MTOP' ? 125 : formData.amount });
-                  }}
-                >
-                  <option value="Expired MTOP">Expired MTOP Permit</option>
-                  <option value="Out of Route Operation">Out of Route Operation</option>
-                  <option value="Overcharging">Overcharging Fare Rate</option>
-                  <option value="Illegal Parking">Illegal Parking / Obstruction</option>
-                  <option value="No License">No Driver License</option>
-                  <option value="No TODA Cert">No TODA Certificate</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Fine Amount (PHP)
+                  Penalty Type
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   className="glass-input"
-                  value={formData.amount}
-                  onChange={e => setFormData({ ...formData, amount: Number(e.target.value) })}
-                  required
-                  readOnly={isExpiredFranchisePenalty}
+                  value="Overdue MTOP Permit"
+                  readOnly
+                  disabled
+                  style={{ fontWeight: 600, color: '#f8fafc', background: 'rgba(255, 255, 255, 0.05)' }}
                 />
-                {isExpiredFranchisePenalty && <span style={{ color: '#facc15', fontSize: '0.78rem' }}>Expired franchise penalty is fixed at ₱125.00.</span>}
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Remarks / Violation Details
+                  Penalty Amount (PHP)
+                </label>
+                <input
+                  type="text"
+                  className="glass-input"
+                  value="₱125.00 (Fixed Rate)"
+                  readOnly
+                  disabled
+                  style={{ fontWeight: 700, color: '#fb7185', background: 'rgba(255, 255, 255, 0.05)' }}
+                />
+                <span style={{ color: '#facc15', fontSize: '0.78rem', display: 'block', marginTop: '0.35rem' }}>
+                  Overdue franchise penalty is fixed at ₱125.00 pursuant to city franchising regulations (regardless of months late).
+                </span>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
+                  Remarks / Overdue Details
                 </label>
                 <textarea
                   className="glass-input"
                   rows={3}
                   value={formData.remarks}
+                  placeholder="e.g., Expired MTOP permit - overdue renewal"
                   onChange={e => setFormData({ ...formData, remarks: e.target.value })}
                 />
               </div>
@@ -247,7 +242,7 @@ export function PenaltyManagement() {
                   Cancel
                 </button>
                 <button type="submit" disabled={saving || !selectedFranchiseId} className="btn-glass btn-orange-glass" style={{ flex: 2 }}>
-                  {saving ? 'Saving...' : 'Issue Penalty'}
+                  {saving ? 'Saving...' : 'Record Penalty'}
                 </button>
               </div>
             </form>

@@ -151,8 +151,8 @@ export function AdminDashboard() {
             </div>
             <div>
               <div className="stat-val" style={{ color: '#fb923c' }}>{totalPenaltiesCount}</div>
-              <div className="stat-lbl">Total Penalties</div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Recorded violations</span>
+              <div className="stat-lbl">Overdue Penalties</div>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Overdue MTOP units</span>
             </div>
           </div>
         </div>
@@ -237,8 +237,8 @@ export function AdminDashboard() {
           <div className="glass-container" style={{ padding: '1.75rem', width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff' }}>Traffic Penalty Records</h3>
-                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Latest violation records</p>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff' }}>Overdue MTOP Penalties</h3>
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Late renewal records (₱125.00 fixed)</p>
               </div>
               <button onClick={() => navigate('/admin/penalties')} className="btn-glass" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
                 View All →
@@ -248,7 +248,7 @@ export function AdminDashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               {penalties.length === 0 ? (
                 <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem' }}>
-                  No penalties recorded.
+                  No overdue penalties recorded.
                 </div>
               ) : (
                 penalties.slice(0, 4).map(p => (

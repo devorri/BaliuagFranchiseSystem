@@ -103,7 +103,7 @@ export function Reports() {
       reference: penalty.id,
       payer: `${penalty.driverName} · ${penalty.plateNumber}`,
       toda: penalty.todaName,
-      classification: `Penalty: ${penalty.violationType}`,
+      classification: `Overdue Penalty: ${penalty.violationType}`,
       method: 'Penalty',
       amount: penalty.amount,
       status: penalty.status,
@@ -160,7 +160,7 @@ export function Reports() {
       const phone = op?.phone || '09171234567';
       const expDate = franchise.expiresAt || franchise.endDate || '';
       const daysLeft = Math.ceil((new Date(expDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      const message = `LGU BALIWAG REMINDER: Ang inyong MTOP #${franchise.mtopNumber || franchise.id} (Plate: ${franchise.plateNumber}) ay ${daysLeft <= 0 ? 'EXPIRED NA' : `mag-eexpire sa ${daysLeft} araw`}. Mag-renew sa pamamagitan ng portal upang maiwasan ang multa.`;
+      const message = `LGU BALIWAG REMINDER: Your MTOP #${franchise.mtopNumber || franchise.id} (Plate: ${franchise.plateNumber}) is ${daysLeft <= 0 ? 'EXPIRED' : `expiring in ${daysLeft} days`}. Please renew via the online portal to avoid overdue penalties.`;
       
       await sendSMS(phone, message);
       setSmsSentNotice(`SMS renewal notice dispatched to ${franchise.operatorName} (${phone})!`);
@@ -421,10 +421,10 @@ export function Reports() {
             <div style={{ color: '#ffffff', fontSize: '1.85rem', fontWeight: 800, lineHeight: 1.15, marginBottom: '0.35rem' }}>
               ₱{totalPenaltyRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ fontWeight: 700, color: '#fb923c', fontSize: '0.88rem' }}>Traffic Enforcement Penalties</div>
+            <div style={{ fontWeight: 700, color: '#fb923c', fontSize: '0.88rem' }}>Overdue MTOP Penalties</div>
           </div>
           <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.5rem' }}>
-            Traffic violation citations & settlement payments
+            Overdue franchise renewal penalties & settlements (₱125 fixed)
           </p>
         </div>
 
@@ -477,7 +477,7 @@ export function Reports() {
             </div>
 
             <div className="glass-panel" style={{ padding: '0.75rem 1rem', borderLeft: '3px solid #fb923c' }}>
-              <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Enforcement</div>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Overdue MTOP</div>
               <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', marginTop: '0.15rem' }}>{penaltyPct}%</div>
               <div style={{ fontSize: '0.75rem', color: '#fb923c', fontWeight: 600 }}>₱{totalPenaltyRevenue.toFixed(0)}</div>
             </div>
@@ -705,7 +705,7 @@ export function Reports() {
                 border: 'none',
               }}
             >
-              Unpaid Citations ({unpaidPenalties.length})
+              Overdue Penalties ({unpaidPenalties.length})
             </button>
           </div>
         </div>
@@ -804,11 +804,11 @@ export function Reports() {
             <table className="glass-table">
               <thead>
                 <tr>
-                  <th>Citation No.</th>
-                  <th>Driver / Violator</th>
+                  <th>Penalty ID</th>
+                  <th>Operator / Driver</th>
                   <th>Plate / Body No.</th>
                   <th>TODA Line</th>
-                  <th>Violation Type</th>
+                  <th>Penalty Reason</th>
                   <th>Date Issued</th>
                   <th>Fine Balance</th>
                   <th style={{ textAlign: 'right' }}>Status</th>
@@ -818,7 +818,7 @@ export function Reports() {
                 {unpaidPenalties.length === 0 ? (
                   <tr>
                     <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                      No outstanding traffic violation fines recorded.
+                      No outstanding overdue franchise penalties recorded.
                     </td>
                   </tr>
                 ) : (
@@ -1111,10 +1111,10 @@ export function Reports() {
               <div style={{ textAlign: 'center', borderBottom: '2px solid #111827', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
                 <img src="/baliuag-logo.png" alt="Baliwag Seal" style={{ height: '70px', width: 'auto', marginBottom: '0.5rem' }} />
                 <div style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#374151' }}>
-                  REPUBLIKA NG PILIPINAS • LALAWIGAN NG BULACAN
+                  REPUBLIC OF THE PHILIPPINES • PROVINCE OF BULACAN
                 </div>
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#111827', margin: '0.2rem 0' }}>
-                  PAMAHALAANG LUNGSOD NG BALIWAG
+                  CITY GOVERNMENT OF BALIWAG
                 </h2>
                 <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#15803d' }}>
                   OFFICE OF THE MUNICIPAL MAYOR & TRICYCLE FRANCHISING BOARD
@@ -1235,7 +1235,7 @@ export function Reports() {
                     <tr key={p.id}>
                       <td style={{ border: '1px solid #374151', padding: '6px 10px' }}>{p.driverName}</td>
                       <td style={{ border: '1px solid #374151', padding: '6px 10px', fontFamily: 'monospace' }}>{p.plateNumber}</td>
-                      <td style={{ border: '1px solid #374151', padding: '6px 10px' }}>Fine: {p.violationType}</td>
+                      <td style={{ border: '1px solid #374151', padding: '6px 10px' }}>Overdue Penalty: {p.violationType}</td>
                       <td style={{ border: '1px solid #374151', padding: '6px 10px', textAlign: 'right', fontWeight: 'bold', color: '#b91c1c' }}>₱{p.amount.toFixed(2)}</td>
                     </tr>
                   ))}
@@ -1316,10 +1316,10 @@ export function Reports() {
         <div style={{ textAlign: 'center', borderBottom: '2px solid #111827', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
           <img src="/baliuag-logo.png" alt="Baliwag Seal" style={{ height: '75px', width: 'auto', marginBottom: '0.5rem' }} />
           <div style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#374151' }}>
-            REPUBLIKA NG PILIPINAS • LALAWIGAN NG BULACAN
+            REPUBLIC OF THE PHILIPPINES • PROVINCE OF BULACAN
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.2rem 0' }}>
-            PAMAHALAANG LUNGSOD NG BALIWAG
+            CITY GOVERNMENT OF BALIWAG
           </h2>
           <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#15803d' }}>
             OFFICE OF THE MUNICIPAL MAYOR & TRICYCLE FRANCHISING BOARD
@@ -1440,7 +1440,7 @@ export function Reports() {
               <tr key={p.id}>
                 <td style={{ border: '1px solid #374151', padding: '6px 10px' }}>{p.driverName}</td>
                 <td style={{ border: '1px solid #374151', padding: '6px 10px', fontFamily: 'monospace' }}>{p.plateNumber}</td>
-                <td style={{ border: '1px solid #374151', padding: '6px 10px' }}>Fine: {p.violationType}</td>
+                <td style={{ border: '1px solid #374151', padding: '6px 10px' }}>Overdue Penalty: {p.violationType}</td>
                 <td style={{ border: '1px solid #374151', padding: '6px 10px', textAlign: 'right', fontWeight: 'bold', color: '#b91c1c' }}>₱{p.amount.toFixed(2)}</td>
               </tr>
             ))}

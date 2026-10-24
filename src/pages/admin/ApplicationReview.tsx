@@ -276,12 +276,12 @@ export function ApplicationReview() {
           details: `Passed engine & chassis stenciling for Motor #${updated.motorNumber} / Plate ${updated.plateNumber}`,
           targetId: appId,
         });
-        showToast('Nai-record na pumasa ang makina at chassis stenciling!', 'success');
+        showToast('Recorded engine & chassis stenciling inspection as passed!', 'success');
         setSelectedApp(updated);
         await loadApplications();
       }
     } catch {
-      showToast('Hindi na-save ang stenciling record.', 'error');
+      showToast('Could not save stenciling record.', 'error');
     } finally {
       setLoading(false);
     }
@@ -297,12 +297,12 @@ export function ApplicationReview() {
         'Verified and endorsed for MTOP grant by Municipal Licensing Officer.'
       );
       if (updated) {
-        showToast('Nai-record ang TODA endorsement ng Admin!', 'success');
+        showToast('Recorded Admin TODA endorsement!', 'success');
         setSelectedApp(updated);
         await loadApplications();
       }
     } catch {
-      showToast('Hindi na-save ang TODA endorsement.', 'error');
+      showToast('Could not save TODA endorsement.', 'error');
     } finally {
       setLoading(false);
     }
@@ -331,10 +331,10 @@ export function ApplicationReview() {
         details: `Treasurer fee marked cleared: ₱${updatedPayment.amount.toFixed(2)} (OR: ${updatedPayment.orNumber})`,
         targetId: appId,
       });
-      showToast('Nai-record na bayad na ang Treasurer Fee!', 'success');
+      showToast('Recorded Treasurer Fee payment!', 'success');
       await loadApplications();
     } catch {
-      showToast('Hindi na-save ang payment record.', 'error');
+      showToast('Could not save payment record.', 'error');
     } finally {
       setLoading(false);
     }
@@ -479,7 +479,7 @@ export function ApplicationReview() {
                   {isApproved && app.startDate && app.endDate && (
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', marginTop: '0.35rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#38bdf8' }}>
                       <span>Effectivity Period:</span>
-                      <strong>{app.startDate} hanggang {app.endDate}</strong>
+                      <strong>{app.startDate} to {app.endDate}</strong>
                     </div>
                   )}
                 </div>
@@ -525,14 +525,14 @@ export function ApplicationReview() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>
-                  Aplikasyon para sa MTOP Approval
+                  Application for MTOP Approval
                 </h3>
                 <p style={{ fontSize: '0.88rem', color: '#94a3b8' }}>
                   Applicant: <strong style={{ color: '#38bdf8' }}>{selectedApp.driverName || selectedApp.applicantName}</strong> | Plate / Body No. (MTOP): <strong style={{ color: '#ffffff' }}>{selectedApp.plateNumber}</strong> ({selectedApp.todaName})
                 </p>
               </div>
               <button onClick={() => setSelectedApp(null)} className="btn-glass" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
-                ✕ Isara
+                ✕ Close
               </button>
             </div>
 
@@ -540,17 +540,17 @@ export function ApplicationReview() {
             <div style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#facc15', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <FileCheck size={18} /> Mga Naisumiteng Dokumento at Requirements ({selectedApp.documents?.length || 0})
+                  <FileCheck size={18} /> Submitted Documents & Requirements ({selectedApp.documents?.length || 0})
                 </h4>
                 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                  Pindutin ang "Tingnan" upang mabuksan ang bawat dokumento
+                  Click "View" to open each submitted document
                 </span>
               </div>
 
               {(!selectedApp.documents || selectedApp.documents.length === 0) ? (
                 <div style={{ padding: '1.5rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', textAlign: 'center', color: '#fca5a5' }}>
                   <AlertCircle size={24} style={{ margin: '0 auto 0.5rem' }} />
-                  Walang na-upload na dokumento ang aplikante.
+                  No documents uploaded by the applicant.
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.85rem' }}>
@@ -787,17 +787,17 @@ export function ApplicationReview() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                 <Calendar size={18} color="#38bdf8" />
                 <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#38bdf8' }}>
-                  Itakda ang Effectivity Dates ng Prangkisa (Registration / Renewal)
+                  Set Franchise Effectivity Dates (Registration / Renewal)
                 </h4>
               </div>
               <p style={{ fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '1rem' }}>
-                Itakda ang simula at huling araw ng bisa ng prangkisa. Ang karaniwang bisa ay 1 taon mula sa petsa ng pag-apruba.
+                Set the start date and expiration date of the franchise permit. Standard validity is 1 year from approval date.
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                    Start Date (Simula ng Bisa) *
+                    Start Date (Effectivity Start) *
                   </label>
                   <input
                     type="date"
@@ -810,7 +810,7 @@ export function ApplicationReview() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                    End Date (Katapusan ng Bisa / Expiration) *
+                    End Date (Expiration Date) *
                   </label>
                   <input
                     type="date"
@@ -826,7 +826,7 @@ export function ApplicationReview() {
             {/* Admin Notes */}
             <div style={{ marginBottom: '1.5rem' }}>
               <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                Admin Notes & Remarks (Ilalagay sa Opisyal na Rekord)
+                Admin Notes & Remarks (Recorded in Official Log)
               </label>
               <textarea
                 className="glass-input"
@@ -1087,10 +1087,10 @@ export function ApplicationReview() {
                     {viewingDoc.fileName}
                   </strong>
                   <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
-                    Opisyal na kopya na naisumite noong {new Date(viewingDoc.uploadedAt).toLocaleDateString()}
+                    Official copy uploaded on {new Date(viewingDoc.uploadedAt).toLocaleDateString()}
                   </span>
                   <div style={{ marginTop: '1rem', padding: '0.4rem 0.8rem', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '6px', fontSize: '0.78rem', color: '#38bdf8' }}>
-                    ✓ Beripikado ang lagda at selyo ng dokumento
+                    ✓ Document seal and signature verified
                   </div>
                 </>
               )}
@@ -1102,7 +1102,7 @@ export function ApplicationReview() {
               className="btn-glass btn-primary-glass" 
               style={{ width: '100%' }}
             >
-              Isara ang Preview
+              Close Preview
             </button>
           </div>
         </div>

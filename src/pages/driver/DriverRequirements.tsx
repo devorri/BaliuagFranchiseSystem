@@ -72,10 +72,10 @@ export function DriverRequirements() {
       if (result.url) {
         setUploadedFiles(prev => ({ ...prev, [type]: { name: file.name, url: result.url! } }));
       } else {
-        setUploadErrors(prev => ({ ...prev, [type]: result.error || 'Hindi na-upload ang file. Pakisubukang muli.' }));
+        setUploadErrors(prev => ({ ...prev, [type]: result.error || 'Failed to upload file. Please try again.' }));
       }
     } catch {
-      setUploadErrors(prev => ({ ...prev, [type]: 'Hindi na-upload ang file. Pakisubukang muli.' }));
+      setUploadErrors(prev => ({ ...prev, [type]: 'Failed to upload file. Please try again.' }));
     } finally {
       setUploadingState(prev => ({ ...prev, [type]: false }));
     }
@@ -146,7 +146,7 @@ export function DriverRequirements() {
         navigate('/driver/toda-status');
       }, 2000);
     } catch (error) {
-      setSubmissionError(error instanceof Error ? error.message : 'Hindi na-save ang application. Pakisubukang muli.');
+      setSubmissionError(error instanceof Error ? error.message : 'Failed to save application. Please try again.');
     }
   };
 

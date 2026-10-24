@@ -165,7 +165,7 @@ export const SMSTemplates = {
 
   /** Penalty Notice */
   penaltyIssued: (violationType: string, amount: number, dueDate: string) =>
-    `BALIUAG CITY NOTICE: A penalty has been issued for ${violationType} (PHP ${amount.toFixed(2)}). Please settle before ${dueDate} at the City Treasurer's Office. - BTTMO Baliuag`,
+    `BALIUAG CITY NOTICE: An overdue franchise penalty has been issued for ${violationType} (PHP ${amount.toFixed(2)}). Please settle before ${dueDate} at the City Treasurer's Office. - Baliwag MTOP Office`,
 
   /** Renewal Reminder */
   renewalReminder: (mtopNumber: string, expiryDate: string) =>

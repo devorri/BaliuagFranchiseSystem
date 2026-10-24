@@ -247,15 +247,15 @@ export function DriverDashboard() {
         {/* Record of Penalties Card */}
         <div className="glass-container" style={{ padding: '1.75rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Record of Penalties & Violations</h3>
-            <span className="pill-badge pill-rose">{penalties.length} Violations</span>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Record of Overdue Penalties</h3>
+            <span className="pill-badge pill-rose">{penalties.length} Overdue</span>
           </div>
 
           <div className="glass-table-wrapper">
             <table className="glass-table">
               <thead>
                 <tr>
-                  <th>Violation</th>
+                  <th>Penalty Type</th>
                   <th>Amount</th>
                   <th>Date</th>
                   <th>Status</th>
@@ -265,7 +265,7 @@ export function DriverDashboard() {
                 {penalties.length === 0 ? (
                   <tr>
                     <td colSpan={4} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                      No recorded penalties or traffic violations. Good standing!
+                      No recorded overdue penalties. Good standing!
                     </td>
                   </tr>
                 ) : (

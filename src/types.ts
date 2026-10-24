@@ -198,13 +198,15 @@ export interface Franchise {
   slotReleasedAt?: string;
 }
 
+export type PenaltyViolationType = 'Overdue MTOP' | 'Expired MTOP';
+
 export interface Penalty {
   id: string;
   driverId: string;
   driverName: string;
   plateNumber: string;
   todaName: string;
-  violationType: 'Expired MTOP' | 'Out of Route Operation' | 'Overcharging' | 'Illegal Parking' | 'No License' | 'No TODA Cert';
+  violationType: PenaltyViolationType;
   amount: number;
   status: 'unpaid' | 'paid';
   issuedDate: string;

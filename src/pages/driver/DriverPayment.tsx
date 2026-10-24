@@ -322,7 +322,7 @@ export function DriverPayment() {
           Treasurer's Office Fee Payment
         </h2>
         <p style={{ color: '#cbd5e1', fontSize: '0.95rem', marginBottom: '2rem' }}>
-          Ang bayad sa MTOP permit application ay opisyal na binabayaran sa <strong>City Treasurer's Office</strong> o sa pamamagitan ng <strong>GCash Cashless Payment</strong> powered by PayMongo.
+          MTOP permit application fees are officially payable at the <strong>City Treasurer's Office</strong> or via <strong>GCash Cashless Payment</strong> powered by PayMongo.
         </p>
 
         {/* Error Alert */}
@@ -365,7 +365,7 @@ export function DriverPayment() {
                   <strong style={{ color: '#ffffff' }}>₱150.00</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
-                  <span style={{ fontWeight: 700, color: '#ffffff' }}>Kabuuang Bayarin sa Treasurer:</span>
+                  <span style={{ fontWeight: 700, color: '#ffffff' }}>Total Treasurer Assessment:</span>
                   <strong style={{ fontSize: '1.3rem', color: '#22c55e', fontWeight: 800 }}>₱{payableAmount.toFixed(2)}</strong>
                 </div>
               </div>
@@ -519,7 +519,7 @@ export function DriverPayment() {
                         {!checkoutUrl ? (
                           <>
                             <p style={{ fontSize: '0.9rem', color: '#cbd5e1', marginBottom: '1.5rem', maxWidth: '550px', margin: '0 auto 1.5rem auto' }}>
-                              I-click ang button sa ibaba upang mag-open ng <strong>PayMongo GCash Checkout</strong>. Ire-redirect ka sa secure na payment page upang makumpleto ang ₱{payableAmount.toFixed(2)} na bayad.
+                              Click the button below to open <strong>PayMongo GCash Checkout</strong>. You will be redirected to a secure payment page to complete your ₱{payableAmount.toFixed(2)} payment.
                             </p>
 
                             {/* PayMongo Badge */}

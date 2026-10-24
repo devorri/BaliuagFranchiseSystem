@@ -59,24 +59,24 @@ export function LandingPage() {
       name: 'Juan Manaloto',
       role: 'Tricycle Driver (BASTODA)',
       rating: 5,
-      comment: 'Napakabilis na ng proseso! Dati mag-hapon ako pumipila sa Municipal Hall. Ngayon naberipika agad ang stenciling at TODA route fee ko sa cellphone.',
-      date: 'Kamakailan lamang',
+      comment: 'The registration process is remarkably fast now! I used to wait in line all day at the Municipal Hall. Now my stenciling and TODA endorsement are processed online.',
+      date: 'Recently',
     },
     {
       id: 'rev-2',
       name: 'Cap. Ernesto Santos',
       role: 'TODA President (BASTODA)',
       rating: 5,
-      comment: 'Magandang sistema para sa aming mga TODA President. Madali naming naaaprubahan ang route membership ng driver bago ipadala sa Municipal Admin.',
-      date: '2 araw ang nakalipas',
+      comment: 'Excellent digital portal for TODA Presidents. We can seamlessly endorse driver memberships right before forwarding them to the Municipal Admin.',
+      date: '2 days ago',
     },
     {
       id: 'rev-3',
       name: 'Pedro Penduko',
       role: 'Franchise Operator (SMTODA)',
       rating: 5,
-      comment: 'May GCash payment option na at instant SMS reminder pa kapag malapit na mag-expire ang MTOP permit. Napakalaking tulong!',
-      date: '1 linggo ang nakalipas',
+      comment: 'The GCash payment option and instant SMS reminders when the MTOP permit is nearing expiration make compliance effortless.',
+      date: '1 week ago',
     }
   ]);
 
@@ -314,7 +314,7 @@ export function LandingPage() {
                 <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(56, 189, 248, 0.25)', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <span style={{ fontSize: '0.78rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Megaphone size={14} /> {advertisements[currentAdIndex]?.category?.toUpperCase() || 'OPISYAL NA ABISO'}
+                      <Megaphone size={14} /> {advertisements[currentAdIndex]?.category?.toUpperCase() || 'OFFICIAL NOTICE'}
                     </span>
                     {advertisements.length > 1 && (
                       <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
@@ -323,10 +323,10 @@ export function LandingPage() {
                     )}
                   </div>
                   <strong style={{ fontSize: '0.88rem', color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>
-                    {advertisements[currentAdIndex]?.title || 'Taunang Pagpaparehistro at MTOP Renewal'}
+                    {advertisements[currentAdIndex]?.title || 'Annual MTOP Registration & Renewal'}
                   </strong>
                   <p style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.4 }}>
-                    {advertisements[currentAdIndex]?.description || 'Maaari na kayong magbayad sa Municipal Treasurer sa pamamagitan ng GCash cashless transaction.'}
+                    {advertisements[currentAdIndex]?.description || 'You may now settle municipal franchising assessments via official GCash payment or at the City Treasury.'}
                   </p>
                 </div>
               </div>
@@ -347,12 +347,12 @@ export function LandingPage() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
-                    Mga Opisyal na Anunsyo at Impormasyon mula sa Pamahalaang Lungsod
+                    Official Announcements and Public Advisories
                   </h3>
-                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Pinamamahalaan sa pamamagitan ng LGU Admin Portal</span>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Managed through the City Government Admin Portal</span>
                 </div>
               </div>
-              <span className="pill-badge pill-cyan">{advertisements.length} Aktibong Abiso</span>
+              <span className="pill-badge pill-cyan">{advertisements.length} Active Notices</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
@@ -430,7 +430,7 @@ export function LandingPage() {
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.6rem' }}>Instant QR Code Permit</h3>
             <p style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: '1.6' }}>
-              Automated generation of official digital MTOP Franchise permits equipped with cryptographic scannable QR Codes for quick enforcer verification.
+              Automated generation of official digital MTOP Franchise permits equipped with cryptographic scannable QR Codes for quick digital inspection and verification.
             </p>
           </div>
         </div>

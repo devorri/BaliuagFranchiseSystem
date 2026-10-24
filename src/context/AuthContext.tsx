@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         return { success: true, user: res.user };
       }
-      return { success: false, error: res.error || 'Hindi ma-proseso ang login.' };
+      return { success: false, error: res.error || 'Unable to process login.' };
     }
   };
 

@@ -32,7 +32,7 @@ export function Sidebar() {
     { to: '/admin/applications', icon: FileText, label: 'Review Applications' },
     { to: '/admin/content', icon: Megaphone, label: 'Content & Ads' },
     { to: '/admin/franchises', icon: Shield, label: 'Franchise Registry' },
-    { to: '/admin/penalties', icon: AlertTriangle, label: 'Penalty Management' },
+    { to: '/admin/penalties', icon: AlertTriangle, label: 'Overdue Penalties' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports & Analytics' },
   ];
 
@@ -57,7 +57,7 @@ export function Sidebar() {
       { to: '/admin/franchises', icon: Shield, label: 'Franchise Registry' },
       { to: '/admin/overview', icon: LayoutDashboard, label: 'Admin Dashboard' },
       { to: '/admin/reports', icon: BarChart3, label: 'Reports & Analytics' },
-      { to: '/admin/penalties', icon: AlertTriangle, label: 'Penalty Management' },
+      { to: '/admin/penalties', icon: AlertTriangle, label: 'Overdue Penalties' },
     ];
     roleTitle = 'Franchise Officer';
   } else if (isPresident || isTodaPresident) {

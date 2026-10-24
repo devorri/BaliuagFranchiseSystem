@@ -728,8 +728,8 @@ export async function savePenaltyAsync(penalty: Penalty, requireSupabaseSave = f
         id: crypto.randomUUID(),
         userId: recipient.id,
         recipientPhone: recipient.phone,
-        title: `Penalty notice: ${penalty.violationType}`,
-        message: `May penalty na ₱${penalty.amount.toFixed(2)} para sa ${penalty.plateNumber}. Due date: ${new Date(penalty.dueDate).toLocaleDateString()}.`,
+        title: `Overdue Franchise Penalty: ${penalty.violationType}`,
+        message: `An overdue franchise penalty of ₱${penalty.amount.toFixed(2)} has been recorded for plate ${penalty.plateNumber}. Due date: ${new Date(penalty.dueDate).toLocaleDateString()}.`,
         type: 'penalty_alert',
         sentAt: new Date().toISOString(),
         read: false,
@@ -812,15 +812,15 @@ export async function processFranchiseLifecycleAsync(): Promise<void> {
       const hasExpiryPenalty = penalties.some(penalty =>
         penalty.driverId === franchise.driverId
         && penalty.plateNumber === franchise.plateNumber
-        && penalty.violationType === 'Expired MTOP'
+        && (penalty.violationType === 'Expired MTOP' || penalty.violationType === 'Overdue MTOP')
       );
       if (!hasExpiryPenalty && franchise.driverId) {
         await savePenaltyAsync({
           id: crypto.randomUUID(), driverId: franchise.driverId, driverName: franchise.driverName,
           plateNumber: franchise.plateNumber, todaName: franchise.todaName,
-          violationType: 'Expired MTOP', amount: FRANCHISE_FEES.expiredFranchisePenalty,
+          violationType: 'Overdue MTOP', amount: FRANCHISE_FEES.expiredFranchisePenalty,
           status: 'unpaid', issuedDate: new Date().toISOString(), dueDate: new Date().toISOString(),
-          remarks: 'Fixed penalty for an expired franchise.', issuedBy: 'Baliwag Franchise System',
+          remarks: 'Fixed ₱125 overdue penalty for expired franchise.', issuedBy: 'Baliwag Franchise System',
         }, isSupabaseConfigured());
       }
       continue;

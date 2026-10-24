@@ -250,7 +250,7 @@ export const seedAdvertisements: Advertisement[] = [
   {
     id: 'ad-001',
     title: 'City Traffic Advisory: Annual MTOP Renewal 2026',
-    description: 'Ang taunang pagpaparehistro at renewal ng Tricycle Franchise para sa taong 2026 ay bukas na. Siguraduhing kumpleto ang mga requirements bago mag-submit.',
+    description: 'Annual registration and renewal of Tricycle Franchises for 2026 is now open. Please ensure all documentary requirements are complete prior to submission.',
     category: 'announcement',
     isActive: true,
     displayOrder: 1,
@@ -259,7 +259,7 @@ export const seedAdvertisements: Advertisement[] = [
   {
     id: 'ad-002',
     title: 'BTTMO Inspection Safety Protocol',
-    description: 'Pinaaalalahanan ang lahat ng TODA members na dalhin ang orihinal na OR/CR at siguraduhing maayos ang ilaw, preno, at emission ng traysikel para sa stenciling.',
+    description: 'All TODA members are reminded to present original OR/CR and ensure operational headlights, brakes, and emission compliance during physical stenciling.',
     category: 'announcement',
     isActive: true,
     displayOrder: 2,
@@ -267,8 +267,8 @@ export const seedAdvertisements: Advertisement[] = [
   },
   {
     id: 'ad-003',
-    title: 'Libreng Stenciling & Emission Assistance',
-    description: 'Handog ng Lokal na Pamahalaan ng Baliuag katuwang ang BTTMO tuwing Lunes hanggang Biyernes, 8:00 AM - 4:00 PM sa City Hall Grounds.',
+    title: 'Free Stenciling & Emission Assistance',
+    description: 'Presented by the City Government of Baliwag in partnership with the BTTMO, Monday to Friday, 8:00 AM - 4:00 PM at the City Hall Grounds.',
     category: 'sponsor',
     isActive: true,
     displayOrder: 3,
@@ -279,25 +279,25 @@ export const seedAdvertisements: Advertisement[] = [
 export const seedInformationItems: InformationItem[] = [
   {
     id: 'info-001',
-    title: 'Ordinansa Blg. 2024-08: Bagong Taripa ng Pamasahe',
+    title: 'Ordinance No. 2024-08: Official Tricycle Fare Matrix',
     category: 'fare_matrix',
-    content: 'Alinsunod sa City Ordinance, ang minimum regular fare para sa unang 2 kilometro ay Php 15.00 at Php 2.50 bawat dagdag na kilometro. 20% discount para sa Senior Citizen, PWD, at Estudyante.',
+    content: 'Pursuant to City Ordinance, the minimum regular fare for the first 2 kilometers is Php 15.00, plus Php 2.50 per additional kilometer. 20% statutory discount applies for Senior Citizens, PWDs, and Students.',
     isActive: true,
     publishedDate: '2026-01-15',
   },
   {
     id: 'info-002',
-    title: 'Mga Kinakailangang Dokumento sa Pagpaparehistro',
+    title: 'Required Documents for Franchise Registration',
     category: 'guideline',
-    content: '1. Valid Driver\'s License (Professional) 2. Latest LTO Official Receipt & Certificate of Registration (OR/CR) 3. Barangay Clearance mula sa nasasakupang barangay 4. TODA Certificate of Endorsement 5. 2x2 ID Picture.',
+    content: '1. Valid Professional Driver\'s License 2. Latest LTO Official Receipt & Certificate of Registration (OR/CR) 3. Barangay Clearance from the jurisdiction barangay 4. TODA Certificate of Endorsement 5. 2x2 ID Photo.',
     isActive: true,
     publishedDate: '2026-02-01',
   },
   {
     id: 'info-003',
-    title: 'Direktoryo ng mga Akreditadong TODA sa Baliuag',
+    title: 'Directory of Accredited TODA Organizations in Baliuag',
     category: 'toda_info',
-    content: 'Kasalukuyang may 12 rehistradong TODA sa Baliuag City kabilang ang BASTODA (Poblacion), SMTODA (Sabang), CONTODA (Concepcion), TIBTODA (Tibag), at TARCTODA (Tarcan).',
+    content: 'There are currently 12 registered TODA associations in Baliuag City, including BASTODA (Poblacion), SMTODA (Sabang), CONTODA (Concepcion), TIBTODA (Tibag), and TARCTODA (Tarcan).',
     isActive: true,
     publishedDate: '2026-02-10',
   }
