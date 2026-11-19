@@ -19,8 +19,42 @@ import type {
   Document,
 } from '../types';
 import { FRANCHISE_FEES } from './fees';
-import { hasCompleteRequirements } from './applicationRules';
-import { sendSMS, isSMSConfigured } from './smsService';
+import { hasCompleteRequirements, EXPIRY_REMINDER_DAYS, franchiseExpiryDate } from './applicationRules';
+import { sendSMS, isSMSConfigured, SMSTemplates } from './smsService';
+import { nowISO, todayStr, daysFromToday, daysUntil } from './clock';
+
+/**
+ * Creates an in-app SMS notification record for a user and dispatches the real
+ * SMS through Semaphore (when configured).
+ */
+export async function notifyUserAsync(
+  target: Pick<User, 'id' | 'phone'> | string,
+  title: string,
+  message: string,
+  type: SMSNotification['type'] = 'status_update'
+): Promise<void> {
+  try {
+    let recipient: Pick<User, 'id' | 'phone'> | undefined =
+      typeof target === 'string' ? undefined : target;
+    if (typeof target === 'string') {
+      if (!target) return;
+      recipient = (await getUsersAsync()).find(u => u.id === target);
+    }
+    if (!recipient?.id) return;
+    await saveSMSNotificationAsync({
+      id: crypto.randomUUID(),
+      userId: recipient.id,
+      recipientPhone: recipient.phone || '',
+      title,
+      message,
+      type,
+      sentAt: nowISO(),
+      read: false,
+    });
+  } catch (err) {
+    console.warn('Notification dispatch notice:', err);
+  }
+}
 
 // ================= USER & AUTH =================
 export async function getUsersAsync(): Promise<User[]> {
@@ -221,7 +255,7 @@ export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>
   return { user: newUser };
 }
 
-export async function updateAccountStatusAsync(userId: string, status: 'approved' | 'rejected'): Promise<User | null> {
+export async function updateAccountStatusAsync(userId: string, status: 'approved' | 'rejected', reason?: string): Promise<User | null> {
   if (isSupabaseConfigured() && supabase) {
     try {
       await supabase
@@ -232,7 +266,20 @@ export async function updateAccountStatusAsync(userId: string, status: 'approved
       console.warn('Supabase update account status error:', err);
     }
   }
-  return storage.updateAccountStatus(userId, status);
+  let updated = storage.updateAccountStatus(userId, status);
+  const account = updated || (await getUsersAsync()).find(u => u.id === userId) || null;
+  if (account && !updated) updated = { ...account, accountStatus: status };
+
+  // Notify the registrant whether the account was approved or rejected
+  if (account) {
+    const name = `${account.firstName} ${account.lastName}`.trim();
+    if (status === 'approved') {
+      await notifyUserAsync(account, 'Account Approved', SMSTemplates.accountApproved(name), 'status_update');
+    } else {
+      await notifyUserAsync(account, 'Account Rejected', SMSTemplates.accountRejected(name, reason), 'status_update');
+    }
+  }
+  return updated;
 }
 
 export async function updatePresidentQrAsync(userId: string, qrUrl: string): Promise<User | null> {
@@ -452,8 +499,8 @@ export async function updateApplicationStatusAsync(
 
     const existing = (await getFranchisesAsync()).find(item => item.applicationId === id);
     const mtopNumber = existing?.mtopNumber || `MTOP-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-    const effectiveStart = startDate || now.slice(0, 10);
-    const effectiveEnd = endDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const effectiveStart = startDate || todayStr();
+    const effectiveEnd = endDate || daysFromToday(365);
     updated.mtopNumber = mtopNumber;
     updated.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(mtopNumber)}`;
     franchiseToSave = {
@@ -484,6 +531,13 @@ export async function updateApplicationStatusAsync(
 
   await saveApplicationAsync(updated, isSupabaseConfigured());
   if (franchiseToSave) await saveFranchiseAsync(franchiseToSave, isSupabaseConfigured());
+
+  // Notify applicant of the final decision
+  if (status === 'approved' && updated.mtopNumber) {
+    void notifyUserAsync(updated.applicantId, 'MTOP Approved', SMSTemplates.approvalNotice(updated.mtopNumber, updated.applicantName), 'status_update');
+  } else if (status === 'rejected') {
+    void notifyUserAsync(updated.applicantId, 'Application Rejected', SMSTemplates.applicationRejected(updated.plateNumber, adminNotes), 'status_update');
+  }
   return updated;
 }
 
@@ -558,7 +612,9 @@ export async function recordTreasurerPaymentAsync(
   const app = apps.find(a => a.id === appId);
   if (!app) return null;
 
-  const paidAt = new Date().toISOString();
+  if (app.treasurerPayment?.paid) return app; // already paid — never record twice
+
+  const paidAt = nowISO();
   app.treasurerPayment = {
     paid: true,
     amount,
@@ -567,8 +623,9 @@ export async function recordTreasurerPaymentAsync(
     paymentMethod,
   };
 
-  if (app.status === 'inspection_passed' || app.status === 'pending_treasurer_payment' || app.status === 'draft') {
-    app.status = 'pending_toda_approval';
+  // Payment is received automatically -> goes straight back to the Admin for MTOP grant
+  if (['inspection_passed', 'pending_treasurer_payment', 'pending_inspection', 'pending_toda_approval', 'draft'].includes(app.status)) {
+    app.status = 'pending_admin_approval';
   }
 
   // Update storage cache
@@ -598,6 +655,8 @@ export async function recordTreasurerPaymentAsync(
   } catch (payErr) {
     console.warn('Could not record payment transaction:', payErr);
   }
+
+  void notifyUserAsync(app.applicantId, 'Payment Received', SMSTemplates.paymentConfirmed(amount, orNumber), 'status_update');
 
   return savedApp;
 }
@@ -797,32 +856,30 @@ export async function saveSMSNotificationAsync(notification: SMSNotification): P
   return storage.saveSMSNotification(notification);
 }
 
+/**
+ * Runs on every dashboard load and whenever the Date Navigator changes the
+ * system date. Handles:
+ *  - expired / re-activated franchise status (based on the system date)
+ *  - SMS reminders 30, 7 and 1 day(s) before expiration
+ *  - SMS notice on the day the franchise expires
+ *  - releasing slots of franchises expired for more than a year
+ */
 export async function processFranchiseLifecycleAsync(): Promise<void> {
   const [franchises, users, penalties] = await Promise.all([getFranchisesAsync(), getUsersAsync(), getPenaltiesAsync()]);
-  const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`).getTime();
-  const dayMs = 24 * 60 * 60 * 1000;
+  const allNotifications = await getSMSNotificationsAsync();
+  // Each reminder has a unique title per franchise + window, so it is sent once only
+  const alreadySent = (userId: string, title: string) =>
+    allNotifications.some(item => item.userId === userId && item.title === title);
 
   for (const franchise of franchises) {
-    const expiry = new Date(`${franchise.expiresAt.slice(0, 10)}T00:00:00Z`).getTime();
-    if (!Number.isFinite(expiry)) continue;
-    const daysUntilExpiry = Math.floor((expiry - today) / dayMs);
+    const expiryValue = franchiseExpiryDate(franchise);
+    if (!expiryValue || !Number.isFinite(new Date(expiryValue).getTime())) continue;
+    const daysUntilExpiry = daysUntil(expiryValue);
+    const expiryLabel = new Date(expiryValue).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 
-    if (franchise.status === 'active' && daysUntilExpiry < 0) {
-      await saveFranchiseAsync({ ...franchise, status: 'expired' }, isSupabaseConfigured());
-      const hasExpiryPenalty = penalties.some(penalty =>
-        penalty.driverId === franchise.driverId
-        && penalty.plateNumber === franchise.plateNumber
-        && (penalty.violationType === 'Expired MTOP' || penalty.violationType === 'Overdue MTOP')
-      );
-      if (!hasExpiryPenalty && franchise.driverId) {
-        await savePenaltyAsync({
-          id: crypto.randomUUID(), driverId: franchise.driverId, driverName: franchise.driverName,
-          plateNumber: franchise.plateNumber, todaName: franchise.todaName,
-          violationType: 'Overdue MTOP', amount: FRANCHISE_FEES.expiredFranchisePenalty,
-          status: 'unpaid', issuedDate: new Date().toISOString(), dueDate: new Date().toISOString(),
-          remarks: 'Fixed ₱125 overdue penalty for expired franchise.', issuedBy: 'Baliwag Franchise System',
-        }, isSupabaseConfigured());
-      }
+    // Date navigator moved back before expiry -> treat as active again
+    if (franchise.status === 'expired' && daysUntilExpiry >= 0) {
+      await saveFranchiseAsync({ ...franchise, status: 'active' }, isSupabaseConfigured());
       continue;
     }
 
@@ -834,28 +891,53 @@ export async function processFranchiseLifecycleAsync(): Promise<void> {
         operatorName: 'Available for reassignment',
         driverId: '',
         driverName: 'Available slot',
-        slotReleasedAt: new Date().toISOString(),
+        slotReleasedAt: nowISO(),
       }, isSupabaseConfigured());
       continue;
     }
 
-    if (franchise.status !== 'active' || daysUntilExpiry < 0 || daysUntilExpiry > 30 || !franchise.driverId) continue;
-    const driver = users.find(account => account.id === franchise.driverId);
-    if (!driver) continue;
+    // The account that receives SMS is the operator (fallback: driver account)
+    const recipient = users.find(account => account.id === franchise.operatorId)
+      || users.find(account => account.id === franchise.driverId);
 
-    const existing = await getSMSNotificationsAsync(driver.id);
-    if (existing.some(item => item.type === 'renewal_reminder' && item.message.includes(franchise.mtopNumber))) continue;
+    if (franchise.status === 'active' && daysUntilExpiry < 0) {
+      await saveFranchiseAsync({ ...franchise, status: 'expired' }, isSupabaseConfigured());
+      const penaltyOwner = franchise.driverId || franchise.operatorId;
+      const hasExpiryPenalty = penalties.some(penalty =>
+        penalty.plateNumber === franchise.plateNumber
+        && (penalty.violationType === 'Expired MTOP' || penalty.violationType === 'Overdue MTOP')
+      );
+      if (!hasExpiryPenalty && penaltyOwner) {
+        await savePenaltyAsync({
+          id: crypto.randomUUID(), driverId: penaltyOwner, driverName: franchise.driverName,
+          plateNumber: franchise.plateNumber, todaName: franchise.todaName,
+          violationType: 'Overdue MTOP', amount: FRANCHISE_FEES.expiredFranchisePenalty,
+          status: 'unpaid', issuedDate: nowISO(), dueDate: nowISO(),
+          remarks: 'Fixed ₱125 overdue penalty for expired franchise.', issuedBy: 'Baliwag Franchise System',
+        }, isSupabaseConfigured());
+      }
+      const title = `Franchise Expired – ${franchise.mtopNumber}`;
+      if (recipient && !alreadySent(recipient.id, title)) {
+        await notifyUserAsync(recipient, title,
+          SMSTemplates.franchiseExpired(franchise.mtopNumber, franchise.plateNumber, expiryLabel), 'expiration');
+      }
+      continue;
+    }
 
-    await saveSMSNotificationAsync({
-      id: crypto.randomUUID(),
-      userId: driver.id,
-      recipientPhone: driver.phone,
-      title: 'Renewal due in 30 days',
-      message: `Reminder: Please renew MTOP ${franchise.mtopNumber} for plate ${franchise.plateNumber}. It is scheduled to expire on ${new Date(franchise.expiresAt).toLocaleDateString()}.`,
-      type: 'renewal_reminder',
-      sentAt: new Date().toISOString(),
-      read: false,
-    });
+    if (franchise.status !== 'active' || daysUntilExpiry < 0 || !recipient) continue;
+
+    // Send the closest reminder window that applies (30 / 7 / 1 day)
+    const windowDays = [...EXPIRY_REMINDER_DAYS].sort((a, b) => a - b).find(days => daysUntilExpiry <= days);
+    if (windowDays === undefined) continue;
+    const title = `Expiry Reminder (${windowDays}-day) – ${franchise.mtopNumber}`;
+    if (alreadySent(recipient.id, title)) continue;
+
+    await notifyUserAsync(
+      recipient,
+      title,
+      SMSTemplates.renewalReminder(franchise.mtopNumber, franchise.plateNumber, expiryLabel, daysUntilExpiry),
+      'renewal_reminder'
+    );
   }
 }
 

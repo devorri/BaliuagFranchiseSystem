@@ -7,6 +7,7 @@ import {
 import { useToast } from '../components/ui/Toast';
 import * as supabaseService from '../services/supabaseService';
 import type { Document, DocumentType, UserRole } from '../types';
+import { REGISTRATION_REQUIRED_DOC, TODA_ROUTES } from '../services/applicationRules';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -69,12 +70,12 @@ export function RegisterPage() {
     }
   };
 
+  // Only ONE primary requirement is asked before an account is created:
+  // a valid government ID or driver's license. The other franchise requirements
+  // are uploaded later in the Franchise Application, and the TODA endorsement is
+  // given directly by the TODA President inside the system.
   const requiredRegistrationDocs: { key: DocumentType; label: string; desc: string }[] = [
-    { key: 'id_photo', label: '2x2 ID Photo / Valid Government ID', desc: 'Recent 2x2 photo or valid government-issued ID' },
-    { key: 'barangay_clearance', label: 'Barangay Clearance', desc: 'Proof of residency within the City of Baliwag' },
-    { key: 'drivers_license', label: "Driver's License", desc: 'Valid Professional Driver License (LTO)' },
-    { key: 'or_cr', label: 'Proof of Unit Ownership (OR/CR)', desc: 'Official Receipt & Certificate of Registration' },
-    { key: 'toda_cert', label: 'TODA Endorsement / Cert', desc: 'Certificate of TODA affiliation or membership' },
+    { key: REGISTRATION_REQUIRED_DOC.key, label: REGISTRATION_REQUIRED_DOC.title, desc: REGISTRATION_REQUIRED_DOC.requirement },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,6 +90,18 @@ export function RegisterPage() {
       showToast('Passwords do not match.', 'error');
       return;
     }
+
+    if (!uploadedFiles[REGISTRATION_REQUIRED_DOC.key]) {
+      showToast("Please upload your valid Government ID or Driver's License.", 'error');
+      return;
+    }
+
+    if (!form.todaName) {
+      showToast('Please select your TODA.', 'error');
+      return;
+    }
+
+    if (loading) return; // prevent double submission
 
     // Convert attached files to Document array
     const documents: Document[] = Object.entries(uploadedFiles).map(([type, file], index) => ({
@@ -146,7 +159,7 @@ export function RegisterPage() {
           <div style={{ padding: '1rem', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: '10px', marginBottom: '1.75rem', textAlign: 'left', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
             <ShieldAlert size={20} color="#facc15" style={{ flexShrink: 0, marginTop: '2px' }} />
             <span style={{ fontSize: '0.85rem', color: '#fef08a', lineHeight: '1.5' }}>
-              You will be able to log in using your username and password once your account and submitted documents are verified and approved by the Security Admin.
+              You will receive an SMS{form.email ? ' and email' : ''} notification once your account is approved or rejected. You can log in using your username and password after approval.
             </span>
           </div>
           <button 
@@ -226,8 +239,13 @@ export function RegisterPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>TODA Affiliation (Optional)</label>
-              <input type="text" className="glass-input" placeholder="e.g. BASTODA, SMTODA" value={form.todaName} onChange={e => updateField('todaName', e.target.value)} />
+              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>TODA *</label>
+              <select className="glass-input glass-select" value={form.todaName} onChange={e => updateField('todaName', e.target.value)} required>
+                <option value="">Select your TODA</option>
+                {Object.keys(TODA_ROUTES).map(toda => (
+                  <option key={toda} value={toda}>{toda}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -338,11 +356,11 @@ export function RegisterPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
               <Upload size={18} color="#38bdf8" />
               <strong style={{ fontSize: '0.95rem', color: '#ffffff' }}>
-                Submit Required Verification Documents (Franchise Operator / Driver)
+                Primary Requirement: Valid Government ID / Driver's License
               </strong>
             </div>
             <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '1rem' }}>
-              Upload your initial requirements now so the Security Administrator can review and approve your account.
+              This is the only document needed to create an account. The Admin will check it before approving your account, and you will be notified by SMS/email once approved or rejected. Other franchise requirements are submitted later in your Franchise Application.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -372,7 +390,7 @@ export function RegisterPage() {
                     className="glass-input"
                     style={{ fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}
                     onChange={e => void handleFileUpload(doc.key, e.target.files?.[0])}
-                    disabled={uploadingDoc[doc.key]}
+                    disabled={uploadingDoc[doc.key] || loading}
                   />
                 </div>
               ))}
@@ -383,7 +401,7 @@ export function RegisterPage() {
             type="submit" 
             className="btn-glass btn-primary-glass" 
             style={{ padding: '0.95rem', fontSize: '1rem', marginTop: '0.5rem' }} 
-            disabled={loading}
+            disabled={loading || Object.values(uploadingDoc).some(Boolean)}
           >
             <UserPlus size={18} /> {loading ? 'Registering Account...' : 'Register Account'}
           </button>

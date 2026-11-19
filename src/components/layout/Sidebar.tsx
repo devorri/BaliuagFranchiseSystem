@@ -22,7 +22,7 @@ export function Sidebar() {
 
   const todaLinks = [
     { to: '/toda', icon: LayoutDashboard, label: 'TODA Overview' },
-    { to: '/toda/approvals', icon: CheckCircle2, label: 'Driver Approvals' },
+    { to: '/toda/approvals', icon: CheckCircle2, label: 'Line Endorsements' },
   ];
 
   // Admin Homepage is set to Accounts & Security

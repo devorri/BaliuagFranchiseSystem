@@ -9,6 +9,8 @@ import {
   AlertTriangle, Clock, CalendarClock, AlertCircle, Coins, Send
 } from 'lucide-react';
 import { sendSMS } from '../../services/smsService';
+import { nowMs as systemNowMs } from '../../services/clock';
+import { TodaMasterlistReport } from '../../components/reports/TodaMasterlistReport';
 
 export function Reports() {
   const [applications, setApplications] = useState<Application[]>([]);
@@ -136,7 +138,7 @@ export function Reports() {
   const totalOutstandingReceivables = totalUnpaidAppFees + totalUnpaidPenaltyFees;
 
   // Module 9: Dedicated Renewals & Expiration Schedule
-  const nowMs = Date.now();
+  const nowMs = systemNowMs();
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
   
   const expiringSoonFranchises = franchises.filter(f => {
@@ -312,6 +314,9 @@ export function Reports() {
           {bastodaMembers.length === 0 ? <tr><td colSpan={5} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>No BASTODA franchises recorded.</td></tr> : bastodaMembers.map(item => <tr key={item.id}><td>{item.mtopNumber}</td><td>{item.operatorName}</td><td>{item.driverName}</td><td>{item.plateNumber}</td><td>{item.status.toUpperCase()}</td></tr>)}
         </tbody></table></div>
       </div>
+
+      {/* TODA MASTERLIST (Operators / Drivers / POS per TODA — printable) */}
+      <TodaMasterlistReport />
 
       {/* WEB VIEW FINANCIAL SUMMARY CARDS */}
       <div className="no-print" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem' }}>

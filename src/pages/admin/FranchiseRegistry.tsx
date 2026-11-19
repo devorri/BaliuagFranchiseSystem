@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { now as systemNow } from '../../services/clock';
 import * as supabaseService from '../../services/supabaseService';
 import type { Franchise, FranchiseStatus, User } from '../../types';
 import { Search, UserCheck } from 'lucide-react';
@@ -26,7 +27,7 @@ export function FranchiseRegistry() {
     if (franchise.status !== 'available' || !operator || !driver) return;
     setSavingSlotId(franchise.id);
     setError('');
-    const now = new Date();
+    const now = systemNow();
     const expiresAt = new Date(now);
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
     try {

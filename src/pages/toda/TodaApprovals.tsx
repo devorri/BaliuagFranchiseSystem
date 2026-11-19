@@ -4,17 +4,16 @@ import * as supabaseService from '../../services/supabaseService';
 import { belongsToToda } from '../../services/todaService';
 import type { Application } from '../../types';
 import { 
-  CheckCircle2, FileText, RefreshCw, UserCheck, 
-  Search, ExternalLink, ChevronLeft, ChevronRight,
-  Eye, X, Clock, Award
+  CheckCircle2, RefreshCw, UserCheck, 
+  Search, ChevronLeft, ChevronRight,
+  Clock, Award
 } from 'lucide-react';
 
 export function TodaApprovals() {
   const { user } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
-  const [viewingDocsApp, setViewingDocsApp] = useState<Application | null>(null);
-  const [remarks, setRemarks] = useState('Driver is eligible to join this TODA line. Requirements forwarded for municipal admin review.');
+  const [remarks, setRemarks] = useState('Applicant is a member in good standing and is eligible for this TODA line.');
   const [successMsg, setSuccessMsg] = useState('');
   const [actionError, setActionError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,7 +50,8 @@ export function TodaApprovals() {
         presidentEndorsedAt: now,
         presidentEndorsedBy: `${user.firstName} ${user.lastName}`,
         presidentRemarks: remarks,
-        status: 'pending_admin_approval',
+        // Requirements are already with the Admin; endorsement does not change the review status
+        status: app.status === 'pending_toda_approval' ? 'pending_admin_approval' : app.status,
         updatedAt: now,
       }, true);
 
@@ -65,7 +65,8 @@ export function TodaApprovals() {
           targetId: app.id,
         });
 
-        setSuccessMsg(`Application for ${app.driverName || app.applicantName} was endorsed and forwarded to Municipal Admin.`);
+        void supabaseService.notifyUserAsync(app.applicantId, 'TODA Line Endorsed', `BALIUAG CITY: Your TODA line endorsement for ${app.todaName} (Plate ${app.plateNumber}) was given by ${user.firstName} ${user.lastName}. - City of Baliwag`, 'toda_approval');
+        setSuccessMsg(`Line endorsement for ${app.driverName || app.applicantName} recorded. The Municipal Admin can now grant the MTOP once all other steps are complete.`);
         setSelectedApp(null);
         await loadApps();
         setTimeout(() => setSuccessMsg(''), 4500);
@@ -81,7 +82,7 @@ export function TodaApprovals() {
   const assignedApplications = useMemo(() => {
     return applications.filter(app => {
       return belongsToToda(app.todaName, user?.todaName)
-        && ['pending_toda_approval', 'pending_admin_approval', 'approved'].includes(app.status);
+        && app.status !== 'rejected' && app.status !== 'draft';
     });
   }, [applications, user?.todaName]);
 
@@ -98,7 +99,7 @@ export function TodaApprovals() {
         (app.vehicleMake || '').toLowerCase().includes(q);
 
       // 2. Status Filter
-      const isEndorsed = app.presidentEndorsed || app.status === 'pending_admin_approval' || app.status === 'approved';
+      const isEndorsed = Boolean(app.presidentEndorsed) || app.status === 'approved';
       let matchesFilter = true;
       if (statusFilter === 'needs_approval') {
         matchesFilter = !isEndorsed;
@@ -148,7 +149,7 @@ export function TodaApprovals() {
           Driver & Line Route Approvals
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem', maxWidth: '750px', lineHeight: 1.5 }}>
-          Review operators and drivers applying for your TODA franchise line. Verify vehicle details and documents before endorsing them to the Municipal Licensing Office.
+          Give the line endorsement for operators and drivers applying under your TODA. Requirements are checked directly by the Municipal Admin, so no document checking is needed here.
         </p>
 
         {successMsg && (
@@ -276,14 +277,14 @@ export function TodaApprovals() {
                   <th style={{ minWidth: '150px' }}>Plate & Vehicle</th>
                   <th style={{ minWidth: '160px' }}>TODA Route</th>
                   <th style={{ minWidth: '170px' }}>Inspection & Treasurer</th>
-                  <th style={{ minWidth: '130px', textAlign: 'center' }}>Documents</th>
+                  <th style={{ minWidth: '130px', textAlign: 'center' }}>Requirements</th>
                   <th style={{ minWidth: '150px' }}>Status</th>
                   <th style={{ minWidth: '150px', textAlign: 'right' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedApplications.map(app => {
-                  const isApproved = app.presidentEndorsed || app.status === 'pending_admin_approval' || app.status === 'approved';
+                  const isApproved = Boolean(app.presidentEndorsed) || app.status === 'approved';
                   const docCount = app.documents?.length || 0;
                   const verifiedDocCount = (app.documents || []).filter(d => d.status === 'verified').length;
 
@@ -356,33 +357,11 @@ export function TodaApprovals() {
                         </div>
                       </td>
 
-                      {/* Documents Column */}
+                      {/* Requirements Column (read-only — checked by Admin) */}
                       <td style={{ textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => setViewingDocsApp(app)}
-                          className="btn-glass"
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            fontSize: '0.78rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            borderColor: docCount > 0 ? 'rgba(56, 189, 248, 0.4)' : 'rgba(255, 255, 255, 0.15)',
-                            background: docCount > 0 ? 'rgba(56, 189, 248, 0.12)' : 'transparent',
-                            color: docCount > 0 ? '#38bdf8' : '#94a3b8'
-                          }}
-                          title="Click to inspect submitted documents"
-                        >
-                          <FileText size={13} />
-                          <span>{docCount} Docs</span>
-                          <Eye size={12} style={{ opacity: 0.8 }} />
-                        </button>
-                        {docCount > 0 && (
-                          <span style={{ display: 'block', fontSize: '0.7rem', color: verifiedDocCount === docCount ? '#4ade80' : '#94a3b8', marginTop: '0.2rem' }}>
-                            {verifiedDocCount}/{docCount} verified
-                          </span>
-                        )}
+                        <span style={{ fontSize: '0.75rem', color: docCount > 0 && verifiedDocCount === docCount ? '#4ade80' : '#94a3b8' }}>
+                          {docCount === 0 ? 'Not yet submitted' : verifiedDocCount === docCount ? '✓ Checked by Admin' : 'Being checked by Admin'}
+                        </span>
                       </td>
 
                       {/* Status Column */}
@@ -528,131 +507,6 @@ export function TodaApprovals() {
         )}
       </div>
 
-      {/* Submitted Requirements Modal */}
-      {viewingDocsApp && (
-        <div className="modal-overlay" onClick={() => setViewingDocsApp(null)}>
-          <div
-            className="glass-container modal-glass-content animate-fade-in"
-            onClick={e => e.stopPropagation()}
-            style={{ maxWidth: '650px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '0.75rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-                  Submitted Requirements
-                </h3>
-                <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
-                  Applicant: <strong style={{ color: '#ffffff' }}>{viewingDocsApp.driverName || viewingDocsApp.applicantName}</strong> (Plate: {viewingDocsApp.plateNumber})
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewingDocsApp(null)}
-                className="btn-glass"
-                style={{ padding: '0.4rem' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {(!viewingDocsApp.documents || viewingDocsApp.documents.length === 0) ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
-                  No documents have been uploaded for this application yet.
-                </div>
-              ) : (
-                viewingDocsApp.documents.map(doc => {
-                  const documentUrl = doc.fileUrl || (/^(https?:|blob:)/i.test(doc.fileName) ? doc.fileName : undefined);
-                  const isDocVerified = doc.status === 'verified';
-                  const isDocRejected = doc.status === 'rejected';
-
-                  return (
-                    <div
-                      key={doc.id}
-                      className="glass-panel"
-                      style={{
-                        padding: '1rem 1.25rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '1rem',
-                        border: isDocVerified ? '1px solid rgba(34, 197, 94, 0.3)' : isDocRejected ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '8px',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          <FileText size={18} color="#38bdf8" />
-                        </div>
-                        <div>
-                          <strong style={{ fontSize: '0.9rem', color: '#ffffff', display: 'block' }}>
-                            {doc.name}
-                          </strong>
-                          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                            File: {doc.fileName}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <span style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '999px',
-                          textTransform: 'uppercase',
-                          background: isDocVerified ? 'rgba(34, 197, 94, 0.18)' : isDocRejected ? 'rgba(239, 68, 68, 0.18)' : 'rgba(245, 158, 11, 0.18)',
-                          color: isDocVerified ? '#4ade80' : isDocRejected ? '#f87171' : '#fbbf24',
-                          border: isDocVerified ? '1px solid rgba(34, 197, 94, 0.4)' : isDocRejected ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)'
-                        }}>
-                          {doc.status}
-                        </span>
-
-                        {documentUrl && (
-                          <a
-                            href={documentUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn-glass"
-                            style={{
-                              padding: '0.35rem 0.75rem',
-                              fontSize: '0.8rem',
-                              color: '#38bdf8',
-                              textDecoration: 'none'
-                            }}
-                          >
-                            <Eye size={13} /> View File <ExternalLink size={11} />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div style={{ marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setViewingDocsApp(null)}
-                className="btn-glass"
-                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Line Endorsement / Details Modal */}
       {selectedApp && (
         <div className="modal-overlay" onClick={() => setSelectedApp(null)}>
@@ -712,7 +566,7 @@ export function TodaApprovals() {
                     />
                   </div>
                   <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
-                    By endorsing, you certify that this driver is eligible for the designated TODA route line in Baliwag City.
+                    By endorsing, you certify that this applicant is a TODA member eligible for the designated route line in Baliwag City. Requirements are checked separately by the Municipal Admin.
                   </p>
                 </div>
 
@@ -734,7 +588,7 @@ export function TodaApprovals() {
                     className="btn-glass btn-emerald-glass"
                     style={{ flex: 2, padding: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
-                    <UserCheck size={18} /> {isSubmitting ? 'Endorsing...' : 'Confirm & Endorse to Admin'}
+                    <UserCheck size={18} /> {isSubmitting ? 'Endorsing...' : 'Confirm Line Endorsement'}
                   </button>
                 </div>
               </div>

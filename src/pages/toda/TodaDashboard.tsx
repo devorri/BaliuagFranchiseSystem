@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { belongsToToda } from '../../services/todaService';
+import { TodaMasterlistReport } from '../../components/reports/TodaMasterlistReport';
 import * as supabaseService from '../../services/supabaseService';
 import type { Application, Payment } from '../../types';
 import { Award, CheckCircle2, Clock, ShieldCheck, UploadCloud, Wallet } from 'lucide-react';
@@ -23,7 +25,7 @@ export function TodaDashboard() {
       supabaseService.getPaymentsAsync(),
     ]);
     const assigned = allApplications
-      .filter(app => app.todaName.trim().toLowerCase() === user?.todaName?.trim().toLowerCase())
+      .filter(app => belongsToToda(app.todaName, user?.todaName))
       .sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
     const appIds = new Set(assigned.map(app => app.id));
     setApplications(assigned);
@@ -34,7 +36,7 @@ export function TodaDashboard() {
     );
   };
 
-  const pendingApprovals = applications.filter(app => app.status === 'pending_toda_approval');
+  const pendingApprovals = applications.filter(app => !app.presidentEndorsed && app.status !== 'approved' && app.status !== 'rejected');
   const endorsedApps = applications.filter(app => app.presidentEndorsed);
   const totalCollectedRouteFees = payments
     .filter(payment => payment.status === 'completed')
@@ -219,6 +221,9 @@ export function TodaDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Printable per-TODA report (locked to this President's TODA) */}
+      {user?.todaName && <TodaMasterlistReport fixedToda={user.todaName} />}
     </div>
   );
 }

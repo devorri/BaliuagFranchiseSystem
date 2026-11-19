@@ -60,7 +60,7 @@ export function SMSNotifications() {
                 className="glass-panel" 
                 style={{ 
                   padding: '1.25rem 1.5rem', 
-                  borderLeft: '4px solid #22c55e',
+                  borderLeft: `4px solid ${n.type === 'expiration' ? '#ef4444' : n.type === 'renewal_reminder' ? '#f59e0b' : '#22c55e'}`,
                   background: 'rgba(12, 28, 18, 0.6)'
                 }}
               >

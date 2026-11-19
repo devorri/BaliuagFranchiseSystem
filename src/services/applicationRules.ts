@@ -1,12 +1,22 @@
-import type { Document, DocumentType, Residency } from '../types';
+import type { Application, Document, DocumentType, Franchise, Residency } from '../types';
 import { franchiseFeeFor } from './fees';
+import { daysUntil } from './clock';
+
+/**
+ * Registration requirement: the ONLY document asked before an account is created
+ * is a valid government ID or driver's license (stored as `drivers_license`).
+ */
+export const REGISTRATION_REQUIRED_DOC: { key: DocumentType; title: string; requirement: string } = {
+  key: 'drivers_license',
+  title: "Valid Government ID / Driver's License",
+  requirement: "Any valid government-issued ID or LTO driver's license (front side, clear photo or PDF)",
+};
 
 export function getRequiredDocuments(type: 'new' | 'renewal' = 'new'): { key: DocumentType; title: string; requirement: string }[] {
   if (type === 'renewal') {
     return [
       { key: 'or_cr', title: 'OR / CR (Official Receipt & Certificate of Registration)', requirement: 'Latest LTO vehicle registration and official receipt' },
       { key: 'drivers_license', title: "Driver's License", requirement: 'Valid professional driver’s license' },
-      { key: 'toda_cert', title: 'TODA Certification', requirement: 'Active TODA membership endorsement certificate' },
       { key: 'id_photo', title: '2×2 ID Photo', requirement: 'Recent passport or 2x2 photo with white background' },
     ];
   }
@@ -15,7 +25,6 @@ export function getRequiredDocuments(type: 'new' | 'renewal' = 'new'): { key: Do
     { key: 'or_cr', title: 'OR / CR (Official Receipt & Certificate of Registration)', requirement: 'Vehicle official receipt and certificate of registration' },
     { key: 'barangay_clearance', title: 'Barangay Clearance', requirement: 'Proof of operator residency within Baliwag City' },
     { key: 'drivers_license', title: "Driver's License", requirement: 'Valid professional driver’s license' },
-    { key: 'toda_cert', title: 'TODA Certification', requirement: 'Active TODA membership endorsement certificate' },
     { key: 'id_photo', title: '2×2 ID Photo', requirement: 'Recent passport or 2x2 photo with white background' },
   ];
 }
@@ -37,6 +46,77 @@ export function residencyFromAddress(address?: string): Residency {
 export function feeForAddress(address?: string) {
   const residency = residencyFromAddress(address);
   return { residency, amount: franchiseFeeFor(residency) };
+}
+
+/** Statuses that count as an application still in process (blocks a second submission). */
+export const ACTIVE_APPLICATION_STATUSES: Application['status'][] = [
+  'draft',
+  'pending_driver_requirements',
+  'pending_inspection',
+  'inspection_passed',
+  'pending_treasurer_payment',
+  'pending_toda_approval',
+  'pending_admin_approval',
+  'requires_revision',
+];
+
+export function isActiveApplication(app: Application): boolean {
+  return ACTIVE_APPLICATION_STATUSES.includes(app.status);
+}
+
+/**
+ * Renewal is only allowed once the franchise has expired.
+ * Set to e.g. 30 to allow renewal 30 days before expiration instead.
+ */
+export const RENEWAL_WINDOW_DAYS = 0;
+
+/** Days before expiration when SMS reminders are sent. */
+export const EXPIRY_REMINDER_DAYS = [30, 7, 1];
+
+export function franchiseExpiryDate(franchise: Pick<Franchise, 'expiresAt' | 'endDate'>): string {
+  return franchise.endDate || franchise.expiresAt;
+}
+
+export function isFranchiseExpired(franchise: Pick<Franchise, 'expiresAt' | 'endDate' | 'status'>): boolean {
+  return daysUntil(franchiseExpiryDate(franchise)) < 0;
+}
+
+export function canRenewFranchise(franchise: Pick<Franchise, 'expiresAt' | 'endDate' | 'status'>): boolean {
+  if (franchise.status === 'available' || franchise.status === 'suspended') return false;
+  return daysUntil(franchiseExpiryDate(franchise)) < RENEWAL_WINDOW_DAYS;
+}
+
+/**
+ * Returns the list of things still missing before the applicant can pay.
+ * Payment is only opened once every item is cleared.
+ */
+export function getPaymentBlockers(app: Application): string[] {
+  const blockers: string[] = [];
+  const requiredFields: [keyof Application, string][] = [
+    ['driverName', 'Driver name'],
+    ['licenseNumber', 'Driver license number'],
+    ['vehicleMake', 'Vehicle make'],
+    ['vehicleModel', 'Vehicle model'],
+    ['plateNumber', 'Plate number'],
+    ['motorNumber', 'Engine / motor number'],
+    ['chassisNumber', 'Chassis number'],
+    ['vehicleColor', 'Vehicle color'],
+    ['todaName', 'TODA'],
+  ];
+  const missingFields = requiredFields.filter(([key]) => !String(app[key] ?? '').trim()).map(([, label]) => label);
+  if (missingFields.length) blockers.push(`Missing application data: ${missingFields.join(', ')}`);
+
+  const required = getRequiredDocuments(app.type);
+  const docs = app.documents || [];
+  const missingDocs = required.filter(({ key }) => !docs.some(doc => doc.type === key));
+  if (missingDocs.length) blockers.push(`Missing requirements: ${missingDocs.map(doc => doc.title).join(', ')}`);
+  if (docs.some(doc => doc.status === 'rejected')) blockers.push('A requirement was rejected by the Admin — re-upload it first');
+  else if (!missingDocs.length && !required.every(({ key }) => docs.some(doc => doc.type === key && doc.status === 'verified'))) {
+    blockers.push('Requirements are still being checked by the Municipal Admin');
+  }
+  if (app.inspection?.status !== 'passed') blockers.push('Stenciling / physical inspection not yet passed');
+  if (!app.totalFee || app.totalFee <= 0) blockers.push('Fee has not been assessed yet');
+  return blockers;
 }
 
 export function hasCompleteRequirements(documents: Document[], type: 'new' | 'renewal' = 'new') {

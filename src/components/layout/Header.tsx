@@ -2,6 +2,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Bell } from 'lucide-react';
 import { useState } from 'react';
 import * as storage from '../../services/storageService';
+import { DateNavigator } from './DateNavigator';
 
 export function Header() {
   const { user } = useAuth();
@@ -55,6 +56,8 @@ export function Header() {
             📱 GCash QR Payment
           </a>
         )}
+
+        <DateNavigator />
 
         {getRoleBadge()}
 

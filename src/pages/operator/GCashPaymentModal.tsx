@@ -14,7 +14,8 @@ import {
 import {
   isValidGcashReference,
   sanitizeGcashReference,
-  generateStandardGcashReference
+  generateStandardGcashReference,
+  getPaymentBlockers
 } from '../../services/applicationRules';
 import { sendPaymentReceiptEmail } from '../../services/emailService';
 import type { Application } from '../../types';
@@ -29,6 +30,8 @@ export function GCashPaymentModal() {
   const [isPaid, setIsPaid] = useState(false);
   const [refNumber, setRefNumber] = useState('');
   const [error, setError] = useState('');
+  // null = still loading; [] = cleared for payment; [..] = reasons payment is locked
+  const [blockers, setBlockers] = useState<string[] | null>(null);
 
   // Mode: QR scan vs GCash direct / reference
   const [paymentMode, setPaymentMode] = useState<'qr' | 'checkout' | 'ref'>('qr');
@@ -55,12 +58,21 @@ export function GCashPaymentModal() {
   useEffect(() => {
     if (!user) return;
     void supabaseService.getApplicationsAsync().then(applications => {
-      const current = applications.find(app => (app.applicantId === user.id || app.driverId === user.id) && !app.treasurerPayment?.paid);
+      const current = applications.find(app =>
+        (app.applicantId === user.id || app.driverId === user.id)
+        && !app.treasurerPayment?.paid
+        && app.status !== 'rejected'
+        && app.status !== 'approved'
+      );
       if (current) {
         setApplication(current);
         setAmount(current.totalFee || 450);
+        // Will not proceed to payment while data/requirements/stencil are incomplete
+        setBlockers(getPaymentBlockers(current));
+      } else {
+        setBlockers(['No unpaid franchise application found. Submit your Franchise Application first.']);
       }
-    });
+    }).catch(() => setBlockers(['Could not load your application. Please refresh.']));
   }, [user]);
 
   // 2. Automatically generate the Real Dynamic QR Ph code
@@ -87,10 +99,10 @@ export function GCashPaymentModal() {
   };
 
   useEffect(() => {
-    if (amount > 0) {
+    if (amount > 0 && blockers !== null && blockers.length === 0) {
       void fetchDynamicQr(amount);
     }
-  }, [amount, application?.id]);
+  }, [amount, application?.id, blockers]);
 
   // 3. Live Polling for Automatic Payment Detection (every 3 seconds)
   useEffect(() => {
@@ -127,6 +139,7 @@ export function GCashPaymentModal() {
 
   // 4. Record Confirmed Payment in Supabase & update Application
   const onPaymentConfirmed = async (ref: string) => {
+    if (isPaid) return; // never record the same payment twice
     setRefNumber(ref);
     setIsPaid(true);
 
@@ -271,7 +284,35 @@ export function GCashPaymentModal() {
           </div>
         )}
 
-        {isPaid ? (
+        {!isPaid && (blockers === null || blockers.length > 0) ? (
+          <div className="glass-panel" style={{ padding: '2rem', borderLeft: '4px solid #f59e0b' }}>
+            {blockers === null ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#94a3b8' }}>
+                <Loader2 size={18} className="spin-icon" /> Checking your application before payment...
+              </div>
+            ) : (
+              <>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fbbf24', marginBottom: '0.5rem' }}>
+                  Payment is not yet available
+                </h3>
+                <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                  Payment opens only after your data is complete, the Admin has checked your requirements, and your unit has passed stenciling. Please settle the following first:
+                </p>
+                <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#fca5a5', fontSize: '0.88rem', lineHeight: 1.7 }}>
+                  {blockers.map(item => <li key={item}>{item}</li>)}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard')}
+                  className="btn-glass btn-primary-glass"
+                  style={{ marginTop: '1.25rem', padding: '0.6rem 1.2rem' }}
+                >
+                  Back to Dashboard
+                </button>
+              </>
+            )}
+          </div>
+        ) : isPaid ? (
           /* ══════════════════════════════════════════════════════════════ */
           /* PAID CONFIRMATION RECEIPT SCREEN (OFFICIAL MUNICIPAL RECEIPT)   */
           /* ══════════════════════════════════════════════════════════════ */

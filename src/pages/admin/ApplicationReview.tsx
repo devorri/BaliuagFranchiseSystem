@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import * as supabaseService from '../../services/supabaseService';
-import type { Application, Document, DocumentType, TreasurerPayment } from '../../types';
-import { hasCompleteRequirements } from '../../services/applicationRules';
+import type { Application, Document, DocumentType } from '../../types';
+import { hasCompleteRequirements, getRequiredDocuments, getPaymentBlockers } from '../../services/applicationRules';
+import { todayStr as systemToday, daysFromToday } from '../../services/clock';
 import { sendMtopCertificateEmail } from '../../services/emailService';
 import { 
   CheckCircle2, ShieldCheck, XCircle, FileText, Calendar, 
@@ -19,8 +20,9 @@ export function ApplicationReview() {
   const [loading, setLoading] = useState(false);
 
   // Effectivity Dates
-  const todayStr = new Date().toISOString().split('T')[0];
-  const nextYearStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // Uses the system date (Date Navigator aware)
+  const todayStr = systemToday();
+  const nextYearStr = daysFromToday(365);
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(nextYearStr);
 
@@ -36,7 +38,8 @@ export function ApplicationReview() {
   const [customRejectionNotes, setCustomRejectionNotes] = useState<string>('');
 
   const canManageRequirements = hasPermission('requirements');
-  const requiredDocumentTypes: DocumentType[] = ['or_cr', 'barangay_clearance', 'drivers_license', 'toda_cert', 'id_photo'];
+  // Required documents depend on the application type (renewal waives Barangay Clearance)
+  const requiredTypesFor = (app: Application): DocumentType[] => getRequiredDocuments(app.type).map(doc => doc.key);
 
   useEffect(() => {
     loadApplications();
@@ -308,30 +311,34 @@ export function ApplicationReview() {
     }
   };
 
+  // Normally payment is marked automatically when the applicant pays via GCash / QR Ph.
+  // This is only a fallback for over-the-counter (cash) payments at the Treasurer.
   const handleMarkTreasurerPaid = async (appId: string) => {
     if (!user || !selectedApp || selectedApp.id !== appId) return;
+    if (selectedApp.treasurerPayment?.paid) return;
+    const blockers = getPaymentBlockers(selectedApp);
+    if (blockers.length > 0) {
+      showToast(`Cannot proceed to payment: ${blockers.join(' • ')}`, 'error');
+      return;
+    }
     setLoading(true);
     try {
-      const orNumber = `OR-ADM-${Date.now().toString().slice(-6)}`;
-      const updatedPayment: TreasurerPayment = {
-        amount: selectedApp.treasurerPayment?.amount || selectedApp.totalFee || 450,
-        paid: true,
-        paidAt: new Date().toISOString(),
-        orNumber: selectedApp.treasurerPayment?.orNumber || orNumber,
-        paymentMethod: 'gcash'
-      };
-      const updatedApp = { ...selectedApp, treasurerPayment: updatedPayment };
-      const saved = await supabaseService.saveApplicationAsync(updatedApp, true);
-      setSelectedApp(saved);
+      const orNumber = `OR-CASH-${Date.now().toString().slice(-6)}`;
+      const amount = selectedApp.totalFee || 450;
+      const saved = await supabaseService.recordTreasurerPaymentAsync(appId, amount, orNumber, 'cash', {
+        id: selectedApp.applicantId,
+        name: selectedApp.applicantName,
+      });
+      if (saved) setSelectedApp(saved);
       void supabaseService.recordAuditLogAsync({
         userId: user?.id,
         userName: `${user.firstName} ${user.lastName}`,
         userRole: user.role,
         action: 'PAYMENT_VERIFIED',
-        details: `Treasurer fee marked cleared: ₱${updatedPayment.amount.toFixed(2)} (OR: ${updatedPayment.orNumber})`,
+        details: `Treasurer cash payment recorded: ₱${amount.toFixed(2)} (OR: ${orNumber})`,
         targetId: appId,
       });
-      showToast('Recorded Treasurer Fee payment!', 'success');
+      showToast('Recorded Treasurer cash payment!', 'success');
       await loadApplications();
     } catch {
       showToast('Could not save payment record.', 'error');
@@ -406,8 +413,8 @@ export function ApplicationReview() {
           return true; // 'all'
         }).sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime()).map(app => {
           const isApproved = app.status === 'approved';
-          const isRequirementsComplete = requiredDocumentTypes.every(type => app.documents?.some(doc => doc.type === type));
-          const isRequirementsVerified = requiredDocumentTypes.every(type => app.documents?.some(doc => doc.type === type && doc.status === 'verified'));
+          const isRequirementsComplete = requiredTypesFor(app).every(type => app.documents?.some(doc => doc.type === type));
+          const isRequirementsVerified = requiredTypesFor(app).every(type => app.documents?.some(doc => doc.type === type && doc.status === 'verified'));
           const isStenciled = app.inspection?.status === 'passed';
           const isTreasurerPaid = app.treasurerPayment?.paid;
           const isTodaApproved = app.todaApproval?.routeFeePaid || app.presidentEndorsed;
@@ -646,7 +653,7 @@ export function ApplicationReview() {
                   <button
                     type="button"
                     onClick={handleVerifyAllDocs}
-                    disabled={loading || requiredDocumentTypes.every(type => selectedApp.documents?.some(doc => doc.type === type && doc.status === 'verified'))}
+                    disabled={loading || requiredTypesFor(selectedApp).every(type => selectedApp.documents?.some(doc => doc.type === type && doc.status === 'verified'))}
                     className="btn-glass"
                     style={{
                       width: '100%',
@@ -657,7 +664,7 @@ export function ApplicationReview() {
                       color: '#4ade80'
                     }}
                   >
-                    <FileCheck size={16} /> {requiredDocumentTypes.every(type => selectedApp.documents?.some(doc => doc.type === type && doc.status === 'verified')) ? '✓ Lahat ng Dokumento ay Verified Na' : 'I-Verify Lahat ng Dokumento'}
+                    <FileCheck size={16} /> {requiredTypesFor(selectedApp).every(type => selectedApp.documents?.some(doc => doc.type === type && doc.status === 'verified')) ? '✓ Lahat ng Dokumento ay Verified Na' : 'I-Verify Lahat ng Dokumento'}
                   </button>
                 </div>
               )}
@@ -741,14 +748,21 @@ export function ApplicationReview() {
                 </strong>
                 <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>OR #: {selectedApp.treasurerPayment?.orNumber || 'None'}</span>
                 {!selectedApp.treasurerPayment?.paid && (
+                  <span style={{ fontSize: '0.68rem', color: getPaymentBlockers(selectedApp).length ? '#f87171' : '#94a3b8' }}>
+                    {getPaymentBlockers(selectedApp).length
+                      ? `Payment locked: ${getPaymentBlockers(selectedApp).join(' • ')}`
+                      : 'Payment open — auto-marked PAID once applicant pays via GCash'}
+                  </span>
+                )}
+                {!selectedApp.treasurerPayment?.paid && (
                   <button
                     type="button"
                     onClick={() => handleMarkTreasurerPaid(selectedApp.id)}
-                    disabled={loading}
+                    disabled={loading || getPaymentBlockers(selectedApp).length > 0}
                     className="btn-glass"
                     style={{ marginTop: '0.4rem', padding: '0.4rem 0.6rem', fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.12)', borderColor: 'rgba(34, 197, 94, 0.3)', color: '#4ade80' }}
                   >
-                    <CheckCircle2 size={13} /> Mark Paid (Admin)
+                    <CheckCircle2 size={13} /> Record Cash Payment
                   </button>
                 )}
               </div>

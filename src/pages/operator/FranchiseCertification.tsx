@@ -3,11 +3,12 @@ import { Award, Printer } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import * as supabaseService from '../../services/supabaseService';
 import type { Franchise } from '../../types';
+import { nowMs as systemNowMs } from '../../services/clock';
 
 export function FranchiseCertification() {
   const { user } = useAuth();
   const [franchises, setFranchises] = useState<Franchise[]>([]);
-  const [now] = useState(() => Date.now());
+  const [now] = useState(() => systemNowMs());
 
   useEffect(() => {
     if (!user) return;

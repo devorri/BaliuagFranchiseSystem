@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
-import { saveApplicationAsync, uploadFileToBucketAsync, recordAuditLogAsync } from '../../services/supabaseService';
-import type { Application, Document, DocumentType } from '../../types';
-import { getRequiredDocuments, TODA_ROUTES, feeForAddress } from '../../services/applicationRules';
+import { saveApplicationAsync, uploadFileToBucketAsync, recordAuditLogAsync, getApplicationsAsync, getFranchisesAsync } from '../../services/supabaseService';
+import type { Application, Document, DocumentType, Franchise } from '../../types';
+import { getRequiredDocuments, TODA_ROUTES, feeForAddress, isActiveApplication, canRenewFranchise, franchiseExpiryDate } from '../../services/applicationRules';
+import { todaKey } from '../../services/todaService';
+import { FRANCHISE_FEES } from '../../services/fees';
+import { nowISO } from '../../services/clock';
 import { analyzeDocumentWithOcr } from '../../services/ocrService';
 import { 
   FileUp, CheckCircle, Loader2, Sparkles, AlertCircle, 
@@ -16,6 +19,7 @@ export function SubmitRequirements() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const applicationType = (searchParams.get('type') === 'renewal' ? 'renewal' : 'new') as 'new' | 'renewal';
+  const renewFranchiseId = searchParams.get('franchise');
 
   const requiredDocuments = useMemo(() => getRequiredDocuments(applicationType), [applicationType]);
 
@@ -38,11 +42,66 @@ export function SubmitRequirements() {
   const [error, setError] = useState('');
   const [ocrSuccessNote, setOcrSuccessNote] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const [checkingExisting, setCheckingExisting] = useState(true);
+  const [activeApplication, setActiveApplication] = useState<Application | null>(null);
+  const [renewFranchise, setRenewFranchise] = useState<Franchise | null>(null);
+  const [renewBlockReason, setRenewBlockReason] = useState<string | null>(null);
+
+  // One submission only: if the operator already has an application in process,
+  // the form is locked. For renewals the franchise must already be expired.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void Promise.all([getApplicationsAsync(), getFranchisesAsync()])
+      .then(([apps, franchises]) => {
+        if (cancelled) return;
+        const mine = apps.filter(app => app.applicantId === user.id);
+        setActiveApplication(mine.find(isActiveApplication) || null);
+
+        // Default TODA = the TODA chosen during registration
+        const registered = Object.keys(TODA_ROUTES).find(name => todaKey(name) === todaKey(user.todaName));
+        if (registered) setForm(prev => ({ ...prev, todaName: registered }));
+
+        if (applicationType === 'renewal') {
+          const owned = franchises.filter(f => f.operatorId === user.id);
+          const target = owned.find(f => f.id === renewFranchiseId) || owned.find(f => canRenewFranchise(f));
+          if (!target) {
+            setRenewBlockReason(owned.length
+              ? 'Your franchise is not yet expired. Renewal is only allowed once the franchise has expired.'
+              : 'You have no registered franchise to renew.');
+          } else if (!canRenewFranchise(target)) {
+            setRenewBlockReason(`Franchise ${target.mtopNumber} is still valid until ${new Date(franchiseExpiryDate(target)).toLocaleDateString()}. Renewal is only allowed once it has expired.`);
+          } else {
+            setRenewFranchise(target);
+            const toda = Object.keys(TODA_ROUTES).find(name => todaKey(name) === todaKey(target.todaName)) || target.todaName;
+            setForm(prev => ({
+              ...prev,
+              driverName: target.driverName || prev.driverName,
+              vehicleMake: target.vehicleMake,
+              vehicleModel: target.vehicleModel,
+              plateNumber: target.plateNumber,
+              motorNumber: target.motorNumber,
+              chassisNumber: target.chassisNumber,
+              vehicleColor: target.vehicleColor,
+              todaName: toda,
+            }));
+          }
+        }
+      })
+      .finally(() => { if (!cancelled) setCheckingExisting(false); });
+    return () => { cancelled = true; };
+  }, [user, applicationType, renewFranchiseId]);
 
   const addressFee = useMemo(() => feeForAddress(user?.address), [user?.address]);
-  const routeArea = TODA_ROUTES[form.todaName] || 'Standard Baliwag Municipal Route';
+  const routeArea = TODA_ROUTES[form.todaName] || renewFranchise?.routeArea || 'Standard Baliwag Municipal Route';
+  const latePenalty = applicationType === 'renewal' && renewFranchise ? FRANCHISE_FEES.expiredFranchisePenalty : 0;
+  const totalFee = addressFee.amount + latePenalty;
+  const formLocked = Boolean(activeApplication) || Boolean(renewBlockReason) || checkingExisting;
   
-  const ready = requiredDocuments.every(doc => files[doc.key]) && 
+  const ready = !formLocked && !submitting &&
+    requiredDocuments.every(doc => files[doc.key]) && 
     !Object.values(uploading).some(Boolean) && 
     !Object.values(scanning).some(Boolean);
 
@@ -133,9 +192,30 @@ export function SubmitRequirements() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!user || !ready) return;
+    if (!user || !ready || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
 
-    const now = new Date().toISOString();
+    // Re-check right before saving so two tabs / double clicks cannot create two applications
+    try {
+      const latest = await getApplicationsAsync();
+      const existing = latest.find(app => app.applicantId === user.id && isActiveApplication(app));
+      const plate = form.plateNumber.trim().toUpperCase();
+      const plateTaken = latest.find(app => isActiveApplication(app) && (app.plateNumber || '').trim().toUpperCase() === plate);
+      if (existing || plateTaken) {
+        setActiveApplication(existing || plateTaken || null);
+        setError(existing
+          ? 'You already submitted an application. Only one submission is allowed while it is being processed.'
+          : `Plate ${form.plateNumber} already has an application in process.`);
+        submittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+    } catch {
+      // continue — save will still work offline
+    }
+
+    const now = nowISO();
     const documents: Document[] = requiredDocuments.map(({ key, title }) => ({
       id: crypto.randomUUID(),
       name: title,
@@ -154,7 +234,10 @@ export function SubmitRequirements() {
       applicantRole: 'operator',
       type: applicationType,
       residency: addressFee.residency,
-      status: 'pending_toda_approval',
+      // Requirements go DIRECTLY to the Municipal Admin for checking.
+      // The TODA President only gives the line endorsement (no requirement checking).
+      status: 'pending_admin_approval',
+      driverId: renewFranchise?.driverId,
       driverName: form.driverName,
       licenseNumber: form.licenseNumber,
       vehicleMake: form.vehicleMake,
@@ -168,8 +251,8 @@ export function SubmitRequirements() {
       documents,
       baseFee: addressFee.amount,
       todaFee: 0,
-      latePenalty: 0,
-      totalFee: addressFee.amount,
+      latePenalty,
+      totalFee,
       submittedAt: now,
       updatedAt: now,
     };
@@ -189,6 +272,8 @@ export function SubmitRequirements() {
       setTimeout(() => navigate('/dashboard'), 1800);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Failed to save application.');
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -209,7 +294,7 @@ export function SubmitRequirements() {
         <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
           {applicationType === 'renewal'
             ? 'Submit the renewal packet for your existing motorized tricycle franchise. Note: Barangay Clearance is waived for franchise renewals.'
-            : 'Operators submit all vehicle specifications and driver requirements. Your application will be endorsed by the TODA President before Municipal Licensing review.'}
+            : 'Operators submit all vehicle specifications and driver requirements. Requirements are checked directly by the Municipal Admin, while your TODA President gives the line endorsement.'}
         </p>
 
         {!isSupabaseConfigured() && (
@@ -228,9 +313,40 @@ export function SubmitRequirements() {
               Application Successfully Submitted!
             </h3>
             <p style={{ color: '#94a3b8', maxWidth: '500px', margin: '0 auto 1.5rem', fontSize: '0.95rem' }}>
-              Your application has been routed to the TODA President for initial line endorsement. Redirecting to your dashboard...
+              Your requirements were sent directly to the Municipal Admin for checking. Redirecting to your dashboard...
             </p>
             <Loader2 size={24} className="spin-icon" style={{ color: '#38bdf8', margin: '0 auto' }} />
+          </div>
+        ) : checkingExisting ? (
+          <div className="glass-panel" style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+            <Loader2 size={24} className="spin-icon" style={{ color: '#38bdf8', margin: '0 auto 0.75rem' }} />
+            Checking your existing applications...
+          </div>
+        ) : activeApplication ? (
+          <div className="glass-panel" style={{ padding: '2.5rem', textAlign: 'center' }}>
+            <ShieldCheck size={40} color="#38bdf8" style={{ margin: '0 auto 1rem' }} />
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem' }}>
+              Application Already Submitted
+            </h3>
+            <p style={{ color: '#94a3b8', maxWidth: '520px', margin: '0 auto 1.25rem', fontSize: '0.92rem', lineHeight: 1.5 }}>
+              Only one submission is allowed. Your {activeApplication.type === 'renewal' ? 'renewal' : 'franchise'} application for plate <strong style={{ color: '#e2e8f0' }}>{activeApplication.plateNumber}</strong> is still being processed. If the Admin rejects a requirement, you can re-upload that file from your dashboard.
+            </p>
+            <button type="button" onClick={() => navigate('/dashboard')} className="btn-glass btn-primary-glass" style={{ padding: '0.7rem 1.4rem' }}>
+              Go to Dashboard
+            </button>
+          </div>
+        ) : renewBlockReason ? (
+          <div className="glass-panel" style={{ padding: '2.5rem', textAlign: 'center' }}>
+            <AlertCircle size={40} color="#f59e0b" style={{ margin: '0 auto 1rem' }} />
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem' }}>
+              Renewal Not Yet Available
+            </h3>
+            <p style={{ color: '#94a3b8', maxWidth: '520px', margin: '0 auto 1.25rem', fontSize: '0.92rem', lineHeight: 1.5 }}>
+              {renewBlockReason}
+            </p>
+            <button type="button" onClick={() => navigate('/dashboard/renewal')} className="btn-glass btn-primary-glass" style={{ padding: '0.7rem 1.4rem' }}>
+              Back to Franchise Renewal
+            </button>
           </div>
         ) : (
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -263,8 +379,11 @@ export function SubmitRequirements() {
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Prescribed Fee</span>
                   <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#38bdf8' }}>
-                    ₱{addressFee.amount.toFixed(2)}
+                    ₱{totalFee.toFixed(2)}
                   </div>
+                  {latePenalty > 0 && (
+                    <div style={{ fontSize: '0.75rem', color: '#f87171' }}>includes ₱{latePenalty.toFixed(2)} expired-franchise penalty</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -572,11 +691,11 @@ export function SubmitRequirements() {
                   cursor: !ready ? 'not-allowed' : 'pointer',
                 }}
               >
-                <FileUp size={20} />
-                Submit Complete Application to TODA President
+                {submitting ? <Loader2 size={20} className="spin-icon" /> : <FileUp size={20} />}
+                {submitting ? 'Submitting...' : 'Submit Complete Application to Municipal Admin'}
               </button>
 
-              {!ready && (
+              {!ready && !submitting && (
                 <p style={{ color: '#94a3b8', fontSize: '0.82rem', textAlign: 'center', margin: 0 }}>
                   Please attach all required official documents above to enable submission.
                 </p>

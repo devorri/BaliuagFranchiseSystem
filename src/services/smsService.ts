@@ -167,9 +167,13 @@ export const SMSTemplates = {
   penaltyIssued: (violationType: string, amount: number, dueDate: string) =>
     `BALIUAG CITY NOTICE: An overdue franchise penalty has been issued for ${violationType} (PHP ${amount.toFixed(2)}). Please settle before ${dueDate} at the City Treasurer's Office. - Baliwag MTOP Office`,
 
-  /** Renewal Reminder */
-  renewalReminder: (mtopNumber: string, expiryDate: string) =>
-    `BALIUAG CITY: Reminder - Your MTOP franchise ${mtopNumber} will expire on ${expiryDate}. Please renew early on the BTTMO portal. - City of Baliwag`,
+  /** Renewal Reminder (sent 30 / 7 / 1 day before expiration) */
+  renewalReminder: (mtopNumber: string, plateNumber: string, expiryDate: string, daysLeft: number) =>
+    `BALIUAG CITY: Reminder - Your MTOP franchise ${mtopNumber} (Plate ${plateNumber}) will expire ${daysLeft <= 0 ? 'TODAY' : `in ${daysLeft} day(s)`} on ${expiryDate}. Renewal opens once the franchise expires. - City of Baliwag`,
+
+  /** Franchise Expired */
+  franchiseExpired: (mtopNumber: string, plateNumber: string, expiryDate: string) =>
+    `BALIUAG CITY: Your MTOP franchise ${mtopNumber} (Plate ${plateNumber}) EXPIRED on ${expiryDate}. Please file your renewal on the portal to avoid further penalties. - City of Baliwag`,
 
   /** Inspection Passed */
   inspectionPassed: (plateNumber: string) =>
@@ -178,4 +182,12 @@ export const SMSTemplates = {
   /** Account Approved */
   accountApproved: (name: string) =>
     `BALIUAG CITY: Welcome, ${name}! Your account in the Tricycle Registration System has been APPROVED. You may now log in to the portal. - City of Baliwag`,
+
+  /** Account Rejected */
+  accountRejected: (name: string, reason?: string) =>
+    `BALIUAG CITY: Hello ${name}, your account registration in the Tricycle Registration System was REJECTED${reason ? ` (Reason: ${reason})` : ''}. Please visit the BTTMO office or register again with a valid ID. - City of Baliwag`,
+
+  /** Application Rejected */
+  applicationRejected: (plateNumber: string, reason?: string) =>
+    `BALIUAG CITY: Your franchise application for plate ${plateNumber} was REJECTED${reason ? ` (Remarks: ${reason})` : ''}. - City of Baliwag`,
 };

@@ -2,65 +2,44 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as supabaseService from '../../services/supabaseService';
 import type { Application, Franchise } from '../../types';
-import { FRANCHISE_FEES, franchiseFeeFor } from '../../services/fees';
-import { feeForAddress } from '../../services/applicationRules';
-import { RefreshCw, CheckCircle2, ArrowRight, ShieldCheck, AlertCircle, FilePlus } from 'lucide-react';
+import { FRANCHISE_FEES } from '../../services/fees';
+import {
+  feeForAddress, canRenewFranchise, franchiseExpiryDate, isActiveApplication, RENEWAL_WINDOW_DAYS,
+} from '../../services/applicationRules';
+import { daysUntil, CLOCK_CHANGED_EVENT } from '../../services/clock';
+import { RefreshCw, ArrowRight, ShieldCheck, AlertCircle, FilePlus, Lock, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function FranchiseRenewal() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [franchises, setFranchises] = useState<Franchise[]>([]);
-  const [renewedId, setRenewedId] = useState<string | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [, setClockTick] = useState(0);
+
+  useEffect(() => {
+    const onClock = () => setClockTick(tick => tick + 1);
+    window.addEventListener(CLOCK_CHANGED_EVENT, onClock);
+    return () => window.removeEventListener(CLOCK_CHANGED_EVENT, onClock);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
-    setLoading(true);
-    void supabaseService.getFranchisesAsync()
-      .then(items => setFranchises(
-        items
-          .filter(item => item.operatorId === user.id)
-          .sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime())
-      ))
+    void Promise.all([supabaseService.getFranchisesAsync(), supabaseService.getApplicationsAsync()])
+      .then(([items, apps]) => {
+        setFranchises(
+          items
+            .filter(item => item.operatorId === user.id)
+            .sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime())
+        );
+        setApplications(apps.filter(app => app.applicantId === user.id));
+      })
       .finally(() => setLoading(false));
   }, [user]);
 
-  const handleInitiateRenewal = async (franchise: Franchise) => {
-    if (!user || renewedId) return;
-    const now = new Date().toISOString();
-    const isExpired = franchise.status === 'expired' || new Date(franchise.expiresAt).getTime() < new Date(now).getTime();
-    const latePenalty = isExpired ? FRANCHISE_FEES.expiredFranchisePenalty : 0;
-    const addressFee = feeForAddress(user.address);
-    const renewal: Application = {
-      id: crypto.randomUUID(),
-      applicantId: user.id,
-      applicantName: `${user.firstName} ${user.lastName}`,
-      applicantRole: 'operator',
-      driverId: franchise.driverId,
-      driverName: franchise.driverName,
-      type: 'renewal',
-      residency: addressFee.residency,
-      status: 'pending_toda_approval',
-      vehicleMake: franchise.vehicleMake,
-      vehicleModel: franchise.vehicleModel,
-      plateNumber: franchise.plateNumber,
-      motorNumber: franchise.motorNumber,
-      chassisNumber: franchise.chassisNumber,
-      vehicleColor: franchise.vehicleColor,
-      todaName: franchise.todaName,
-      routeArea: franchise.routeArea,
-      documents: [],
-      baseFee: franchiseFeeFor(addressFee.residency),
-      todaFee: 0,
-      latePenalty,
-      totalFee: franchiseFeeFor(addressFee.residency) + latePenalty,
-      submittedAt: now,
-      updatedAt: now,
-    };
-    await supabaseService.saveApplicationAsync(renewal, true);
-    setRenewedId(franchise.id);
-  };
+  const baseFee = feeForAddress(user?.address).amount;
+  const pendingApplication = applications.find(isActiveApplication);
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: '960px', margin: '0 auto' }}>
@@ -74,16 +53,27 @@ export function FranchiseRenewal() {
           Franchise Renewal Application
         </h2>
         <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-          Renew your motorized tricycle franchise permit before expiration to avoid late penalties and revocation of MTOP privileges.
+          {RENEWAL_WINDOW_DAYS > 0
+            ? `Renewal opens ${RENEWAL_WINDOW_DAYS} day(s) before your franchise expires.`
+            : 'Renewal opens once your franchise has expired. While your franchise is still valid, renewal is locked.'}{' '}
+          You will receive SMS reminders 30, 7 and 1 day(s) before expiration.
         </p>
 
-        {/* Policy Notice: Barangay Clearance waived */}
         <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '8px', color: '#38bdf8', fontSize: '0.88rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <ShieldCheck size={20} style={{ flexShrink: 0 }} />
           <span>
-            <strong>Policy Update:</strong> Barangay Clearance is <strong>waived</strong> for franchise renewals. Only updated OR/CR, Driver's License, TODA Endorsement, and 2x2 Photo are required.
+            <strong>Policy:</strong> Barangay Clearance is <strong>waived</strong> for renewals. Only updated OR/CR, Driver's License and 2x2 Photo are required. An expired franchise carries a ₱{FRANCHISE_FEES.expiredFranchisePenalty} penalty.
           </span>
         </div>
+
+        {pendingApplication && (
+          <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', color: '#fbbf24', fontSize: '0.88rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Clock size={20} style={{ flexShrink: 0 }} />
+            <span>
+              You already have an application in process (Plate <strong>{pendingApplication.plateNumber}</strong>). Only one submission is allowed at a time.
+            </span>
+          </div>
+        )}
 
         {loading ? (
           <div className="glass-panel" style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
@@ -96,7 +86,7 @@ export function FranchiseRenewal() {
               No Existing Franchises Found
             </h3>
             <p style={{ color: '#94a3b8', maxWidth: '500px', margin: '0 auto 1.5rem', fontSize: '0.9rem' }}>
-              You do not currently have any active or expired franchises registered under your account. To obtain a franchise, please submit a new application.
+              You do not currently have any franchise registered under your account. To obtain a franchise, please submit a new application.
             </p>
             <button
               onClick={() => navigate('/dashboard/requirements')}
@@ -109,7 +99,13 @@ export function FranchiseRenewal() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {franchises.map(f => {
-              const isExpired = f.status === 'expired' || new Date(f.expiresAt).getTime() < Date.now();
+              const expiry = franchiseExpiryDate(f);
+              const daysLeft = daysUntil(expiry);
+              const isExpired = daysLeft < 0;
+              const renewable = canRenewFranchise(f);
+              const hasPendingForUnit = applications.some(app => isActiveApplication(app) && app.plateNumber === f.plateNumber);
+              const blocked = !renewable || Boolean(pendingApplication);
+
               return (
                 <div key={f.id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
@@ -117,8 +113,8 @@ export function FranchiseRenewal() {
                       <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#38bdf8', margin: 0 }}>
                         {f.mtopNumber}
                       </h3>
-                      <span className={isExpired ? 'pill-badge pill-rejected' : 'pill-badge pill-approved'}>
-                        {isExpired ? 'EXPIRED' : 'ACTIVE'}
+                      <span className={isExpired ? 'pill-badge pill-rejected' : daysLeft <= 30 ? 'pill-badge pill-pending' : 'pill-badge pill-approved'}>
+                        {isExpired ? 'EXPIRED' : daysLeft <= 30 ? `EXPIRES IN ${daysLeft} DAY(S)` : 'ACTIVE'}
                       </span>
                     </div>
 
@@ -127,33 +123,39 @@ export function FranchiseRenewal() {
                     </div>
 
                     <p style={{ fontSize: '0.8rem', color: isExpired ? '#f87171' : '#cbd5e1', marginTop: '0.35rem', margin: 0 }}>
-                      Expiration Date: <strong>{new Date(f.expiresAt).toLocaleDateString()}</strong>
-                      {isExpired && ' (Subject to ₱125 expired penalty fee)'}
+                      Expiration Date: <strong>{new Date(expiry).toLocaleDateString()}</strong>
+                      {isExpired && ` (Subject to ₱${FRANCHISE_FEES.expiredFranchisePenalty} expired penalty fee)`}
                     </p>
                   </div>
 
-                  <div>
-                    {renewedId === f.id ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
-                        <span className="pill-badge pill-approved" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <CheckCircle2 size={16} /> Renewal Initiated
-                        </span>
+                  <div style={{ textAlign: 'right' }}>
+                    {hasPendingForUnit ? (
+                      <span className="pill-badge pill-pending">Renewal in process</span>
+                    ) : blocked ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
                         <button
-                          onClick={() => navigate('/dashboard/requirements?type=renewal')}
-                          className="btn-glass btn-emerald-glass"
-                          style={{ fontSize: '0.85rem', padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                          type="button"
+                          disabled
+                          className="btn-glass"
+                          style={{ padding: '0.7rem 1.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', opacity: 0.55, cursor: 'not-allowed' }}
                         >
-                          Submit Renewal Documents <ArrowRight size={15} />
+                          <Lock size={16} /> Renewal Locked
                         </button>
+                        {!renewable && (
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                            Still valid — renewal opens after {new Date(expiry).toLocaleDateString()}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <button
-                        onClick={() => void handleInitiateRenewal(f)}
+                        onClick={() => navigate(`/dashboard/requirements?type=renewal&franchise=${f.id}`)}
                         className="btn-glass btn-orange-glass"
                         style={{ padding: '0.7rem 1.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
                       >
                         <RefreshCw size={18} />
-                        <span>Start Renewal (₱450{isExpired ? ' + ₱125 penalty' : ''})</span>
+                        <span>Renew (₱{baseFee}{isExpired ? ` + ₱${FRANCHISE_FEES.expiredFranchisePenalty} penalty` : ''})</span>
+                        <ArrowRight size={15} />
                       </button>
                     )}
                   </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { daysUntil } from '../../services/clock';
 import { useAuth } from '../../context/AuthContext';
 import * as supabaseService from '../../services/supabaseService';
 import type { Application, Document, Franchise, SMSNotification, User } from '../../types';
@@ -177,7 +178,7 @@ export function OperatorDashboard() {
       case 'pending_toda_approval':
         return <span className="pill-badge pill-pending">Pending TODA Endorsement</span>;
       case 'pending_admin_approval':
-        return <span className="pill-badge pill-pending">Pending Final Admin Review</span>;
+        return <span className="pill-badge pill-pending">Under Admin Review (Requirements / Stencil / Payment)</span>;
       default:
         return <span className="pill-badge pill-pending">{(status as string).replace(/_/g, ' ').toUpperCase()}</span>;
     }
@@ -589,7 +590,15 @@ export function OperatorDashboard() {
                       </td>
                       <td>{f.plateNumber}</td>
                       <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
-                        {new Date(f.expiresAt).toLocaleDateString()}
+                        {new Date(f.endDate || f.expiresAt).toLocaleDateString()}
+                        {(() => {
+                          const left = daysUntil(f.endDate || f.expiresAt);
+                          return (
+                            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: left < 0 ? '#f87171' : left <= 30 ? '#fbbf24' : '#4ade80' }}>
+                              {left < 0 ? `Expired ${Math.abs(left)} day(s) ago` : left === 0 ? 'Expires today' : `${left} day(s) left`}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td>
                         <span className={`pill-badge ${f.status === 'active' ? 'pill-approved' : 'pill-rejected'}`}>
