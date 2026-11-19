@@ -6,11 +6,12 @@ import {
   Printer, FileText, Eye, X, TrendingUp, Wallet, 
   Landmark, Scale, Download, CheckCircle2, 
   ShieldCheck, Receipt, Calendar, PieChart, Search,
-  AlertTriangle, Clock, CalendarClock, AlertCircle, Coins, Send
+  AlertTriangle, Clock, CalendarClock, AlertCircle, Coins, Send, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { sendSMS } from '../../services/smsService';
 import { nowMs as systemNowMs } from '../../services/clock';
 import { TodaMasterlistReport } from '../../components/reports/TodaMasterlistReport';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 
 export function Reports() {
   const [applications, setApplications] = useState<Application[]>([]);
@@ -24,6 +25,16 @@ export function Reports() {
   const [unpaidTab, setUnpaidTab] = useState<'apps' | 'penalties'>('apps');
   const [smsSendingId, setSmsSendingId] = useState<string | null>(null);
   const [smsSentNotice, setSmsSentNotice] = useState<string | null>(null);
+  const [todaCompliancePage, setTodaCompliancePage] = useState(1);
+  const [unpaidAppsPage, setUnpaidAppsPage] = useState(1);
+  const [unpaidPenaltiesPage, setUnpaidPenaltiesPage] = useState(1);
+  const [renewalsPage, setRenewalsPage] = useState(1);
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [isTodaComplianceFolded, setIsTodaComplianceFolded] = useState(false);
+  const [isUnpaidFolded, setIsUnpaidFolded] = useState(false);
+  const [isRenewalsFolded, setIsRenewalsFolded] = useState(false);
+  const [isLedgerFolded, setIsLedgerFolded] = useState(false);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     async function loadData() {
@@ -207,7 +218,6 @@ export function Reports() {
     t.name.toLowerCase().includes(searchToda.toLowerCase()) || 
     t.code.toLowerCase().includes(searchToda.toLowerCase())
   );
-  const bastodaMembers = franchises.filter(franchise => (franchise.todaName || '').toUpperCase().includes('BASTODA'));
 
   const currentDateStr = new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -305,14 +315,6 @@ export function Reports() {
             Official Data Certified as of <strong>{currentDateStr}</strong>
           </div>
         </div>
-      </div>
-
-      <div className="glass-container no-print" style={{ padding: '1.75rem' }}>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>BASTODA roster ({bastodaMembers.length})</h3>
-        <p style={{ color: '#94a3b8', fontSize: '.85rem', margin: '.35rem 0 1rem' }}>Printable roster of all franchise holders and drivers assigned to BASTODA.</p>
-        <div className="glass-table-wrapper"><table className="glass-table"><thead><tr><th>MTOP No.</th><th>Operator</th><th>Driver</th><th>Plate</th><th>Status</th></tr></thead><tbody>
-          {bastodaMembers.length === 0 ? <tr><td colSpan={5} style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8' }}>No BASTODA franchises recorded.</td></tr> : bastodaMembers.map(item => <tr key={item.id}><td>{item.mtopNumber}</td><td>{item.operatorName}</td><td>{item.driverName}</td><td>{item.plateNumber}</td><td>{item.status.toUpperCase()}</td></tr>)}
-        </tbody></table></div>
       </div>
 
       {/* TODA MASTERLIST (Operators / Drivers / POS per TODA — printable) */}
@@ -592,78 +594,100 @@ export function Reports() {
 
       {/* TODA ASSOCIATION COMPLIANCE MATRIX TABLE (Dynamically Computed & Searchable) */}
       <div className="glass-container no-print" style={{ padding: '1.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isTodaComplianceFolded ? 0 : '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>
-              TODA Association Compliance & Franchise Statistics
+              TODA Association Compliance & Franchise Statistics ({todaStats.length})
             </h3>
             <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '0.2rem' }}>
               Official line compliance rating and revenue attribution per registered association.
             </p>
           </div>
 
-          <div style={{ position: 'relative', width: '260px' }}>
-            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              className="glass-input"
-              style={{ paddingLeft: '2.4rem', paddingRight: '0.75rem', fontSize: '0.85rem', width: '100%' }}
-              placeholder="Search TODA line..."
-              value={searchToda}
-              onChange={e => setSearchToda(e.target.value)}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            {!isTodaComplianceFolded && (
+              <div style={{ position: 'relative', width: '240px' }}>
+                <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  className="glass-input"
+                  style={{ paddingLeft: '2.4rem', paddingRight: '0.75rem', fontSize: '0.85rem', width: '100%' }}
+                  placeholder="Search TODA line..."
+                  value={searchToda}
+                  onChange={e => { setSearchToda(e.target.value); setTodaCompliancePage(1); }}
+                />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsTodaComplianceFolded(!isTodaComplianceFolded)}
+              className="btn-glass"
+              style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', color: '#38bdf8' }}
+            >
+              {isTodaComplianceFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+            </button>
           </div>
         </div>
 
-        <div className="glass-table-wrapper">
-          <table className="glass-table">
-            <thead>
-              <tr>
-                <th>TODA Association</th>
-                <th>Route Line Code</th>
-                <th>Active Franchises</th>
-                <th>Expired Units</th>
-                <th>Estimated Distribution</th>
-                <th style={{ textAlign: 'right' }}>Compliance Rating</th>
-              </tr>
-            </thead>
-            <tbody>
-              {todaStats.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                    No TODA associations match your search query.
-                  </td>
-                </tr>
-              ) : (
-                todaStats.map((row, idx) => (
-                  <tr key={idx}>
-                    <td style={{ fontWeight: 700, color: '#ffffff' }}>
-                      {row.name}
-                    </td>
-                    <td>
-                      <span className="pill-badge pill-purple" style={{ fontSize: '0.75rem' }}>{row.code}</span>
-                    </td>
-                    <td style={{ color: '#22c55e', fontWeight: 700 }}>{row.activeUnits}</td>
-                    <td style={{ color: row.expiredUnits > 0 ? '#fb7185' : '#94a3b8', fontWeight: 700 }}>
-                      {row.expiredUnits}
-                    </td>
-                    <td style={{ fontWeight: 600, color: '#cbd5e1' }}>
-                      ₱{row.revenueEstimate.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <span className={`pill-badge ${row.ratingClass}`}>{row.complianceRating}</span>
-                    </td>
+        {!isTodaComplianceFolded && (
+          <>
+            <div className="glass-table-wrapper">
+              <table className="glass-table">
+                <thead>
+                  <tr>
+                    <th>TODA Association</th>
+                    <th>Route Line Code</th>
+                    <th>Active Franchises</th>
+                    <th>Expired Units</th>
+                    <th>Estimated Distribution</th>
+                    <th style={{ textAlign: 'right' }}>Compliance Rating</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {todaStats.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                        No TODA associations match your search query.
+                      </td>
+                    </tr>
+                  ) : (
+                    todaStats.slice((todaCompliancePage - 1) * PAGE_SIZE, todaCompliancePage * PAGE_SIZE).map((row, idx) => (
+                      <tr key={idx}>
+                        <td style={{ fontWeight: 700, color: '#ffffff' }}>
+                          {row.name}
+                        </td>
+                        <td>
+                          <span className="pill-badge pill-purple" style={{ fontSize: '0.75rem' }}>{row.code}</span>
+                        </td>
+                        <td style={{ color: '#22c55e', fontWeight: 700 }}>{row.activeUnits}</td>
+                        <td style={{ color: row.expiredUnits > 0 ? '#fb7185' : '#94a3b8', fontWeight: 700 }}>
+                          {row.expiredUnits}
+                        </td>
+                        <td style={{ fontWeight: 600, color: '#cbd5e1' }}>
+                          ₱{row.revenueEstimate.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <span className={`pill-badge ${row.ratingClass}`}>{row.complianceRating}</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              currentPage={todaCompliancePage}
+              totalItems={todaStats.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setTodaCompliancePage}
+            />
+          </>
+        )}
       </div>
 
       {/* MODULE 9: DEDICATED UNPAID FEES & MUNICIPAL RECEIVABLES REPORT */}
       <div className="glass-container no-print" style={{ padding: '1.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: isUnpaidFolded ? 0 : '1.5rem', borderBottom: isUnpaidFolded ? 'none' : '1px solid rgba(255,255,255,0.08)', paddingBottom: isUnpaidFolded ? 0 : '1.25rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Coins size={20} color="#fbbf24" />
@@ -677,201 +701,231 @@ export function Reports() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.25)', padding: '0.3rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.25)', padding: '0.3rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button
+                type="button"
+                onClick={() => { setUnpaidTab('apps'); setIsUnpaidFolded(false); }}
+                style={{
+                  padding: '0.45rem 0.95rem',
+                  borderRadius: '7px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  background: unpaidTab === 'apps' ? '#f59e0b' : 'transparent',
+                  color: unpaidTab === 'apps' ? '#ffffff' : '#94a3b8',
+                  border: 'none',
+                }}
+              >
+                Unpaid Applications ({unpaidApplications.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setUnpaidTab('penalties'); setIsUnpaidFolded(false); }}
+                style={{
+                  padding: '0.45rem 0.95rem',
+                  borderRadius: '7px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  background: unpaidTab === 'penalties' ? '#ef4444' : 'transparent',
+                  color: unpaidTab === 'penalties' ? '#ffffff' : '#94a3b8',
+                  border: 'none',
+                }}
+              >
+                Overdue Penalties ({unpaidPenalties.length})
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => setUnpaidTab('apps')}
-              style={{
-                padding: '0.45rem 0.95rem',
-                borderRadius: '7px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                background: unpaidTab === 'apps' ? '#f59e0b' : 'transparent',
-                color: unpaidTab === 'apps' ? '#ffffff' : '#94a3b8',
-                border: 'none',
-              }}
+              onClick={() => setIsUnpaidFolded(!isUnpaidFolded)}
+              className="btn-glass"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', color: '#38bdf8' }}
             >
-              Unpaid Applications ({unpaidApplications.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setUnpaidTab('penalties')}
-              style={{
-                padding: '0.45rem 0.95rem',
-                borderRadius: '7px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                background: unpaidTab === 'penalties' ? '#ef4444' : 'transparent',
-                color: unpaidTab === 'penalties' ? '#ffffff' : '#94a3b8',
-                border: 'none',
-              }}
-            >
-              Overdue Penalties ({unpaidPenalties.length})
+              {isUnpaidFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
             </button>
           </div>
         </div>
 
-        {/* Receivables Metric Strip */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-          <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f59e0b' }}>
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Total Outstanding Receivables</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24', marginTop: '0.2rem' }}>
-              ₱{totalOutstandingReceivables.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {!isUnpaidFolded && (
+          <>
+            {/* Receivables Metric Strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f59e0b' }}>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Total Outstanding Receivables</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24', marginTop: '0.2rem' }}>
+                  ₱{totalOutstandingReceivables.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Consolidated uncollected revenue</span>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #38bdf8' }}>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Unpaid Franchise Assessments</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8', marginTop: '0.2rem' }}>
+                  ₱{totalUnpaidAppFees.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{unpaidApplications.length} applications awaiting payment</span>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f87171' }}>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Outstanding Traffic Fines</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f87171', marginTop: '0.2rem' }}>
+                  ₱{totalUnpaidPenaltyFees.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{unpaidPenalties.length} unsettled citations</span>
+              </div>
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Consolidated uncollected revenue</span>
-          </div>
 
-          <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #38bdf8' }}>
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Unpaid Franchise Assessments</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8', marginTop: '0.2rem' }}>
-              ₱{totalUnpaidAppFees.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{unpaidApplications.length} applications awaiting payment</span>
-          </div>
+            {/* Tab Content: Unpaid Applications Table */}
+            {unpaidTab === 'apps' && (
+              <>
+                <div className="glass-table-wrapper">
+                  <table className="glass-table">
+                    <thead>
+                      <tr>
+                        <th>Applicant / Operator</th>
+                        <th>Plate / Body No. (MTOP)</th>
+                        <th>TODA Route Line</th>
+                        <th>Residency Tier</th>
+                        <th>Date Submitted</th>
+                        <th>Assessed Fee</th>
+                        <th style={{ textAlign: 'right' }}>Payment Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unpaidApplications.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                            No unpaid applications on record. All applicant fees are settled!
+                          </td>
+                        </tr>
+                      ) : (
+                        unpaidApplications.slice((unpaidAppsPage - 1) * PAGE_SIZE, unpaidAppsPage * PAGE_SIZE).map(app => (
+                          <tr key={app.id}>
+                            <td style={{ fontWeight: 700, color: '#ffffff' }}>
+                              {app.applicantName}
+                            </td>
+                            <td>
+                              <span style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>
+                                {app.plateNumber}
+                              </span>
+                              {app.bodyNumber && <small style={{ color: '#94a3b8', marginLeft: '0.4rem' }}>({app.bodyNumber})</small>}
+                            </td>
+                            <td>
+                              <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
+                                {app.todaName ? app.todaName.split(' ')[0] : 'BASTODA'}
+                              </span>
+                            </td>
+                            <td style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>
+                              {app.residency === 'baliwag_resident' ? 'Baliwag Resident (₱450)' : 'Non-Resident (₱550)'}
+                            </td>
+                            <td style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
+                              {new Date(app.submittedAt).toLocaleDateString()}
+                            </td>
+                            <td style={{ fontWeight: 800, color: '#fbbf24' }}>
+                              ₱{(app.totalFee || app.baseFee || 450).toFixed(2)}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <span className="pill-badge pill-orange">
+                                <Clock size={11} /> UNPAID
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <PaginationBar
+                  currentPage={unpaidAppsPage}
+                  totalItems={unpaidApplications.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setUnpaidAppsPage}
+                />
+              </>
+            )}
 
-          <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f87171' }}>
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Outstanding Traffic Fines</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f87171', marginTop: '0.2rem' }}>
-              ₱{totalUnpaidPenaltyFees.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{unpaidPenalties.length} unsettled citations</span>
-          </div>
-        </div>
-
-        {/* Tab Content: Unpaid Applications Table */}
-        {unpaidTab === 'apps' && (
-          <div className="glass-table-wrapper">
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Applicant / Operator</th>
-                  <th>Plate / Body No. (MTOP)</th>
-                  <th>TODA Route Line</th>
-                  <th>Residency Tier</th>
-                  <th>Date Submitted</th>
-                  <th>Assessed Fee</th>
-                  <th style={{ textAlign: 'right' }}>Payment Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unpaidApplications.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                      No unpaid applications on record. All applicant fees are settled!
-                    </td>
-                  </tr>
-                ) : (
-                  unpaidApplications.map(app => (
-                    <tr key={app.id}>
-                      <td style={{ fontWeight: 700, color: '#ffffff' }}>
-                        {app.applicantName}
-                      </td>
-                      <td>
-                        <span style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>
-                          {app.plateNumber}
-                        </span>
-                        {app.bodyNumber && <small style={{ color: '#94a3b8', marginLeft: '0.4rem' }}>({app.bodyNumber})</small>}
-                      </td>
-                      <td>
-                        <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
-                          {app.todaName ? app.todaName.split(' ')[0] : 'BASTODA'}
-                        </span>
-                      </td>
-                      <td style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>
-                        {app.residency === 'baliwag_resident' ? 'Baliwag Resident (₱450)' : 'Non-Resident (₱550)'}
-                      </td>
-                      <td style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
-                        {new Date(app.submittedAt).toLocaleDateString()}
-                      </td>
-                      <td style={{ fontWeight: 800, color: '#fbbf24' }}>
-                        ₱{(app.totalFee || app.baseFee || 450).toFixed(2)}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <span className="pill-badge pill-orange">
-                          <Clock size={11} /> UNPAID
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Tab Content: Unpaid Penalties Table */}
-        {unpaidTab === 'penalties' && (
-          <div className="glass-table-wrapper">
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Penalty ID</th>
-                  <th>Operator / Driver</th>
-                  <th>Plate / Body No.</th>
-                  <th>TODA Line</th>
-                  <th>Penalty Reason</th>
-                  <th>Date Issued</th>
-                  <th>Fine Balance</th>
-                  <th style={{ textAlign: 'right' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unpaidPenalties.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                      No outstanding overdue franchise penalties recorded.
-                    </td>
-                  </tr>
-                ) : (
-                  unpaidPenalties.map(p => (
-                    <tr key={p.id}>
-                      <td style={{ fontFamily: 'monospace', color: '#fb7185', fontWeight: 700 }}>
-                        {p.id.slice(0, 10)}
-                      </td>
-                      <td style={{ fontWeight: 700, color: '#ffffff' }}>
-                        {p.driverName}
-                      </td>
-                      <td>
-                        <span style={{ fontFamily: 'monospace', color: '#38bdf8' }}>{p.plateNumber}</span>
-                      </td>
-                      <td>
-                        <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
-                          {p.todaName || '—'}
-                        </span>
-                      </td>
-                      <td style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>{p.violationType}</td>
-                      <td style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
-                        {new Date(p.issuedDate).toLocaleDateString()}
-                      </td>
-                      <td style={{ fontWeight: 800, color: '#f87171' }}>
-                        ₱{p.amount.toFixed(2)}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <span className="pill-badge pill-rose">
-                          <AlertTriangle size={11} /> UNSETTLED
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+            {/* Tab Content: Unpaid Penalties Table */}
+            {unpaidTab === 'penalties' && (
+              <>
+                <div className="glass-table-wrapper">
+                  <table className="glass-table">
+                    <thead>
+                      <tr>
+                        <th>Penalty ID</th>
+                        <th>Operator / Driver</th>
+                        <th>Plate / Body No.</th>
+                        <th>TODA Line</th>
+                        <th>Penalty Reason</th>
+                        <th>Date Issued</th>
+                        <th>Fine Balance</th>
+                        <th style={{ textAlign: 'right' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unpaidPenalties.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                            No outstanding overdue franchise penalties recorded.
+                          </td>
+                        </tr>
+                      ) : (
+                        unpaidPenalties.slice((unpaidPenaltiesPage - 1) * PAGE_SIZE, unpaidPenaltiesPage * PAGE_SIZE).map(p => (
+                          <tr key={p.id}>
+                            <td style={{ fontFamily: 'monospace', color: '#fb7185', fontWeight: 700 }}>
+                              {p.id.slice(0, 10)}
+                            </td>
+                            <td style={{ fontWeight: 700, color: '#ffffff' }}>
+                              {p.driverName}
+                            </td>
+                            <td>
+                              <span style={{ fontFamily: 'monospace', color: '#38bdf8' }}>{p.plateNumber}</span>
+                            </td>
+                            <td>
+                              <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
+                                {p.todaName || '—'}
+                              </span>
+                            </td>
+                            <td style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>{p.violationType}</td>
+                            <td style={{ color: '#94a3b8', fontSize: '0.82rem' }}>
+                              {new Date(p.issuedDate).toLocaleDateString()}
+                            </td>
+                            <td style={{ fontWeight: 800, color: '#f87171' }}>
+                              ₱{p.amount.toFixed(2)}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <span className="pill-badge pill-rose">
+                                <AlertTriangle size={11} /> UNSETTLED
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <PaginationBar
+                  currentPage={unpaidPenaltiesPage}
+                  totalItems={unpaidPenalties.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setUnpaidPenaltiesPage}
+                />
+              </>
+            )}
+          </>
         )}
       </div>
 
       {/* MODULE 9: DEDICATED FRANCHISE RENEWALS & EXPIRATION SCHEDULE REPORT */}
       <div className="glass-container no-print" style={{ padding: '1.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: isRenewalsFolded ? 0 : '1.5rem', borderBottom: isRenewalsFolded ? 'none' : '1px solid rgba(255,255,255,0.08)', paddingBottom: isRenewalsFolded ? 0 : '1.25rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <CalendarClock size={20} color="#a855f7" />
               <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#ffffff' }}>
-                Franchise Renewals & Expiration Schedule
+                Franchise Renewals & Expiration Schedule ({franchises.length})
               </h3>
               <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>30-Day Window Monitored</span>
             </div>
@@ -880,141 +934,161 @@ export function Reports() {
             </p>
           </div>
 
-          {smsSentNotice && (
-            <div style={{ padding: '0.5rem 1rem', background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.4)', borderRadius: '8px', color: '#4ade80', fontSize: '0.82rem', fontWeight: 600 }}>
-              {smsSentNotice}
-            </div>
-          )}
-        </div>
-
-        {/* Renewal Metrics */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-          <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #facc15' }}>
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Expiring Soon (Next 30 Days)</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#facc15', marginTop: '0.2rem' }}>
-              {expiringSoonFranchises.length} Units
-            </div>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Within official renewal window</span>
-          </div>
-
-          <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f43f5e' }}>
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Expired / Overdue Units</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fb7185', marginTop: '0.2rem' }}>
-              {overdueExpiredFranchises.length} Units
-            </div>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Subject to late penalty assessment</span>
-          </div>
-
-          <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #4ade80' }}>
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Active Renewal Filings</span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80', marginTop: '0.2rem' }}>
-              {renewalApplications.length} Submitted
-            </div>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Operators renewing in system</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            {smsSentNotice && (
+              <div style={{ padding: '0.5rem 1rem', background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.4)', borderRadius: '8px', color: '#4ade80', fontSize: '0.82rem', fontWeight: 600 }}>
+                {smsSentNotice}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsRenewalsFolded(!isRenewalsFolded)}
+              className="btn-glass"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', color: '#38bdf8' }}
+            >
+              {isRenewalsFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+            </button>
           </div>
         </div>
 
-        {/* Renewals Table */}
-        <div className="glass-table-wrapper">
-          <table className="glass-table">
-            <thead>
-              <tr>
-                <th>MTOP / Body No.</th>
-                <th>Operator Name</th>
-                <th>Driver & Contact</th>
-                <th>TODA Route Line</th>
-                <th>Plate Number</th>
-                <th>Validity Expiry</th>
-                <th>Renewal Status</th>
-                <th style={{ textAlign: 'right' }}>Officer Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {franchises.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                    No franchise renewal records available.
-                  </td>
-                </tr>
-              ) : (
-                franchises.map(f => {
-                  const expDate = f.expiresAt || f.endDate || '';
-                  const expiresAtMs = new Date(expDate).getTime();
-                  const isExpired = expiresAtMs < nowMs || f.status === 'expired';
-                  const isExpiringSoon = !isExpired && expiresAtMs - nowMs <= thirtyDaysMs;
-                  const daysRemaining = Math.ceil((expiresAtMs - nowMs) / (1000 * 60 * 60 * 24));
+        {!isRenewalsFolded && (
+          <>
+            {/* Renewal Metrics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #facc15' }}>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Expiring Soon (Next 30 Days)</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#facc15', marginTop: '0.2rem' }}>
+                  {expiringSoonFranchises.length} Units
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Within official renewal window</span>
+              </div>
 
-                  return (
-                    <tr key={f.id}>
-                      <td style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 800, fontSize: '0.92rem' }}>
-                        {f.mtopNumber || f.id.slice(0, 8)}
-                      </td>
-                      <td style={{ fontWeight: 700, color: '#ffffff' }}>
-                        {f.operatorName}
-                      </td>
-                      <td>
-                        <div style={{ color: '#cbd5e1' }}>{f.driverName || '—'}</div>
-                      </td>
-                      <td>
-                        <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
-                          {f.todaName || 'BASTODA'}
-                        </span>
-                      </td>
-                      <td style={{ fontFamily: 'monospace', color: '#e2e8f0' }}>
-                        {f.plateNumber}
-                      </td>
-                      <td style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>
-                        {expDate ? new Date(expDate).toLocaleDateString() : '—'}
-                      </td>
-                      <td>
-                        {isExpired ? (
-                          <span className="pill-badge pill-rose">
-                            <AlertCircle size={11} /> EXPIRED ({Math.abs(daysRemaining)}d ago)
-                          </span>
-                        ) : isExpiringSoon ? (
-                          <span className="pill-badge pill-orange">
-                            <Clock size={11} /> {daysRemaining} DAYS LEFT
-                          </span>
-                        ) : (
-                          <span className="pill-badge pill-emerald">
-                            ACTIVE ({daysRemaining}d)
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleSendRenewalReminder(f)}
-                          disabled={smsSendingId === f.id}
-                          className="btn-glass"
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            fontSize: '0.78rem',
-                            color: isExpired || isExpiringSoon ? '#38bdf8' : '#94a3b8',
-                            borderColor: isExpired || isExpiringSoon ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255,255,255,0.1)'
-                          }}
-                          title="Send SMS notification alert to operator"
-                        >
-                          <Send size={12} /> {smsSendingId === f.id ? 'Sending...' : 'SMS Notice'}
-                        </button>
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f43f5e' }}>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Expired / Overdue Units</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fb7185', marginTop: '0.2rem' }}>
+                  {overdueExpiredFranchises.length} Units
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Subject to late penalty assessment</span>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #4ade80' }}>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Active Renewal Filings</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80', marginTop: '0.2rem' }}>
+                  {renewalApplications.length} Submitted
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Operators renewing in system</span>
+              </div>
+            </div>
+
+            {/* Renewals Table */}
+            <div className="glass-table-wrapper">
+              <table className="glass-table">
+                <thead>
+                  <tr>
+                    <th>MTOP / Body No.</th>
+                    <th>Operator Name</th>
+                    <th>Driver & Contact</th>
+                    <th>TODA Route Line</th>
+                    <th>Plate Number</th>
+                    <th>Validity Expiry</th>
+                    <th>Renewal Status</th>
+                    <th style={{ textAlign: 'right' }}>Officer Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {franchises.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                        No franchise renewal records available.
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  ) : (
+                    franchises.slice((renewalsPage - 1) * PAGE_SIZE, renewalsPage * PAGE_SIZE).map(f => {
+                      const expDate = f.expiresAt || f.endDate || '';
+                      const expiresAtMs = new Date(expDate).getTime();
+                      const isExpired = expiresAtMs < nowMs || f.status === 'expired';
+                      const isExpiringSoon = !isExpired && expiresAtMs - nowMs <= thirtyDaysMs;
+                      const daysRemaining = Math.ceil((expiresAtMs - nowMs) / (1000 * 60 * 60 * 24));
+
+                      return (
+                        <tr key={f.id}>
+                          <td style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 800, fontSize: '0.92rem' }}>
+                            {f.mtopNumber || f.id.slice(0, 8)}
+                          </td>
+                          <td style={{ fontWeight: 700, color: '#ffffff' }}>
+                            {f.operatorName}
+                          </td>
+                          <td>
+                            <div style={{ color: '#cbd5e1' }}>{f.driverName || '—'}</div>
+                          </td>
+                          <td>
+                            <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
+                              {f.todaName || 'BASTODA'}
+                            </span>
+                          </td>
+                          <td style={{ fontFamily: 'monospace', color: '#e2e8f0' }}>
+                            {f.plateNumber}
+                          </td>
+                          <td style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>
+                            {expDate ? new Date(expDate).toLocaleDateString() : '—'}
+                          </td>
+                          <td>
+                            {isExpired ? (
+                              <span className="pill-badge pill-rose">
+                                <AlertCircle size={11} /> EXPIRED ({Math.abs(daysRemaining)}d ago)
+                              </span>
+                            ) : isExpiringSoon ? (
+                              <span className="pill-badge pill-orange">
+                                <Clock size={11} /> {daysRemaining} DAYS LEFT
+                              </span>
+                            ) : (
+                              <span className="pill-badge pill-emerald">
+                                ACTIVE ({daysRemaining}d)
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleSendRenewalReminder(f)}
+                              disabled={smsSendingId === f.id}
+                              className="btn-glass"
+                              style={{
+                                padding: '0.35rem 0.75rem',
+                                fontSize: '0.78rem',
+                                color: isExpired || isExpiringSoon ? '#38bdf8' : '#94a3b8',
+                                borderColor: isExpired || isExpiringSoon ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255,255,255,0.1)'
+                              }}
+                              title="Send SMS notification alert to operator"
+                            >
+                              <Send size={12} /> {smsSendingId === f.id ? 'Sending...' : 'SMS Notice'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              currentPage={renewalsPage}
+              totalItems={franchises.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setRenewalsPage}
+            />
+          </>
+        )}
       </div>
 
       {/* RECENT TRANSACTION & AUDIT LEDGER */}
       <div className="glass-container no-print" style={{ padding: '1.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isLedgerFolded ? 0 : '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Receipt size={18} color="#34d399" />
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>
-                Audited Fee Collections & Transactions Ledger
+                Audited Fee Collections & Transactions Ledger ({transactionRows.length})
               </h3>
             </div>
             <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '0.2rem' }}>
@@ -1022,73 +1096,93 @@ export function Reports() {
             </p>
           </div>
 
-          <button onClick={handleExportCSV} className="btn-glass" style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem' }}>
-            <Download size={15} /> Export Audit Log
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <button onClick={handleExportCSV} className="btn-glass" style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem' }}>
+              <Download size={15} /> Export Audit Log
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsLedgerFolded(!isLedgerFolded)}
+              className="btn-glass"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', color: '#38bdf8' }}
+            >
+              {isLedgerFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+            </button>
+          </div>
         </div>
 
-        <div className="glass-table-wrapper">
-          <table className="glass-table">
-            <thead>
-              <tr>
-                <th>Official Receipt (OR)</th>
-                <th>Payer / Driver</th>
-                <th>TODA Route</th>
-                <th>Fee Classification</th>
-                <th>Payment Channel</th>
-                <th>Amount Collected</th>
-                <th style={{ textAlign: 'right' }}>Audit Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactionRows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                    No recorded transactions available at this time.
-                  </td>
-                </tr>
-              ) : (
-                transactionRows.slice(0, 30).map(transaction => (
-                  <tr key={transaction.id}>
-                    <td style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>
-                      {transaction.reference}
-                    </td>
-                    <td style={{ fontWeight: 700, color: '#ffffff' }}>
-                      {transaction.payer}
-                    </td>
-                    <td>
-                      <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
-                        {transaction.toda}
-                      </span>
-                    </td>
-                    <td style={{ color: '#cbd5e1' }}>{transaction.classification}</td>
-                    <td>
-                      <span style={{ 
-                        textTransform: 'uppercase', 
-                        fontSize: '0.75rem', 
-                        fontWeight: 700, 
-                        color: transaction.method.toLowerCase() === 'gcash' ? '#38bdf8' : '#e2e8f0',
-                        background: transaction.method.toLowerCase() === 'gcash' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '6px'
-                      }}>
-                        {transaction.method}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 800, color: '#4ade80' }}>
-                      ₱{transaction.amount.toFixed(2)}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <span className={`pill-badge ${transaction.status === 'completed' || transaction.status === 'paid' ? 'pill-emerald' : transaction.status === 'pending' || transaction.status === 'unpaid' ? 'pill-orange' : 'pill-rose'}`}>
-                        {transaction.status === 'completed' || transaction.status === 'paid' ? <CheckCircle2 size={12} /> : null} {transaction.status.toUpperCase()}
-                      </span>
-                    </td>
+        {!isLedgerFolded && (
+          <>
+            <div className="glass-table-wrapper">
+              <table className="glass-table">
+                <thead>
+                  <tr>
+                    <th>Official Receipt (OR)</th>
+                    <th>Payer / Driver</th>
+                    <th>TODA Route</th>
+                    <th>Fee Classification</th>
+                    <th>Payment Channel</th>
+                    <th>Amount Collected</th>
+                    <th style={{ textAlign: 'right' }}>Audit Status</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {transactionRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                        No recorded transactions available at this time.
+                      </td>
+                    </tr>
+                  ) : (
+                    transactionRows.slice((ledgerPage - 1) * PAGE_SIZE, ledgerPage * PAGE_SIZE).map(transaction => (
+                      <tr key={transaction.id}>
+                        <td style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>
+                          {transaction.reference}
+                        </td>
+                        <td style={{ fontWeight: 700, color: '#ffffff' }}>
+                          {transaction.payer}
+                        </td>
+                        <td>
+                          <span className="pill-badge pill-purple" style={{ fontSize: '0.72rem' }}>
+                            {transaction.toda}
+                          </span>
+                        </td>
+                        <td style={{ color: '#cbd5e1' }}>{transaction.classification}</td>
+                        <td>
+                          <span style={{ 
+                            textTransform: 'uppercase', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 700, 
+                            color: transaction.method.toLowerCase() === 'gcash' ? '#38bdf8' : '#e2e8f0',
+                            background: transaction.method.toLowerCase() === 'gcash' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '6px'
+                          }}>
+                            {transaction.method}
+                          </span>
+                        </td>
+                        <td style={{ fontWeight: 800, color: '#4ade80' }}>
+                          ₱{transaction.amount.toFixed(2)}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <span className={`pill-badge ${transaction.status === 'completed' || transaction.status === 'paid' ? 'pill-emerald' : transaction.status === 'pending' || transaction.status === 'unpaid' ? 'pill-orange' : 'pill-rose'}`}>
+                            {transaction.status === 'completed' || transaction.status === 'paid' ? <CheckCircle2 size={12} /> : null} {transaction.status.toUpperCase()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              currentPage={ledgerPage}
+              totalItems={transactionRows.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setLedgerPage}
+            />
+          </>
+        )}
       </div>
 
       {/* MODAL PREVIEW FOR OFFICIAL PDF DOCUMENT */}
@@ -1515,9 +1609,9 @@ export function Reports() {
         </table>
 
         <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', borderBottom: '1px solid #9ca3af', paddingBottom: '0.35rem', marginBottom: '0.75rem', color: '#111827' }}>
-          VI. BASTODA FRANCHISE ROSTER ({bastodaMembers.length})
+          VI. ALL TODA FRANCHISE ROSTER ({franchises.length})
         </h4>
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem', fontSize: '0.82rem' }}><thead><tr style={{ background: '#f3f4f6' }}><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>MTOP</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Operator</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Driver</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Plate</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Status</th></tr></thead><tbody>{bastodaMembers.map(item => <tr key={item.id}><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.mtopNumber}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.operatorName}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.driverName}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.plateNumber}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.status}</td></tr>)}</tbody></table>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem', fontSize: '0.82rem' }}><thead><tr style={{ background: '#f3f4f6' }}><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>TODA</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>MTOP</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Operator</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Driver</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Plate</th><th style={{ border: '1px solid #374151', padding: '8px', textAlign: 'left' }}>Status</th></tr></thead><tbody>{franchises.map(item => <tr key={item.id}><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.todaName}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.mtopNumber}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.operatorName}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.driverName}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.plateNumber}</td><td style={{ border: '1px solid #374151', padding: '8px' }}>{item.status}</td></tr>)}</tbody></table>
 
         {/* Section VII: Signatures Block */}
         <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', textTransform: 'uppercase', borderBottom: '1px solid #9ca3af', paddingBottom: '0.35rem', marginBottom: '1.5rem', color: '#111827' }}>

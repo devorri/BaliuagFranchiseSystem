@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard, FileText, FilePlus, Shield,
   ChevronLeft, ChevronRight, LogOut, QrCode, AlertTriangle,
   CheckCircle2, BellRing, RefreshCw, BarChart3,
-  Users, Megaphone, Award
+  Users, Megaphone
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -41,7 +42,6 @@ export function Sidebar() {
     { to: '/dashboard/requirements', icon: FilePlus, label: 'Franchise Application' },
     { to: '/dashboard/gcash-payment', icon: QrCode, label: 'GCash QR Payment' },
     { to: '/dashboard/renewal', icon: RefreshCw, label: 'Franchise Renewal' },
-    { to: '/dashboard/certification', icon: Award, label: 'Franchise Certification' },
     { to: '/dashboard/sms-notifications', icon: BellRing, label: 'SMS Notifications' },
   ];
 
@@ -132,11 +132,15 @@ export function Sidebar() {
         </button>
       </div>
 
-      {showLogoutModal && (
-        <div className="modal-overlay animate-fade-in" onClick={() => setShowLogoutModal(false)}>
+      {showLogoutModal && createPortal(
+        <div
+          className="modal-overlay animate-fade-in"
+          style={{ zIndex: 9999 }}
+          onClick={() => setShowLogoutModal(false)}
+        >
           <div
             className="glass-container modal-glass-content"
-            style={{ maxWidth: '420px', padding: '2rem', textAlign: 'center' }}
+            style={{ maxWidth: '420px', padding: '2rem', textAlign: 'center', margin: '0 auto' }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{
@@ -185,7 +189,8 @@ export function Sidebar() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </aside>
   );

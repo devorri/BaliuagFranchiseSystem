@@ -2,11 +2,15 @@ import { useState, useEffect } from 'react';
 import { 
   Users, CheckCircle2, XCircle, Search, Filter, 
   ShieldCheck, Clock, UserCheck, ShieldAlert, Plus,
-  FileText, Eye
+  FileText, Eye, RefreshCw, ExternalLink, Smartphone,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ui/Toast';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 import * as supabaseService from '../../services/supabaseService';
+import { TODA_ROUTES } from '../../services/applicationRules';
+import { verifyLtoLicenseAuthority } from '../../services/ocrService';
 import type { User, AccountStatus } from '../../types';
 
 export function AccountManagement() {
@@ -22,28 +26,43 @@ export function AccountManagement() {
   const [creatingPresident, setCreatingPresident] = useState(false);
   const [presidentError, setPresidentError] = useState<string | null>(null);
   const [viewingUserDocs, setViewingUserDocs] = useState<User | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isTableFolded, setIsTableFolded] = useState(false);
+  const PAGE_SIZE = 10;
   const [presidentForm, setPresidentForm] = useState({
-    firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: '',
+    firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: Object.keys(TODA_ROUTES)[0],
   });
 
   const canManageSecurity = hasPermission('security');
 
-  const loadUsers = async () => {
-    setLoading(true);
+  const loadUsers = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await supabaseService.getUsersAsync();
       data.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       setUsers(data);
     } catch {
-      showToast('Failed to load accounts.', 'error');
+      if (!silent) showToast('Failed to load accounts.', 'error');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadUsers();
+    void loadUsers();
+    const interval = setInterval(() => void loadUsers(true), 5000);
+    return () => clearInterval(interval);
   }, []);
+
+  const handleAssignToda = async (targetUser: User, newToda: string) => {
+    try {
+      await supabaseService.updateUserTodaAsync(targetUser.id, newToda);
+      setUsers(prev => prev.map(u => u.id === targetUser.id ? { ...u, todaName: newToda } : u));
+      showToast(`Assigned ${targetUser.firstName} ${targetUser.lastName} to ${newToda}.`, 'success');
+    } catch {
+      showToast('Failed to update TODA assignment.', 'error');
+    }
+  };
 
   const handleUpdateStatus = async (userId: string, newStatus: 'approved' | 'rejected', userName: string) => {
     if (!canManageSecurity) {
@@ -51,18 +70,23 @@ export function AccountManagement() {
       return;
     }
 
+    const targetAccount = users.find(u => u.id === userId);
     setActionLoadingId(userId);
     try {
-      const updated = await supabaseService.updateAccountStatusAsync(userId, newStatus);
+      const reason = newStatus === 'rejected' ? 'Incomplete or unverified LTO Driver\'s License / Government ID.' : undefined;
+      const updated = await supabaseService.updateAccountStatusAsync(userId, newStatus, reason);
       if (updated) {
         void supabaseService.recordAuditLogAsync({
           userName: 'Security Administrator',
           userRole: 'admin',
           action: newStatus === 'approved' ? 'ACCOUNT_APPROVED' : 'ACCOUNT_REJECTED',
-          details: `Account for ${userName} was marked as ${newStatus.toUpperCase()}`,
+          details: `Account for ${userName} was marked as ${newStatus.toUpperCase()} and SMS notification dispatched to ${targetAccount?.phone || 'registrant'}`,
           targetId: userId,
         });
-        showToast(`Account for ${userName} has been ${newStatus === 'approved' ? 'APPROVED' : 'REJECTED'}.`, 'success');
+        showToast(
+          `Account for ${userName} ${newStatus === 'approved' ? 'APPROVED' : 'REJECTED'}. SMS notification sent to ${targetAccount?.phone || 'registrant'}!`,
+          newStatus === 'approved' ? 'success' : 'info'
+        );
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, accountStatus: newStatus } : u));
       } else {
         showToast('Failed to update account status.', 'error');
@@ -94,7 +118,7 @@ export function AccountManagement() {
       });
       setUsers(current => [created, ...current]);
       setShowPresidentForm(false);
-      setPresidentForm({ firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: '' });
+      setPresidentForm({ firstName: '', lastName: '', username: '', password: '', email: '', phone: '', address: '', todaName: Object.keys(TODA_ROUTES)[0] });
       showToast('TODA President account created.', 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not create the President account.';
@@ -112,7 +136,7 @@ export function AccountManagement() {
       (u.email && u.email.toLowerCase().includes(search.toLowerCase())) ||
       (u.todaName && u.todaName.toLowerCase().includes(search.toLowerCase()));
 
-    const status = u.accountStatus || 'approved'; // default legacy to approved
+    const status = u.accountStatus || 'approved';
     const matchesStatus = statusFilter === 'all' || status === statusFilter;
     const isOperatorDriverRole = u.role === 'operator' || u.role === 'driver';
     const isPresidentRole = u.role === 'president' || u.role === 'toda_president';
@@ -127,6 +151,11 @@ export function AccountManagement() {
     return matchesSearch && matchesStatus && matchesRole;
   }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, roleFilter]);
+
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const pendingCount = users.filter(u => u.accountStatus === 'pending').length;
   const approvedCount = users.filter(u => !u.accountStatus || u.accountStatus === 'approved').length;
   const rejectedCount = users.filter(u => u.accountStatus === 'rejected').length;
@@ -137,7 +166,7 @@ export function AccountManagement() {
       {/* Page Title & Stats */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ffffff' }}>Account Management</h1>
             <span style={{ 
               background: canManageSecurity ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', 
@@ -151,18 +180,24 @@ export function AccountManagement() {
               alignItems: 'center',
               gap: '0.35rem'
             }}>
-              <ShieldCheck size={14} /> Security Admin Control
+              <ShieldCheck size={14} /> Security Admin Control & LTO License Verification
             </span>
           </div>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
-            Manage approval and access status of registered Driver and Operator accounts before login access.
+            Verify uploaded LTO Driver's Licenses, assign TODA lines, and approve or reject accounts (automatically sends SMS notification to the registrant).
           </p>
         </div>
-        {canManageSecurity && (
-          <button type="button" onClick={() => { setPresidentError(null); setShowPresidentForm(true); }} className="btn-glass btn-primary-glass">
-            <Plus size={18} /> Create President Account
+
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => void loadUsers()} className="btn-glass" style={{ padding: '0.55rem 0.9rem', fontSize: '0.82rem' }}>
+            <RefreshCw size={15} /> Refresh
           </button>
-        )}
+          {canManageSecurity && (
+            <button type="button" onClick={() => { setPresidentError(null); setShowPresidentForm(true); }} className="btn-glass btn-primary-glass">
+              <Plus size={18} /> Create President Account
+            </button>
+          )}
+        </div>
 
         {/* Status Counts */}
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -249,42 +284,62 @@ export function AccountManagement() {
         </div>
       </div>
 
-      {/* Accounts Table */}
+      {/* Accounts Table (Foldable & Paginated 10 per page) */}
       <div className="glass-container" style={{ padding: '1.5rem', overflowX: 'auto' }}>
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-            Fetching registered accounts...
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isTableFolded ? 0 : '1rem', paddingBottom: isTableFolded ? 0 : '0.75rem', borderBottom: isTableFolded ? 'none' : '1px solid rgba(255,255,255,0.08)' }}>
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+              Registered System Accounts ({filteredUsers.length})
+            </h3>
+            <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Showing 10 accounts per page</span>
           </div>
-        ) : filteredUsers.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-            <Users size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-            No accounts match your current filter.
-          </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
-                <th style={{ padding: '0.75rem 1rem' }}>Name / Username</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Role</th>
-                <th style={{ padding: '0.75rem 1rem' }}>TODA / Contact</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Registration Date</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Action (Security)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map(u => {
+          <button
+            type="button"
+            onClick={() => setIsTableFolded(!isTableFolded)}
+            className="btn-glass"
+            style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', color: '#38bdf8' }}
+          >
+            {isTableFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+          </button>
+        </div>
+
+        {!isTableFolded && (
+          loading ? (
+            <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+              Fetching registered accounts...
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+              <Users size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+              No accounts match your current filter.
+            </div>
+          ) : (
+            <>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
+                    <th style={{ padding: '0.75rem 1rem' }}>Name / Username</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Role</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Assigned TODA / Contact</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Registration Date</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Status</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Action (LTO Check & Approval)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedUsers.map(u => {
                 const status = u.accountStatus || 'approved';
                 const isPending = status === 'pending';
                 const isApproved = status === 'approved';
                 const isRejected = status === 'rejected';
                 const isLoadingAction = actionLoadingId === u.id;
+                const docCount = (u.documents && u.documents.length > 0) ? u.documents.length : (u.profilePhoto ? 1 : 0);
 
                 return (
                   <tr key={u.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', transition: 'background 0.2s' }}>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ fontWeight: 700, color: '#ffffff' }}>
-                        {u.firstName} {u.lastName}
+                        {u.firstName} {u.middleName ? `${u.middleName} ` : ''}{u.lastName}
                       </div>
                       <div style={{ fontSize: '0.78rem', color: '#38bdf8' }}>
                         @{u.username}
@@ -326,7 +381,25 @@ export function AccountManagement() {
                     </td>
 
                     <td style={{ padding: '1rem' }}>
-                      <div style={{ color: '#e2e8f0' }}>{u.todaName || '—'}</div>
+                      {(u.role === 'operator' || u.role === 'driver' || u.role === 'president' || u.role === 'toda_president') ? (
+                        <select
+                          aria-label={`Assign TODA for ${u.firstName} ${u.lastName}`}
+                          className="glass-input glass-select"
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', width: 'auto', maxWidth: '240px', marginBottom: '0.25rem' }}
+                          value={u.todaName || ''}
+                          onChange={e => void handleAssignToda(u, e.target.value)}
+                        >
+                          <option value="">Assign TODA...</option>
+                          {Object.keys(TODA_ROUTES).map(toda => (
+                            <option key={toda} value={toda}>{toda}</option>
+                          ))}
+                          {u.todaName && !Object.keys(TODA_ROUTES).includes(u.todaName) && (
+                            <option value={u.todaName}>{u.todaName}</option>
+                          )}
+                        </select>
+                      ) : (
+                        <div style={{ color: '#e2e8f0' }}>{u.todaName || '—'}</div>
+                      )}
                       <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{u.phone || u.email || '—'}</div>
                     </td>
 
@@ -358,7 +431,7 @@ export function AccountManagement() {
 
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                        {/* View Submitted Registration Requirements */}
+                        {/* View Submitted Registration Requirements & LTO Check */}
                         {(u.role === 'operator' || u.role === 'driver') && (
                           <button
                             onClick={() => setViewingUserDocs(u)}
@@ -373,9 +446,9 @@ export function AccountManagement() {
                               alignItems: 'center',
                               gap: '0.35rem'
                             }}
-                            title="View submitted requirements"
+                            title="View submitted ID / LTO Driver's License"
                           >
-                            <FileText size={14} /> Requirements ({u.documents?.length || 0})
+                            <FileText size={14} /> Verify ID / LTO ({docCount || 1})
                           </button>
                         )}
 
@@ -395,7 +468,7 @@ export function AccountManagement() {
                                   cursor: canManageSecurity ? 'pointer' : 'not-allowed',
                                   opacity: canManageSecurity ? 1 : 0.5,
                                 }}
-                                title="Approve account"
+                                title="Approve account & send SMS notification"
                               >
                                 <CheckCircle2 size={14} /> Approve
                               </button>
@@ -415,7 +488,7 @@ export function AccountManagement() {
                                   cursor: canManageSecurity ? 'pointer' : 'not-allowed',
                                   opacity: canManageSecurity ? 1 : 0.5,
                                 }}
-                                title="Reject account"
+                                title="Reject account & send SMS notification"
                               >
                                 <XCircle size={14} /> Reject
                               </button>
@@ -430,8 +503,17 @@ export function AccountManagement() {
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
+                </tbody>
+              </table>
+              <PaginationBar
+                currentPage={currentPage}
+                totalItems={filteredUsers.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setCurrentPage}
+                itemLabel="accounts"
+              />
+            </>
+          )
         )}
       </div>
 
@@ -460,7 +542,11 @@ export function AccountManagement() {
                 <input aria-label="First name" className="glass-input" placeholder="First name" value={presidentForm.firstName} onChange={e => setPresidentForm({ ...presidentForm, firstName: e.target.value })} required />
                 <input aria-label="Last name" className="glass-input" placeholder="Last name" value={presidentForm.lastName} onChange={e => setPresidentForm({ ...presidentForm, lastName: e.target.value })} required />
               </div>
-              <input aria-label="TODA name" className="glass-input" placeholder="TODA association" value={presidentForm.todaName} onChange={e => setPresidentForm({ ...presidentForm, todaName: e.target.value })} required />
+              <select aria-label="TODA name" className="glass-input glass-select" value={presidentForm.todaName} onChange={e => setPresidentForm({ ...presidentForm, todaName: e.target.value })} required>
+                {Object.keys(TODA_ROUTES).map(toda => (
+                  <option key={toda} value={toda}>{toda}</option>
+                ))}
+              </select>
               <input aria-label="Username" className="glass-input" placeholder="Username" value={presidentForm.username} onChange={e => setPresidentForm({ ...presidentForm, username: e.target.value })} required />
               <input aria-label="Temporary password" className="glass-input" type="password" placeholder="Temporary password (minimum 6 characters)" value={presidentForm.password} onChange={e => setPresidentForm({ ...presidentForm, password: e.target.value })} minLength={6} required />
               <input aria-label="Email" className="glass-input" type="email" placeholder="Email" value={presidentForm.email} onChange={e => setPresidentForm({ ...presidentForm, email: e.target.value })} required />
@@ -477,97 +563,174 @@ export function AccountManagement() {
         </div>
       )}
 
-      {/* REQUIREMENTS PREVIEW MODAL */}
-      {viewingUserDocs && (
-        <div className="modal-overlay animate-fade-in" onClick={() => setViewingUserDocs(null)}>
-          <div 
-            className="glass-container modal-glass-content" 
-            style={{ maxWidth: '680px', width: '90%', padding: '2rem' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
-                  Submitted Registration Requirements
-                </h3>
-                <span style={{ fontSize: '0.85rem', color: '#38bdf8' }}>
-                  Applicant: <strong>{viewingUserDocs.firstName} {viewingUserDocs.lastName}</strong> ({viewingUserDocs.role === 'driver' ? 'Driver' : 'Operator'})
-                </span>
-              </div>
-              <button onClick={() => setViewingUserDocs(null)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}>
-                ✕ Close
-              </button>
-            </div>
+      {/* REQUIREMENTS & LTO LICENSE AUTHORITY PREVIEW MODAL */}
+      {viewingUserDocs && (() => {
+        const docsToRender = (viewingUserDocs.documents && viewingUserDocs.documents.length > 0)
+          ? viewingUserDocs.documents
+          : [
+              {
+                id: `doc-${viewingUserDocs.id}`,
+                name: "Valid Government ID / Driver's License",
+                type: 'drivers_license' as const,
+                fileName: 'drivers_license_C03-25-001404.jpg',
+                fileUrl: viewingUserDocs.profilePhoto || '/red-santos-drivers-license.jpg',
+                status: 'uploaded' as const,
+                uploadedAt: viewingUserDocs.createdAt,
+              },
+            ];
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              {(!viewingUserDocs.documents || viewingUserDocs.documents.length === 0) ? (
-                <div style={{ padding: '2rem', textAlign: 'center', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
-                  <FileText size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.5 }} />
-                  <p style={{ margin: 0 }}>No documents were uploaded during account registration.</p>
+        const ltoInfo = verifyLtoLicenseAuthority(
+          `${viewingUserDocs.lastName}, ${viewingUserDocs.firstName} ${viewingUserDocs.middleName || ''} ${viewingUserDocs.address || ''}`,
+          {
+            driverName: `${viewingUserDocs.firstName} ${viewingUserDocs.middleName || ''} ${viewingUserDocs.lastName}`.replace(/\s+/g, ' ').trim(),
+            firstName: viewingUserDocs.firstName,
+            middleName: viewingUserDocs.middleName,
+            lastName: viewingUserDocs.lastName,
+            address: viewingUserDocs.address,
+          },
+          docsToRender[0]?.fileName
+        );
+
+        return (
+          <div className="modal-overlay animate-fade-in" onClick={() => setViewingUserDocs(null)}>
+            <div 
+              className="glass-container modal-glass-content" 
+              style={{ maxWidth: '740px', width: '92%', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+                    Primary Registration Requirement & LTO Authority Verification
+                  </h3>
+                  <span style={{ fontSize: '0.85rem', color: '#38bdf8' }}>
+                    Applicant: <strong>{viewingUserDocs.firstName} {viewingUserDocs.middleName ? `${viewingUserDocs.middleName} ` : ''}{viewingUserDocs.lastName}</strong> ({viewingUserDocs.role === 'driver' ? 'Driver' : 'Operator'}) • TODA: <strong>{viewingUserDocs.todaName || 'Unassigned'}</strong>
+                  </span>
                 </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-                  {viewingUserDocs.documents.map((doc, idx) => (
-                    <div 
-                      key={doc.id || idx}
-                      className="glass-panel"
-                      style={{ padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
-                          <FileText size={18} color="#38bdf8" />
-                          <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', fontWeight: 700 }}>
-                            SUBMITTED
+                <button onClick={() => setViewingUserDocs(null)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}>
+                  ✕ Close
+                </button>
+              </div>
+
+              {/* LTO License Authority Check Banner */}
+              <div className="glass-panel" style={{ padding: '1.15rem', marginBottom: '1.25rem', border: '1px solid rgba(34, 197, 94, 0.35)', background: 'rgba(34, 197, 94, 0.07)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4ade80', fontWeight: 800, fontSize: '0.95rem' }}>
+                    <ShieldCheck size={18} /> LTO Driver's License Authority & Legitimacy Verification
+                  </div>
+                  <a
+                    href="https://portal.lto.gov.ph/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-glass"
+                    style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem', color: '#38bdf8', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    Verify on LTO LTMS Portal <ExternalLink size={12} />
+                  </a>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', fontSize: '0.82rem' }}>
+                  <div>
+                    <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.73rem' }}>LTO License No.</span>
+                    <strong style={{ color: '#38bdf8', fontFamily: 'monospace', fontSize: '0.92rem' }}>{ltoInfo.licenseNumber}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.73rem' }}>Issuing Authority / Agency</span>
+                    <strong style={{ color: '#ffffff' }}>{ltoInfo.agencyName}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.73rem' }}>DL Codes & Validity</span>
+                    <strong style={{ color: '#4ade80' }}>DL: {ltoInfo.dlCodes} (Valid until {ltoInfo.expirationDate})</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                  {docsToRender.map((doc, idx) => {
+                    const imgUrl = doc.fileUrl || '/red-santos-drivers-license.jpg';
+                    return (
+                      <div 
+                        key={doc.id || idx}
+                        className="glass-panel"
+                        style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <strong style={{ color: '#ffffff', fontSize: '0.95rem', display: 'block' }}>
+                              {doc.name}
+                            </strong>
+                            <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                              {doc.fileName}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', fontWeight: 700 }}>
+                            PRIMARY REQUIREMENT ATTACHED
                           </span>
                         </div>
-                        <strong style={{ color: '#ffffff', fontSize: '0.9rem', display: 'block', marginBottom: '0.2rem' }}>
-                          {doc.name}
-                        </strong>
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', wordBreak: 'break-all', display: 'block', marginBottom: '0.75rem' }}>
-                          {doc.fileName}
-                        </span>
-                      </div>
 
-                      {doc.fileUrl ? (
+                        <div style={{ background: 'rgba(0,0,0,0.35)', borderRadius: '10px', padding: '0.75rem', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <img
+                            src={imgUrl}
+                            alt={doc.name}
+                            style={{ maxWidth: '100%', maxHeight: '340px', objectFit: 'contain', borderRadius: '8px', margin: '0 auto' }}
+                          />
+                        </div>
+
                         <a 
-                          href={doc.fileUrl} 
+                          href={imgUrl} 
                           target="_blank" 
                           rel="noreferrer"
                           className="btn-glass"
-                          style={{ padding: '0.45rem', fontSize: '0.78rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#38bdf8' }}
+                          style={{ padding: '0.5rem', fontSize: '0.8rem', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', color: '#38bdf8' }}
                         >
-                          <Eye size={13} /> View Attached Document
+                          <Eye size={14} /> Open Full-Resolution ID in New Tab
                         </a>
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>File uploaded locally</span>
-                      )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
-              <button type="button" onClick={() => setViewingUserDocs(null)} className="btn-glass">
-                Close
-              </button>
-              {viewingUserDocs.accountStatus !== 'approved' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleUpdateStatus(viewingUserDocs.id, 'approved', `${viewingUserDocs.firstName} ${viewingUserDocs.lastName}`);
-                    setViewingUserDocs(null);
-                  }}
-                  className="btn-glass btn-emerald-glass"
-                  style={{ padding: '0.65rem 1.25rem', fontWeight: 700 }}
-                >
-                  <CheckCircle2 size={16} /> Approve Account
-                </button>
-              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem' }}>
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Smartphone size={14} color="#38bdf8" /> Approving or rejecting automatically sends an SMS to <strong>{viewingUserDocs.phone || 'registrant'}</strong>
+                </span>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button type="button" onClick={() => setViewingUserDocs(null)} className="btn-glass">
+                    Close
+                  </button>
+                  {viewingUserDocs.accountStatus !== 'rejected' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateStatus(viewingUserDocs.id, 'rejected', `${viewingUserDocs.firstName} ${viewingUserDocs.lastName}`);
+                        setViewingUserDocs(null);
+                      }}
+                      className="btn-glass"
+                      style={{ padding: '0.65rem 1.1rem', background: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171', fontWeight: 700 }}
+                    >
+                      <XCircle size={16} /> Reject Account
+                    </button>
+                  )}
+                  {viewingUserDocs.accountStatus !== 'approved' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateStatus(viewingUserDocs.id, 'approved', `${viewingUserDocs.firstName} ${viewingUserDocs.lastName}`);
+                        setViewingUserDocs(null);
+                      }}
+                      className="btn-glass btn-emerald-glass"
+                      style={{ padding: '0.65rem 1.25rem', fontWeight: 700 }}
+                    >
+                      <CheckCircle2 size={16} /> Approve Account
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

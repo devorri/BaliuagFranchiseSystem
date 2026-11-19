@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { now as systemNow } from '../../services/clock';
 import * as supabaseService from '../../services/supabaseService';
 import type { Franchise, FranchiseStatus, User } from '../../types';
-import { Search, UserCheck } from 'lucide-react';
+import { Search, UserCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 
 export function FranchiseRegistry() {
   const [franchises, setFranchises] = useState<Franchise[]>([]);
@@ -13,6 +14,9 @@ export function FranchiseRegistry() {
   const [selectedDrivers, setSelectedDrivers] = useState<Record<string, string>>({});
   const [savingSlotId, setSavingSlotId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isRegistryFolded, setIsRegistryFolded] = useState(false);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     Promise.all([supabaseService.getFranchisesAsync(), supabaseService.getUsersAsync()]).then(([units, accounts]) => {
@@ -88,7 +92,7 @@ export function FranchiseRegistry() {
               style={{ paddingLeft: '2.75rem' }}
               placeholder="Search by Body Number (MTOP #), Plate Number, Driver, or TODA..."
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
           </div>
 
@@ -96,7 +100,7 @@ export function FranchiseRegistry() {
             className="glass-input glass-select"
             style={{ width: '200px' }}
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value as 'all' | FranchiseStatus)}
+            onChange={e => { setFilterStatus(e.target.value as 'all' | FranchiseStatus); setCurrentPage(1); }}
           >
             <option value="all">All Franchise Statuses</option>
             <option value="active">Active Franchises Only</option>
@@ -110,65 +114,94 @@ export function FranchiseRegistry() {
 
       {/* Registry Table Card */}
       <div className="glass-container" style={{ padding: '1.75rem' }}>
-        <div className="glass-table-wrapper">
-          <table className="glass-table">
-            <thead>
-              <tr>
-                <th>Body Number (MTOP #)</th>
-                <th>Driver / Operator</th>
-                <th>Plate Number</th>
-                <th>TODA Route</th>
-                <th>Issued Date</th>
-                <th>Expiration Date</th>
-                <th>Status</th>
-                <th>Slot Assignment</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredFranchises.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                    No records found in the franchise registry.
-                  </td>
-                </tr>
-              ) : (
-                filteredFranchises.map(f => (
-                  <tr key={f.id}>
-                    <td style={{ fontWeight: 800, color: '#38bdf8' }}>{f.mtopNumber}</td>
-                    <td>
-                      <strong style={{ color: '#ffffff', display: 'block' }}>{f.driverName}</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Op: {f.operatorName}</span>
-                    </td>
-                    <td style={{ fontWeight: 700 }}>{f.plateNumber}</td>
-                    <td style={{ fontSize: '0.85rem' }}>{f.todaName}</td>
-                    <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{new Date(f.issuedAt).toLocaleDateString()}</td>
-                    <td style={{ fontSize: '0.82rem', color: f.status === 'expired' ? '#fb7185' : '#cbd5e1', fontWeight: f.status === 'expired' ? 700 : 400 }}>
-                      {new Date(f.expiresAt).toLocaleDateString()}
-                    </td>
-                    <td><span className={`pill-badge ${f.status === 'active' ? 'pill-emerald' : f.status === 'available' ? 'pill-cyan' : 'pill-rose'}`}>{f.status.toUpperCase()}</span></td>
-                    <td>
-                      {f.status === 'available' && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(130px, 1fr) minmax(130px, 1fr) auto', gap: '0.4rem', minWidth: '410px' }}>
-                          <select className="glass-input glass-select" aria-label="Assign operator" value={selectedOperators[f.id] || ''} onChange={e => setSelectedOperators(current => ({ ...current, [f.id]: e.target.value }))}>
-                            <option value="">Select operator</option>
-                            {users.filter(account => account.role === 'operator').map(operator => <option key={operator.id} value={operator.id}>{operator.firstName} {operator.lastName}</option>)}
-                          </select>
-                          <select className="glass-input glass-select" aria-label="Assign driver" value={selectedDrivers[f.id] || ''} onChange={e => setSelectedDrivers(current => ({ ...current, [f.id]: e.target.value }))}>
-                            <option value="">Select driver</option>
-                            {users.filter(account => account.role === 'driver').map(driver => <option key={driver.id} value={driver.id}>{driver.firstName} {driver.lastName}</option>)}
-                          </select>
-                          <button type="button" className="btn-glass btn-primary-glass" title="Assign available slot" disabled={!selectedOperators[f.id] || !selectedDrivers[f.id] || savingSlotId === f.id} onClick={() => void handleAssignSlot(f)}>
-                            <UserCheck size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isRegistryFolded ? 0 : '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+              Registered MTOP Franchise Units ({filteredFranchises.length})
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+              Showing up to {PAGE_SIZE} franchise units per page
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsRegistryFolded(!isRegistryFolded)}
+            className="btn-glass"
+            style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', color: '#38bdf8' }}
+          >
+            {isRegistryFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+          </button>
         </div>
+
+        {!isRegistryFolded && (
+          <>
+            <div className="glass-table-wrapper">
+              <table className="glass-table">
+                <thead>
+                  <tr>
+                    <th>Body Number (MTOP #)</th>
+                    <th>Driver / Operator</th>
+                    <th>Plate Number</th>
+                    <th>TODA Route</th>
+                    <th>Issued Date</th>
+                    <th>Expiration Date</th>
+                    <th>Status</th>
+                    <th>Slot Assignment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredFranchises.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
+                        No records found in the franchise registry.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredFranchises.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map(f => (
+                      <tr key={f.id}>
+                        <td style={{ fontWeight: 800, color: '#38bdf8' }}>{f.mtopNumber}</td>
+                        <td>
+                          <strong style={{ color: '#ffffff', display: 'block' }}>{f.driverName}</strong>
+                          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Op: {f.operatorName}</span>
+                        </td>
+                        <td style={{ fontWeight: 700 }}>{f.plateNumber}</td>
+                        <td style={{ fontSize: '0.85rem' }}>{f.todaName}</td>
+                        <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{new Date(f.issuedAt).toLocaleDateString()}</td>
+                        <td style={{ fontSize: '0.82rem', color: f.status === 'expired' ? '#fb7185' : '#cbd5e1', fontWeight: f.status === 'expired' ? 700 : 400 }}>
+                          {new Date(f.expiresAt).toLocaleDateString()}
+                        </td>
+                        <td><span className={`pill-badge ${f.status === 'active' ? 'pill-emerald' : f.status === 'available' ? 'pill-cyan' : 'pill-rose'}`}>{f.status.toUpperCase()}</span></td>
+                        <td>
+                          {f.status === 'available' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(130px, 1fr) minmax(130px, 1fr) auto', gap: '0.4rem', minWidth: '410px' }}>
+                              <select className="glass-input glass-select" aria-label="Assign operator" value={selectedOperators[f.id] || ''} onChange={e => setSelectedOperators(current => ({ ...current, [f.id]: e.target.value }))}>
+                                <option value="">Select operator</option>
+                                {users.filter(account => account.role === 'operator').map(operator => <option key={operator.id} value={operator.id}>{operator.firstName} {operator.lastName}</option>)}
+                              </select>
+                              <select className="glass-input glass-select" aria-label="Assign driver" value={selectedDrivers[f.id] || ''} onChange={e => setSelectedDrivers(current => ({ ...current, [f.id]: e.target.value }))}>
+                                <option value="">Select driver</option>
+                                {users.filter(account => account.role === 'driver').map(driver => <option key={driver.id} value={driver.id}>{driver.firstName} {driver.lastName}</option>)}
+                              </select>
+                              <button type="button" className="btn-glass btn-primary-glass" title="Assign available slot" disabled={!selectedOperators[f.id] || !selectedDrivers[f.id] || savingSlotId === f.id} onClick={() => void handleAssignSlot(f)}>
+                                <UserCheck size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              currentPage={currentPage}
+              totalItems={filteredFranchises.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        )}
       </div>
     </div>
   );

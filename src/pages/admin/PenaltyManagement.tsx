@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import * as supabaseService from '../../services/supabaseService';
 import type { Franchise, Penalty, User } from '../../types';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 
 export function PenaltyManagement() {
   const { user } = useAuth();
@@ -14,6 +15,9 @@ export function PenaltyManagement() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isPenaltiesFolded, setIsPenaltiesFolded] = useState(false);
+  const PAGE_SIZE = 10;
 
   const [formData, setFormData] = useState({
     violationType: 'Overdue MTOP' as Penalty['violationType'],
@@ -108,61 +112,90 @@ export function PenaltyManagement() {
 
       {/* Penalties List Table */}
       <div className="glass-container" style={{ padding: '1.75rem' }}>
-        <div className="glass-table-wrapper">
-          <table className="glass-table">
-            <thead>
-              <tr>
-                <th>Penalty ID</th>
-                <th>Driver / Plate</th>
-                <th>Penalty Type</th>
-                <th>Penalty Amount</th>
-                <th>Date Issued</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {penalties.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                    No recorded overdue penalties found.
-                  </td>
-                </tr>
-              ) : (
-                penalties.slice().sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime()).map(p => (
-                  <tr key={p.id}>
-                    <td style={{ fontWeight: 800, color: '#38bdf8' }}>{p.id.slice(0, 8)}</td>
-                    <td>
-                      <strong style={{ color: '#ffffff', display: 'block' }}>{p.driverName}</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Plate: {p.plateNumber}</span>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{p.violationType}</td>
-                    <td style={{ color: '#fb7185', fontWeight: 800 }}>₱{p.amount.toFixed(2)}</td>
-                    <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{new Date(p.issuedDate).toLocaleDateString()}</td>
-                    <td>
-                      {p.status === 'paid' ? (
-                        <span className="pill-badge pill-emerald">PAID</span>
-                      ) : (
-                        <span className="pill-badge pill-rose">UNPAID</span>
-                      )}
-                    </td>
-                    <td>
-                      {p.status === 'unpaid' && (
-                        <button
-                          onClick={() => handleMarkAsPaid(p.id)}
-                          className="btn-glass btn-emerald-glass"
-                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-                        >
-                          Mark Paid
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isPenaltiesFolded ? 0 : '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+              Recorded Overdue MTOP Penalties ({penalties.length})
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+              Showing up to {PAGE_SIZE} penalty records per page
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsPenaltiesFolded(!isPenaltiesFolded)}
+            className="btn-glass"
+            style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', color: '#38bdf8' }}
+          >
+            {isPenaltiesFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+          </button>
         </div>
+
+        {!isPenaltiesFolded && (
+          <>
+            <div className="glass-table-wrapper">
+              <table className="glass-table">
+                <thead>
+                  <tr>
+                    <th>Penalty ID</th>
+                    <th>Driver / Plate</th>
+                    <th>Penalty Type</th>
+                    <th>Penalty Amount</th>
+                    <th>Date Issued</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {penalties.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
+                        No recorded overdue penalties found.
+                      </td>
+                    </tr>
+                  ) : (
+                    penalties.slice().sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime()).slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map(p => (
+                      <tr key={p.id}>
+                        <td style={{ fontWeight: 800, color: '#38bdf8' }}>{p.id.slice(0, 8)}</td>
+                        <td>
+                          <strong style={{ color: '#ffffff', display: 'block' }}>{p.driverName}</strong>
+                          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Plate: {p.plateNumber}</span>
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{p.violationType}</td>
+                        <td style={{ color: '#fb7185', fontWeight: 800 }}>₱{p.amount.toFixed(2)}</td>
+                        <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>{new Date(p.issuedDate).toLocaleDateString()}</td>
+                        <td>
+                          {p.status === 'paid' ? (
+                            <span className="pill-badge pill-emerald">PAID</span>
+                          ) : (
+                            <span className="pill-badge pill-rose">UNPAID</span>
+                          )}
+                        </td>
+                        <td>
+                          {p.status === 'unpaid' && (
+                            <button
+                              onClick={() => handleMarkAsPaid(p.id)}
+                              className="btn-glass btn-emerald-glass"
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                            >
+                              Mark Paid
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              currentPage={currentPage}
+              totalItems={penalties.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        )}
       </div>
 
       {/* Record Penalty Modal */}

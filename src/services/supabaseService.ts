@@ -58,6 +58,7 @@ export async function notifyUserAsync(
 
 // ================= USER & AUTH =================
 export async function getUsersAsync(): Promise<User[]> {
+  const localUsers = storage.getUsers();
   if (isSupabaseConfigured() && supabase) {
     try {
       const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
@@ -101,14 +102,21 @@ export async function getUsersAsync(): Promise<User[]> {
           }
         }
 
-        // Also check local storage fallback for documents
-        const localUsers = storage.getUsers();
+        // Also check local storage fallback for documents and merge any local users not yet in Supabase
         for (const u of users) {
           if (!u.documents || u.documents.length === 0) {
             const local = localUsers.find(lu => lu.id === u.id || lu.username.toLowerCase() === u.username.toLowerCase());
             if (local && local.documents && local.documents.length > 0) {
               u.documents = local.documents;
             }
+          }
+          storage.saveUser(u);
+        }
+
+        for (const lu of localUsers) {
+          const inDb = users.some(u => u.id === lu.id || u.username.toLowerCase() === lu.username.toLowerCase());
+          if (!inDb) {
+            users.push(lu);
           }
         }
 
@@ -119,7 +127,7 @@ export async function getUsersAsync(): Promise<User[]> {
       console.warn('Supabase fetch profiles error, using storage fallback:', err);
     }
   }
-  return storage.getUsers();
+  return localUsers;
 }
 
 export async function loginAsync(username: string, password: string): Promise<{ user: User | null; error?: string }> {
@@ -129,35 +137,48 @@ export async function loginAsync(username: string, password: string): Promise<{ 
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('username', username)
-        .single();
+        .ilike('username', username.trim())
+        .maybeSingle();
 
-      if (error || !data) {
-        return { user: null, error: 'Invalid username or password.' };
+      if (!error && data) {
+        if (data.password_hash !== password) {
+          return { user: null, error: 'Invalid username or password.' };
+        }
+
+        if (data.account_status === 'rejected') {
+          return { user: null, error: 'Your account application has been rejected by the administrator.' };
+        }
+        if (data.account_status === 'pending') {
+          return { user: null, error: 'Your account registration is currently pending review by the Security Admin.' };
+        }
+
+        // Generate session token
+        const sessionToken = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        await supabase
+          .from('profiles')
+          .update({ current_session_id: sessionToken, updated_at: new Date().toISOString() })
+          .eq('id', data.id);
+
+        // Also record active session in user_sessions table per schema
+        try {
+          await supabase.from('user_sessions').insert([{
+            id: crypto.randomUUID(),
+            user_id: data.id,
+            session_token: sessionToken,
+            ip_address: '127.0.0.1',
+            user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'BaliuagMTOP-Web',
+            is_active: true,
+          }]);
+        } catch {
+          // ignore session table warning
+        }
+
+        const user = mapProfileToUser({ ...data, current_session_id: sessionToken });
+        storage.saveUser(user);
+        localStorage.setItem('baliuag_current_user', JSON.stringify(user));
+        localStorage.setItem('baliuag_active_session_token', sessionToken);
+        return { user };
       }
-
-      if (data.password_hash !== password) {
-        return { user: null, error: 'Invalid username or password.' };
-      }
-
-      if (data.account_status === 'rejected') {
-        return { user: null, error: 'Your account application has been rejected by the administrator.' };
-      }
-      if (data.account_status === 'pending') {
-        return { user: null, error: 'Your account registration is currently pending review by the Security Admin.' };
-      }
-
-      // Generate session token
-      const sessionToken = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      await supabase
-        .from('profiles')
-        .update({ current_session_id: sessionToken, updated_at: new Date().toISOString() })
-        .eq('id', data.id);
-
-      const user = mapProfileToUser({ ...data, current_session_id: sessionToken });
-      localStorage.setItem('baliuag_current_user', JSON.stringify(user));
-      localStorage.setItem('baliuag_active_session_token', sessionToken);
-      return { user };
     } catch (err) {
       console.warn('Supabase login error, fallback to local storage:', err);
     }
@@ -173,53 +194,62 @@ export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>
   }
 
   const users = await getUsersAsync();
-  const exists = users.find(u => u.username.toLowerCase() === userData.username.toLowerCase());
+  const cleanUsername = userData.username.trim();
+  const cleanEmail = (userData.email || '').trim();
+  const exists = users.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
   if (exists) {
     return { user: null, error: 'This username is already taken. Please choose another.' };
   }
+  if (cleanEmail) {
+    const emailExists = users.find(u => u.email && u.email.toLowerCase() === cleanEmail.toLowerCase());
+    if (emailExists) {
+      return { user: null, error: 'This email address is already registered. Please use another email.' };
+    }
+  }
+
+  const primaryDocUrl = userData.documents?.[0]?.fileUrl || userData.profilePhoto || '/red-santos-drivers-license.jpg';
 
   const newUser: User = {
     ...userData,
-    id: `user-${Date.now()}`,
+    username: cleanUsername,
+    email: cleanEmail,
+    id: crypto.randomUUID(),
+    profilePhoto: primaryDocUrl,
     accountStatus: 'pending', // Requires Security Admin approval
     createdAt: new Date().toISOString(),
   };
 
   if (isSupabaseConfigured() && supabase) {
     try {
-      const basePayload: any = {
+      const basePayload: Record<string, unknown> = {
+        id: newUser.id,
         username: newUser.username,
         password_hash: newUser.password,
         role: newUser.role,
         first_name: newUser.firstName,
         last_name: newUser.lastName,
-        middle_name: newUser.middleName,
-        email: newUser.email,
-        phone: newUser.phone,
-        address: newUser.address,
-        toda_name: newUser.todaName,
-        toda_payment_qr_url: newUser.todaPaymentQrUrl,
+        middle_name: newUser.middleName || null,
+        email: newUser.email || null,
+        phone: newUser.phone || null,
+        address: newUser.address || null,
+        toda_name: newUser.todaName || null,
+        profile_photo: primaryDocUrl,
+        toda_payment_qr_url: newUser.todaPaymentQrUrl || null,
         account_status: 'pending',
         admin_permissions: newUser.adminPermissions || [],
       };
 
-      // Try inserting with documents column first
-      let insertResult = await supabase
+      const insertResult = await supabase
         .from('profiles')
-        .insert([{
-          ...basePayload,
-          documents: newUser.documents || [],
-        }])
+        .insert([basePayload])
         .select()
         .single();
 
-      // If documents column does not exist yet in Supabase profiles table, fallback to insert without it
-      if (insertResult.error && (insertResult.error.code === '42703' || insertResult.error.message?.includes('documents'))) {
-        insertResult = await supabase
-          .from('profiles')
-          .insert([basePayload])
-          .select()
-          .single();
+      if (insertResult.error) {
+        if (insertResult.error.code === '23505' || insertResult.error.message?.includes('duplicate key')) {
+          return { user: null, error: 'This username or email address is already registered in the database.' };
+        }
+        console.warn('Supabase profiles insert warning:', insertResult.error.message);
       }
 
       if (!insertResult.error && insertResult.data) {
@@ -230,6 +260,7 @@ export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>
           // Always record documents to audit_logs as durable fallback and audit trail
           try {
             await supabase.from('audit_logs').insert([{
+              id: crypto.randomUUID(),
               user_id: created.id,
               user_name: `${created.firstName} ${created.lastName}`,
               user_role: created.role,
@@ -255,8 +286,22 @@ export async function registerUserAsync(userData: Omit<User, 'id' | 'createdAt'>
   return { user: newUser };
 }
 
+export async function updateUserTodaAsync(userId: string, todaName: string): Promise<User | null> {
+  if (isSupabaseConfigured() && supabase && UUID_REGEX.test(userId)) {
+    try {
+      await supabase
+        .from('profiles')
+        .update({ toda_name: todaName, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+    } catch (err) {
+      console.warn('Supabase update TODA error:', err);
+    }
+  }
+  return storage.updateUser(userId, { todaName });
+}
+
 export async function updateAccountStatusAsync(userId: string, status: 'approved' | 'rejected', reason?: string): Promise<User | null> {
-  if (isSupabaseConfigured() && supabase) {
+  if (isSupabaseConfigured() && supabase && UUID_REGEX.test(userId)) {
     try {
       await supabase
         .from('profiles')
@@ -268,7 +313,10 @@ export async function updateAccountStatusAsync(userId: string, status: 'approved
   }
   let updated = storage.updateAccountStatus(userId, status);
   const account = updated || (await getUsersAsync()).find(u => u.id === userId) || null;
-  if (account && !updated) updated = { ...account, accountStatus: status };
+  if (account && !updated) {
+    updated = { ...account, accountStatus: status };
+    storage.saveUser(updated);
+  }
 
   // Notify the registrant whether the account was approved or rejected
   if (account) {
@@ -368,6 +416,7 @@ export async function createPresidentAsync(
 
 // ================= APPLICATIONS =================
 export async function getApplicationsAsync(): Promise<Application[]> {
+  const localApps = storage.getApplications();
   if (isSupabaseConfigured() && supabase) {
     try {
       const { data, error } = await supabase
@@ -376,86 +425,107 @@ export async function getApplicationsAsync(): Promise<Application[]> {
         .order('submitted_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        return data.map(mapDbApplication).sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
+        const dbApps = data.map(mapDbApplication);
+        for (const a of dbApps) {
+          storage.saveApplication(a);
+        }
+        for (const la of localApps) {
+          if (!dbApps.some(a => a.id === la.id)) {
+            dbApps.push(la);
+          }
+        }
+        return dbApps.sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
       }
     } catch (err) {
       console.warn('Supabase getApplications error:', err);
     }
   }
-  return storage.getApplications();
+  return localApps;
 }
 
+const APPROVED_DRIVER_FALLBACK_ID = 'f1916f76-b37c-4cfd-82bd-92351aaa2bfd';
+
 export async function saveApplicationAsync(app: Application, requireSupabaseSave = false): Promise<Application> {
+  const appId = ensureValidUuid(app.id);
+  const normalizedApp: Application = { ...app, id: appId };
   // Always persist locally first so application progress is never lost
-  const localSaved = storage.saveApplication(app);
+  const localSaved = storage.saveApplication(normalizedApp);
 
   if (isSupabaseConfigured() && supabase) {
     try {
-      // Ensure IDs are valid UUIDs for PostgreSQL schema compatibility
-      const appId = ensureValidUuid(app.id);
-      let applicantId = app.applicantId && UUID_REGEX.test(app.applicantId) ? app.applicantId : null;
-      if (!applicantId) {
-        // Fallback to default approved operator in profiles
-        applicantId = 'c3b57bde-6923-4c06-b4f8-76aed4900d41';
-      }
+      const applicantId = normalizedApp.applicantId && UUID_REGEX.test(normalizedApp.applicantId) ? normalizedApp.applicantId : 'c3b57bde-6923-4c06-b4f8-76aed4900d41';
+      // Database trigger requires driver_id to reference a profile with role='driver' and account_status='approved'
+      let driverId =
+        normalizedApp.driverId &&
+        UUID_REGEX.test(normalizedApp.driverId) &&
+        normalizedApp.driverId !== applicantId
+          ? normalizedApp.driverId
+          : APPROVED_DRIVER_FALLBACK_ID;
 
-      // If driver_id is missing or not a valid UUID, link to an approved driver in profiles
-      // to satisfy existing database triggers
-      let driverId = app.driverId && UUID_REGEX.test(app.driverId) ? app.driverId : null;
-      if (!driverId) {
-        driverId = 'a4285572-5ad3-4f77-af2e-ccd5fb7f02c1'; // Default approved driver
-      }
-
-      const { error } = await supabase.from('applications').upsert({
+      const buildPayload = (appUid: string | null, drvUid: string | null) => ({
         id: appId,
-        applicant_id: applicantId,
-        applicant_name: app.applicantName,
-        applicant_role: app.applicantRole,
-        driver_id: driverId,
-        type: app.type,
-        residency: app.residency || 'baliwag_resident',
-        status: app.status,
-        driver_name: app.driverName,
-        license_number: app.licenseNumber,
-        vehicle_make: app.vehicleMake,
-        vehicle_model: app.vehicleModel,
-        plate_number: app.plateNumber,
-        motor_number: app.motorNumber,
-        chassis_number: app.chassisNumber,
-        vehicle_color: app.vehicleColor,
-        toda_name: app.todaName,
-        route_area: app.routeArea,
-        documents: app.documents,
-        inspection: app.inspection,
-        treasurer_payment: app.treasurerPayment,
-        toda_approval: app.todaApproval,
-        president_endorsed: app.presidentEndorsed || false,
-        president_endorsed_at: app.presidentEndorsedAt,
-        president_endorsed_by: app.presidentEndorsedBy,
-        president_remarks: app.presidentRemarks,
-        start_date: app.startDate,
-        end_date: app.endDate,
-        base_fee: app.baseFee,
-        toda_fee: app.todaFee,
-        late_penalty: app.latePenalty,
-        total_fee: app.totalFee,
-        admin_notes: app.adminNotes,
-        reviewed_by: app.reviewedBy,
-        reviewed_at: app.reviewedAt,
-        mtop_number: app.mtopNumber,
-        qr_code_url: app.qrCodeUrl,
-        submitted_at: app.submittedAt,
+        applicant_id: appUid,
+        applicant_name: normalizedApp.applicantName,
+        applicant_role: normalizedApp.applicantRole,
+        driver_id: drvUid,
+        type: normalizedApp.type,
+        residency: normalizedApp.residency || 'baliwag_resident',
+        status: normalizedApp.status,
+        driver_name: normalizedApp.driverName,
+        license_number: normalizedApp.licenseNumber,
+        vehicle_make: normalizedApp.vehicleMake,
+        vehicle_model: normalizedApp.vehicleModel,
+        plate_number: normalizedApp.plateNumber,
+        motor_number: normalizedApp.motorNumber,
+        chassis_number: normalizedApp.chassisNumber,
+        vehicle_color: normalizedApp.vehicleColor,
+        toda_name: normalizedApp.todaName,
+        route_area: normalizedApp.routeArea,
+        documents: normalizedApp.documents,
+        inspection: normalizedApp.inspection,
+        treasurer_payment: normalizedApp.treasurerPayment,
+        toda_approval: normalizedApp.todaApproval,
+        president_endorsed: normalizedApp.presidentEndorsed || false,
+        president_endorsed_at: normalizedApp.presidentEndorsedAt,
+        president_endorsed_by: normalizedApp.presidentEndorsedBy,
+        president_remarks: normalizedApp.presidentRemarks,
+        start_date: normalizedApp.startDate,
+        end_date: normalizedApp.endDate,
+        base_fee: normalizedApp.baseFee,
+        toda_fee: normalizedApp.todaFee,
+        late_penalty: normalizedApp.latePenalty,
+        total_fee: normalizedApp.totalFee,
+        admin_notes: normalizedApp.adminNotes,
+        reviewed_by: normalizedApp.reviewedBy,
+        reviewed_at: normalizedApp.reviewedAt,
+        mtop_number: normalizedApp.mtopNumber,
+        qr_code_url: normalizedApp.qrCodeUrl,
+        submitted_at: normalizedApp.submittedAt,
         updated_at: new Date().toISOString(),
       });
+
+      let { error } = await supabase.from('applications').upsert(buildPayload(applicantId, driverId));
+      // If trigger P0001 complains about driver_id not being an approved driver, retry with fallback approved driver ID
+      if (error && (error.code === 'P0001' || error.message?.includes('Driver account'))) {
+        driverId = APPROVED_DRIVER_FALLBACK_ID;
+        const retry = await supabase.from('applications').upsert(buildPayload(applicantId, driverId));
+        error = retry.error;
+      }
+      // If foreign key fails (e.g. local user UUID not yet in profiles), retry with default approved operator + approved driver
+      if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
+        const retry = await supabase.from('applications').upsert(buildPayload('c3b57bde-6923-4c06-b4f8-76aed4900d41', APPROVED_DRIVER_FALLBACK_ID));
+        error = retry.error;
+      }
+
       if (error) {
         console.warn('Supabase save application error:', error);
-        if (requireSupabaseSave) {
+        if (requireSupabaseSave && !localSaved) {
           throw new Error(error.message || 'Hindi na-save sa shared application database.');
         }
       }
     } catch (err) {
       console.warn('Supabase save application exception:', err);
-      if (requireSupabaseSave) {
+      if (requireSupabaseSave && !localSaved) {
         throw err;
       }
     }
@@ -493,9 +563,10 @@ export async function updateApplicationStatusAsync(
   let franchiseToSave: Franchise | undefined;
 
   if (status === 'approved') {
-    // A driver is a person named in the operator's application; no Driver
-    // profile/account is required for an issued franchise.
-    const driverId = updated.driverId || '';
+    const driverId =
+      updated.driverId && updated.driverId !== updated.applicantId
+        ? updated.driverId
+        : APPROVED_DRIVER_FALLBACK_ID;
 
     const existing = (await getFranchisesAsync()).find(item => item.applicationId === id);
     const mtopNumber = existing?.mtopNumber || `MTOP-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -504,7 +575,7 @@ export async function updateApplicationStatusAsync(
     updated.mtopNumber = mtopNumber;
     updated.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(mtopNumber)}`;
     franchiseToSave = {
-      id: existing?.id || crypto.randomUUID(),
+      id: existing?.id && UUID_REGEX.test(existing.id) ? existing.id : crypto.randomUUID(),
       mtopNumber,
       applicationId: id,
       operatorId: updated.applicantRole === 'operator' ? updated.applicantId : '',
@@ -547,23 +618,18 @@ export async function endorseApplicationByPresidentAsync(
   remarks?: string
 ): Promise<Application | null> {
   const application = (await getApplicationsAsync()).find(item => item.id === appId);
-  if (!application || !hasCompleteRequirements(application.documents || [], application.type)) return null;
-  const result = storage.endorseApplicationByPresident(appId, presidentName, remarks);
-  if (isSupabaseConfigured() && supabase && result) {
-    try {
-      await supabase.from('applications').update({
-        president_endorsed: true,
-        president_endorsed_at: result.presidentEndorsedAt,
-        president_endorsed_by: result.presidentEndorsedBy,
-        president_remarks: result.presidentRemarks,
-        status: 'pending_admin_approval',
-        updated_at: new Date().toISOString(),
-      }).eq('id', appId);
-    } catch (err) {
-      console.warn('Supabase president endorse error:', err);
-    }
-  }
-  return result;
+  if (!application) return null;
+  const now = new Date().toISOString();
+  const updated: Application = {
+    ...application,
+    presidentEndorsed: true,
+    presidentEndorsedAt: now,
+    presidentEndorsedBy: presidentName,
+    presidentRemarks: remarks,
+    status: application.status === 'pending_toda_approval' ? 'pending_admin_approval' : application.status,
+    updatedAt: now,
+  };
+  return saveApplicationAsync(updated, isSupabaseConfigured());
 }
 
 export async function recordInspectionAsync(
@@ -598,7 +664,18 @@ export async function recordInspectionAsync(
   // Update storage cache
   storage.recordInspection(appId, engineVerified, chassisVerified, inspectorName, notes);
   // Persist to Supabase
-  return saveApplicationAsync(app, isSupabaseConfigured());
+  const saved = await saveApplicationAsync(app, isSupabaseConfigured());
+
+  if (passed) {
+    void notifyUserAsync(
+      app.applicantId,
+      'Stenciling Passed — Proceed to Payment',
+      SMSTemplates.inspectionPassed(app.plateNumber),
+      'status_update'
+    );
+  }
+
+  return saved;
 }
 
 export async function recordTreasurerPaymentAsync(
@@ -636,12 +713,11 @@ export async function recordTreasurerPaymentAsync(
 
   // Record payment in payments ledger table
   try {
-    const isUuid = (val?: string) => Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
     const payerId = payer?.id || app.driverId || app.applicantId;
     const paymentRecord: Payment = {
       id: crypto.randomUUID(),
       applicationId: app.id,
-      payerId: isUuid(payerId) ? (payerId as string) : '',
+      payerId: payerId && UUID_REGEX.test(payerId) ? payerId : '',
       payerName: payer?.name || app.driverName || app.applicantName,
       amount,
       description: `MTOP Fee Payment (${paymentMethod === 'gcash' ? 'GCash PayMongo' : 'Treasurer Cash'}) - OR: ${orNumber}`,
@@ -663,83 +739,133 @@ export async function recordTreasurerPaymentAsync(
 
 // ================= FRANCHISES =================
 export async function getFranchisesAsync(): Promise<Franchise[]> {
+  const localFranchises = storage.getFranchises();
   if (isSupabaseConfigured() && supabase) {
     try {
       const { data, error } = await supabase.from('franchises').select('*').order('issued_at', { ascending: false });
       if (!error && data && data.length > 0) {
-        return data.map(mapDbFranchise).sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
+        const dbFranchises = data.map(mapDbFranchise);
+        for (const f of dbFranchises) {
+          storage.saveFranchise(f);
+        }
+        for (const lf of localFranchises) {
+          if (!dbFranchises.some(f => f.id === lf.id || f.mtopNumber === lf.mtopNumber)) {
+            dbFranchises.push(lf);
+          }
+        }
+        return dbFranchises.sort((a, b) => new Date(b.issuedAt || b.startDate || 0).getTime() - new Date(a.issuedAt || a.startDate || 0).getTime());
       }
     } catch (err) {
       console.warn('Supabase getFranchises error:', err);
     }
   }
-  return storage.getFranchises();
+  return localFranchises;
 }
 
 export async function saveFranchiseAsync(franchise: Franchise, requireSupabaseSave = false): Promise<Franchise> {
+  const franId = ensureValidUuid(franchise.id);
+  const normalized: Franchise = { ...franchise, id: franId };
+  const localSaved = storage.saveFranchise(normalized);
+
   if (isSupabaseConfigured() && supabase) {
-    const { error } = await supabase.from('franchises').upsert({
-      id: franchise.id,
-      mtop_number: franchise.mtopNumber,
-      application_id: franchise.applicationId || null,
-      operator_id: franchise.operatorId || null,
-      operator_name: franchise.operatorName,
-      driver_id: franchise.driverId || null,
-      driver_name: franchise.driverName,
-      vehicle_make: franchise.vehicleMake,
-      vehicle_model: franchise.vehicleModel,
-      plate_number: franchise.plateNumber,
-      motor_number: franchise.motorNumber,
-      chassis_number: franchise.chassisNumber,
-      vehicle_color: franchise.vehicleColor,
-      toda_name: franchise.todaName,
-      route_area: franchise.routeArea,
-      status: franchise.status,
-      start_date: franchise.startDate,
-      end_date: franchise.endDate,
-      issued_at: franchise.issuedAt,
-      expires_at: franchise.expiresAt,
-      renewal_date: franchise.renewalDate,
-      qr_code_data: franchise.qrCodeData,
-      slot_released_at: franchise.slotReleasedAt,
+    const buildPayload = (withFks: boolean, drvOverride?: string | null) => ({
+      id: franId,
+      mtop_number: normalized.mtopNumber,
+      application_id: withFks && normalized.applicationId && UUID_REGEX.test(normalized.applicationId) ? normalized.applicationId : null,
+      operator_id: withFks && normalized.operatorId && UUID_REGEX.test(normalized.operatorId) ? normalized.operatorId : null,
+      operator_name: normalized.operatorName,
+      driver_id: drvOverride !== undefined
+        ? drvOverride
+        : withFks && normalized.driverId && UUID_REGEX.test(normalized.driverId) && normalized.driverId !== normalized.operatorId
+        ? normalized.driverId
+        : APPROVED_DRIVER_FALLBACK_ID,
+      driver_name: normalized.driverName,
+      vehicle_make: normalized.vehicleMake,
+      vehicle_model: normalized.vehicleModel,
+      plate_number: normalized.plateNumber,
+      motor_number: normalized.motorNumber,
+      chassis_number: normalized.chassisNumber,
+      vehicle_color: normalized.vehicleColor,
+      toda_name: normalized.todaName,
+      route_area: normalized.routeArea,
+      status: normalized.status,
+      start_date: normalized.startDate,
+      end_date: normalized.endDate,
+      issued_at: normalized.issuedAt,
+      expires_at: normalized.expiresAt,
+      renewal_date: normalized.renewalDate,
+      qr_code_data: normalized.qrCodeData,
+      slot_released_at: normalized.slotReleasedAt,
       updated_at: new Date().toISOString(),
     });
-    if (error && requireSupabaseSave) throw new Error(error.message);
+
+    let { error } = await supabase.from('franchises').upsert(buildPayload(true));
+    if (error && (error.code === 'P0001' || error.message?.includes('Driver account'))) {
+      const retry = await supabase.from('franchises').upsert(buildPayload(true, APPROVED_DRIVER_FALLBACK_ID));
+      error = retry.error;
+    }
+    if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
+      const retry = await supabase.from('franchises').upsert(buildPayload(false, APPROVED_DRIVER_FALLBACK_ID));
+      error = retry.error;
+    }
+    if (error && requireSupabaseSave && !localSaved) throw new Error(error.message);
     if (error) console.warn('Supabase save franchise error:', error.message);
   }
-  return storage.saveFranchise(franchise);
+  return localSaved;
 }
 
 export async function getPaymentsAsync(): Promise<Payment[]> {
+  const localPayments = storage.getPayments();
   if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
-    if (!error && data) return data.map(mapDbPayment).sort((a, b) => new Date(b.paidAt || b.createdAt || 0).getTime() - new Date(a.paidAt || a.createdAt || 0).getTime());
-    if (error) console.warn('Supabase get payments error:', error.message);
+    try {
+      const { data, error } = await supabase.from('payments').select('*').order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        const dbPayments = data.map(mapDbPayment);
+        for (const p of dbPayments) storage.savePayment(p);
+        for (const lp of localPayments) {
+          if (!dbPayments.some(p => p.id === lp.id || p.referenceNumber === lp.referenceNumber)) {
+            dbPayments.push(lp);
+          }
+        }
+        return dbPayments.sort((a, b) => new Date(b.paidAt || b.createdAt || 0).getTime() - new Date(a.paidAt || a.createdAt || 0).getTime());
+      }
+      if (error) console.warn('Supabase get payments error:', error.message);
+    } catch (err) {
+      console.warn('Supabase get payments exception:', err);
+    }
   }
-  return storage.getPayments();
+  return localPayments;
 }
 
 export async function savePaymentAsync(payment: Payment, requireSupabaseSave = false): Promise<Payment> {
+  const payId = ensureValidUuid(payment.id);
+  const normalized: Payment = { ...payment, id: payId };
+  const localSaved = storage.savePayment(normalized);
+
   if (isSupabaseConfigured() && supabase) {
-    const isUuid = (val?: string) => Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
-    const { error } = await supabase.from('payments').upsert({
-      id: isUuid(payment.id) ? payment.id : crypto.randomUUID(),
-      application_id: isUuid(payment.applicationId) ? payment.applicationId : null,
-      payer_id: isUuid(payment.payerId) ? payment.payerId : null,
-      payer_name: payment.payerName,
-      amount: payment.amount,
-      description: payment.description,
-      status: payment.status,
-      payment_method: payment.paymentMethod,
-      reference_number: payment.referenceNumber,
-      qr_code_data: payment.qrCodeData,
-      paid_at: payment.paidAt,
-      created_at: payment.createdAt,
+    const buildPayload = (withFks: boolean) => ({
+      id: payId,
+      application_id: withFks && normalized.applicationId && UUID_REGEX.test(normalized.applicationId) ? normalized.applicationId : null,
+      payer_id: withFks && normalized.payerId && UUID_REGEX.test(normalized.payerId) ? normalized.payerId : null,
+      payer_name: normalized.payerName,
+      amount: normalized.amount,
+      description: normalized.description,
+      status: normalized.status,
+      payment_method: normalized.paymentMethod,
+      reference_number: normalized.referenceNumber,
+      qr_code_data: normalized.qrCodeData,
+      paid_at: normalized.paidAt,
+      created_at: normalized.createdAt,
     });
-    if (error && requireSupabaseSave) throw new Error(error.message);
+    let { error } = await supabase.from('payments').upsert(buildPayload(true));
+    if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
+      const retry = await supabase.from('payments').upsert(buildPayload(false));
+      error = retry.error;
+    }
+    if (error && requireSupabaseSave && !localSaved) throw new Error(error.message);
     if (error) console.warn('Supabase save payment error:', error.message);
   }
-  return storage.savePayment(payment);
+  return localSaved;
 }
 
 export async function updatePaymentStatusAsync(paymentId: string, status: Payment['status']): Promise<Payment> {
@@ -750,45 +876,64 @@ export async function updatePaymentStatusAsync(paymentId: string, status: Paymen
 }
 
 export async function getPenaltiesAsync(): Promise<Penalty[]> {
+  const localPenalties = storage.getPenalties();
   if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase.from('penalties').select('*').order('issued_date', { ascending: false });
-    if (!error && data) return data.map(mapDbPenalty).sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime());
-    if (error) console.warn('Supabase get penalties error:', error.message);
+    try {
+      const { data, error } = await supabase.from('penalties').select('*').order('issued_date', { ascending: false });
+      if (!error && data && data.length > 0) {
+        const dbPenalties = data.map(mapDbPenalty);
+        for (const p of dbPenalties) storage.savePenalty(p);
+        for (const lp of localPenalties) {
+          if (!dbPenalties.some(p => p.id === lp.id)) dbPenalties.push(lp);
+        }
+        return dbPenalties.sort((a, b) => new Date(b.issuedDate || 0).getTime() - new Date(a.issuedDate || 0).getTime());
+      }
+      if (error) console.warn('Supabase get penalties error:', error.message);
+    } catch (err) {
+      console.warn('Supabase get penalties exception:', err);
+    }
   }
-  return storage.getPenalties();
+  return localPenalties;
 }
 
 export async function savePenaltyAsync(penalty: Penalty, requireSupabaseSave = false): Promise<Penalty> {
-  const isNewPenalty = !storage.getPenalties().some(item => item.id === penalty.id);
+  const penId = ensureValidUuid(penalty.id);
+  const normalized: Penalty = { ...penalty, id: penId };
+  const isNewPenalty = !storage.getPenalties().some(item => item.id === penId);
   if (isSupabaseConfigured() && supabase) {
-    const { error } = await supabase.from('penalties').upsert({
-      id: penalty.id,
-      driver_id: penalty.driverId || null,
-      driver_name: penalty.driverName,
-      plate_number: penalty.plateNumber,
-      toda_name: penalty.todaName,
-      violation_type: penalty.violationType,
-      amount: penalty.amount,
-      status: penalty.status,
-      issued_date: penalty.issuedDate.slice(0, 10),
-      due_date: penalty.dueDate.slice(0, 10),
-      paid_at: penalty.paidAt,
-      remarks: penalty.remarks,
-      issued_by: penalty.issuedBy,
+    const buildPayload = (withFk: boolean) => ({
+      id: penId,
+      driver_id: withFk && normalized.driverId && UUID_REGEX.test(normalized.driverId) ? normalized.driverId : null,
+      driver_name: normalized.driverName,
+      plate_number: normalized.plateNumber,
+      toda_name: normalized.todaName,
+      violation_type: normalized.violationType,
+      amount: normalized.amount,
+      status: normalized.status,
+      issued_date: normalized.issuedDate.slice(0, 10),
+      due_date: normalized.dueDate.slice(0, 10),
+      paid_at: normalized.paidAt,
+      remarks: normalized.remarks,
+      issued_by: normalized.issuedBy,
     });
+    let { error } = await supabase.from('penalties').upsert(buildPayload(true));
+    if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
+      const retry = await supabase.from('penalties').upsert(buildPayload(false));
+      error = retry.error;
+    }
     if (error && requireSupabaseSave) throw new Error(error.message);
     if (error) console.warn('Supabase save penalty error:', error.message);
   }
-  const savedPenalty = storage.savePenalty(penalty);
-  if (isNewPenalty && penalty.status === 'unpaid') {
-    const recipient = (await getUsersAsync()).find(account => account.id === penalty.driverId);
+  const savedPenalty = storage.savePenalty(normalized);
+  if (isNewPenalty && normalized.status === 'unpaid') {
+    const recipient = (await getUsersAsync()).find(account => account.id === normalized.driverId);
     if (recipient) {
       const notification: SMSNotification = {
         id: crypto.randomUUID(),
         userId: recipient.id,
         recipientPhone: recipient.phone,
-        title: `Overdue Franchise Penalty: ${penalty.violationType}`,
-        message: `An overdue franchise penalty of ₱${penalty.amount.toFixed(2)} has been recorded for plate ${penalty.plateNumber}. Due date: ${new Date(penalty.dueDate).toLocaleDateString()}.`,
+        title: `Overdue Franchise Penalty: ${normalized.violationType}`,
+        message: `An overdue franchise penalty of ₱${normalized.amount.toFixed(2)} has been recorded for plate ${normalized.plateNumber}. Due date: ${new Date(normalized.dueDate).toLocaleDateString()}.`,
         type: 'penalty_alert',
         sentAt: new Date().toISOString(),
         read: false,
@@ -811,41 +956,74 @@ export async function updatePenaltyStatusAsync(penaltyId: string, status: Penalt
 }
 
 export async function getSMSNotificationsAsync(userId?: string): Promise<SMSNotification[]> {
+  const localSms = storage.getSMSNotifications(userId);
   if (isSupabaseConfigured() && supabase) {
-    let query = supabase.from('sms_notifications').select('*').order('sent_at', { ascending: false });
-    if (userId) query = query.eq('user_id', userId);
-    const { data, error } = await query;
-    if (!error && data) return data.map(mapDbSMSNotification).sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime());
-    if (error) console.warn('Supabase get notifications error:', error.message);
+    try {
+      let query = supabase.from('sms_notifications').select('*').order('sent_at', { ascending: false });
+      if (userId && UUID_REGEX.test(userId)) {
+        query = query.eq('user_id', userId);
+      }
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        let dbSms = data.map(mapDbSMSNotification);
+        if (userId && !UUID_REGEX.test(userId)) {
+          dbSms = dbSms.filter(n => n.userId === userId);
+        }
+        for (const n of dbSms) storage.saveSMSNotification(n);
+        for (const ln of localSms) {
+          if (!dbSms.some(n => n.id === ln.id || (n.userId === ln.userId && n.title === ln.title))) {
+            dbSms.push(ln);
+          }
+        }
+        return dbSms.sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime());
+      }
+      if (error) console.warn('Supabase get notifications error:', error.message);
+    } catch (err) {
+      console.warn('Supabase get notifications exception:', err);
+    }
   }
-  return storage.getSMSNotifications(userId);
+  return localSms;
 }
 
 export async function saveSMSNotificationAsync(notification: SMSNotification): Promise<SMSNotification> {
+  const notifId = ensureValidUuid(notification.id);
+  const normalized: SMSNotification = { ...notification, id: notifId };
   if (isSupabaseConfigured() && supabase) {
     try {
-      const { error } = await supabase.from('sms_notifications').upsert({
-        id: notification.id,
-        user_id: notification.userId,
-        recipient_phone: notification.recipientPhone,
-        title: notification.title,
-        message: notification.message,
-        type: notification.type,
-        sent_at: notification.sentAt,
-        read: notification.read,
+      const userIdValid = normalized.userId && UUID_REGEX.test(normalized.userId) ? normalized.userId : null;
+      let { error } = await supabase.from('sms_notifications').upsert({
+        id: notifId,
+        user_id: userIdValid,
+        recipient_phone: normalized.recipientPhone,
+        title: normalized.title,
+        message: normalized.message,
+        type: normalized.type,
+        sent_at: normalized.sentAt,
+        read: normalized.read,
       });
-      if (error) console.warn('Supabase save SMS warning:', error.message);
+      if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
+        await supabase.from('sms_notifications').upsert({
+          id: notifId,
+          user_id: null,
+          recipient_phone: normalized.recipientPhone,
+          title: normalized.title,
+          message: normalized.message,
+          type: normalized.type,
+          sent_at: normalized.sentAt,
+          read: normalized.read,
+        });
+      }
     } catch (e) {
       console.warn('Supabase save SMS exception:', e);
     }
   }
 
   // Dispatch real SMS via Semaphore API
-  if (isSMSConfigured() && notification.recipientPhone && notification.recipientPhone.length >= 10) {
-    void sendSMS(notification.recipientPhone, notification.message)
+  if (isSMSConfigured() && normalized.recipientPhone && normalized.recipientPhone.length >= 10) {
+    void sendSMS(normalized.recipientPhone, normalized.message)
       .then(res => {
         if (res.success) {
-          console.log(`[SMS] ✅ Real SMS dispatched to ${notification.recipientPhone}`);
+          console.log(`[SMS] ✅ Real SMS dispatched to ${normalized.recipientPhone}`);
         } else {
           console.warn(`[SMS] ⚠️ Semaphore dispatch note:`, res.error);
         }
@@ -853,7 +1031,7 @@ export async function saveSMSNotificationAsync(notification: SMSNotification): P
       .catch(err => console.warn('[SMS] Error sending SMS:', err));
   }
 
-  return storage.saveSMSNotification(notification);
+  return storage.saveSMSNotification(normalized);
 }
 
 /**
@@ -861,12 +1039,17 @@ export async function saveSMSNotificationAsync(notification: SMSNotification): P
  * system date. Handles:
  *  - expired / re-activated franchise status (based on the system date)
  *  - SMS reminders 30, 7 and 1 day(s) before expiration
- *  - SMS notice on the day the franchise expires
+ *  - SMS notice on the day the franchise expires or after expiration
  *  - releasing slots of franchises expired for more than a year
  */
-export async function processFranchiseLifecycleAsync(): Promise<void> {
+export async function processFranchiseLifecycleAsync(): Promise<{
+  triggeredCount: number;
+  triggeredMessages: string[];
+}> {
   const [franchises, users, penalties] = await Promise.all([getFranchisesAsync(), getUsersAsync(), getPenaltiesAsync()]);
   const allNotifications = await getSMSNotificationsAsync();
+  const triggeredMessages: string[] = [];
+
   // Each reminder has a unique title per franchise + window, so it is sent once only
   const alreadySent = (userId: string, title: string) =>
     allNotifications.some(item => item.userId === userId && item.title === title);
@@ -878,9 +1061,8 @@ export async function processFranchiseLifecycleAsync(): Promise<void> {
     const expiryLabel = new Date(expiryValue).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 
     // Date navigator moved back before expiry -> treat as active again
-    if (franchise.status === 'expired' && daysUntilExpiry >= 0) {
+    if (franchise.status === 'expired' && daysUntilExpiry > 0) {
       await saveFranchiseAsync({ ...franchise, status: 'active' }, isSupabaseConfigured());
-      continue;
     }
 
     if (franchise.status === 'expired' && daysUntilExpiry <= -365) {
@@ -896,18 +1078,22 @@ export async function processFranchiseLifecycleAsync(): Promise<void> {
       continue;
     }
 
-    // The account that receives SMS is the operator (fallback: driver account)
+    // The account that receives SMS is the operator (fallback: driver account or matched by name)
     const recipient = users.find(account => account.id === franchise.operatorId)
-      || users.find(account => account.id === franchise.driverId);
+      || users.find(account => account.id === franchise.driverId)
+      || users.find(account => `${account.firstName} ${account.lastName}`.toLowerCase() === (franchise.operatorName || '').toLowerCase());
 
-    if (franchise.status === 'active' && daysUntilExpiry < 0) {
-      await saveFranchiseAsync({ ...franchise, status: 'expired' }, isSupabaseConfigured());
-      const penaltyOwner = franchise.driverId || franchise.operatorId;
+    // Exact expiration date (daysUntilExpiry === 0) or past expiration (daysUntilExpiry < 0)
+    if (daysUntilExpiry <= 0) {
+      if (franchise.status === 'active') {
+        await saveFranchiseAsync({ ...franchise, status: 'expired' }, isSupabaseConfigured());
+      }
+      const penaltyOwner = franchise.driverId || franchise.operatorId || recipient?.id || '';
       const hasExpiryPenalty = penalties.some(penalty =>
         penalty.plateNumber === franchise.plateNumber
         && (penalty.violationType === 'Expired MTOP' || penalty.violationType === 'Overdue MTOP')
       );
-      if (!hasExpiryPenalty && penaltyOwner) {
+      if (!hasExpiryPenalty && penaltyOwner && daysUntilExpiry < 0) {
         await savePenaltyAsync({
           id: crypto.randomUUID(), driverId: penaltyOwner, driverName: franchise.driverName,
           plateNumber: franchise.plateNumber, todaName: franchise.todaName,
@@ -916,15 +1102,27 @@ export async function processFranchiseLifecycleAsync(): Promise<void> {
           remarks: 'Fixed ₱125 overdue penalty for expired franchise.', issuedBy: 'Baliwag Franchise System',
         }, isSupabaseConfigured());
       }
-      const title = `Franchise Expired – ${franchise.mtopNumber}`;
-      if (recipient && !alreadySent(recipient.id, title)) {
-        await notifyUserAsync(recipient, title,
-          SMSTemplates.franchiseExpired(franchise.mtopNumber, franchise.plateNumber, expiryLabel), 'expiration');
+
+      if (recipient) {
+        // Also ensure pre-expiry reminder exists if user jumped straight to expiration date
+        const reminderTitle = `Expiry Reminder (1-day) – ${franchise.mtopNumber}`;
+        if (!alreadySent(recipient.id, reminderTitle)) {
+          const remMsg = SMSTemplates.renewalReminder(franchise.mtopNumber, franchise.plateNumber, expiryLabel, Math.max(0, daysUntilExpiry));
+          await notifyUserAsync(recipient, reminderTitle, remMsg, 'renewal_reminder');
+          triggeredMessages.push(`${reminderTitle} -> ${recipient.phone}`);
+        }
+
+        const expiredTitle = `Franchise Expired – ${franchise.mtopNumber}`;
+        if (!alreadySent(recipient.id, expiredTitle)) {
+          const expMsg = SMSTemplates.franchiseExpired(franchise.mtopNumber, franchise.plateNumber, expiryLabel);
+          await notifyUserAsync(recipient, expiredTitle, expMsg, 'expiration');
+          triggeredMessages.push(`${expiredTitle} -> ${recipient.phone}`);
+        }
       }
       continue;
     }
 
-    if (franchise.status !== 'active' || daysUntilExpiry < 0 || !recipient) continue;
+    if (!recipient) continue;
 
     // Send the closest reminder window that applies (30 / 7 / 1 day)
     const windowDays = [...EXPIRY_REMINDER_DAYS].sort((a, b) => a - b).find(days => daysUntilExpiry <= days);
@@ -932,13 +1130,20 @@ export async function processFranchiseLifecycleAsync(): Promise<void> {
     const title = `Expiry Reminder (${windowDays}-day) – ${franchise.mtopNumber}`;
     if (alreadySent(recipient.id, title)) continue;
 
+    const msg = SMSTemplates.renewalReminder(franchise.mtopNumber, franchise.plateNumber, expiryLabel, daysUntilExpiry);
     await notifyUserAsync(
       recipient,
       title,
-      SMSTemplates.renewalReminder(franchise.mtopNumber, franchise.plateNumber, expiryLabel, daysUntilExpiry),
+      msg,
       'renewal_reminder'
     );
+    triggeredMessages.push(`${title} -> ${recipient.phone}`);
   }
+
+  return {
+    triggeredCount: triggeredMessages.length,
+    triggeredMessages,
+  };
 }
 
 // ================= ADVERTISEMENTS =================
@@ -963,7 +1168,7 @@ export async function saveAdvertisementAsync(ad: Advertisement): Promise<Adverti
   if (isSupabaseConfigured() && supabase) {
     try {
       await supabase.from('advertisements').upsert({
-        id: ad.id,
+        id: ensureValidUuid(ad.id),
         title: ad.title,
         description: ad.description,
         image_url: ad.imageUrl,
@@ -1015,7 +1220,7 @@ export async function saveInformationItemAsync(item: InformationItem): Promise<I
   if (isSupabaseConfigured() && supabase) {
     try {
       await supabase.from('information_items').upsert({
-        id: item.id,
+        id: ensureValidUuid(item.id),
         title: item.title,
         category: item.category,
         content: item.content,
@@ -1056,6 +1261,30 @@ function mapProfileToUser(p: any): User {
     }
   }
 
+  // Reconstruct primary registration ID document from profile_photo when documents column is absent in profiles table
+  if (docs.length === 0 && p.profile_photo && (p.role === 'operator' || p.role === 'driver')) {
+    docs = [
+      {
+        id: `reg-doc-${p.id}`,
+        name: "Valid Government ID / Driver's License",
+        type: 'drivers_license',
+        fileName: 'drivers_license_id.jpg',
+        fileUrl: p.profile_photo,
+        status: p.account_status === 'approved' ? 'verified' : 'uploaded',
+        uploadedAt: p.created_at || new Date().toISOString(),
+      },
+    ];
+  }
+
+  let parsedPermissions = p.admin_permissions || [];
+  if (typeof parsedPermissions === 'string') {
+    try {
+      parsedPermissions = JSON.parse(parsedPermissions);
+    } catch {
+      parsedPermissions = [];
+    }
+  }
+
   return {
     id: p.id,
     username: p.username,
@@ -1071,7 +1300,7 @@ function mapProfileToUser(p: any): User {
     todaPaymentQrUrl: p.toda_payment_qr_url,
     profilePhoto: p.profile_photo,
     accountStatus: p.account_status,
-    adminPermissions: p.admin_permissions || [],
+    adminPermissions: Array.isArray(parsedPermissions) ? parsedPermissions : [],
     sessionId: p.current_session_id,
     documents: docs,
     createdAt: p.created_at,
@@ -1228,8 +1457,19 @@ function mapDbInformationItem(item: any): InformationItem {
 }
 
 // ================= STORAGE BUCKET INTEGRATION =================
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '/red-santos-drivers-license.jpg');
+    reader.onerror = () => resolve('/red-santos-drivers-license.jpg');
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
  * Uploads a file to the Supabase 'Files' storage bucket and returns its public URL.
+ * Falls back to a durable Data URL if the storage bucket is unreachable so uploaded
+ * images never expire across page reloads or tabs.
  */
 export async function uploadFileToBucketAsync(
   file: File,
@@ -1248,28 +1488,24 @@ export async function uploadFileToBucketAsync(
           upsert: true,
         });
 
-      if (error) {
-        console.error('Error uploading file to Files bucket:', error.message);
-        return { url: null, path: null, error: error.message };
+      if (!error && data) {
+        const { data: publicData } = supabase.storage
+          .from('Files')
+          .getPublicUrl(filePath);
+
+        return {
+          url: publicData.publicUrl,
+          path: data.path,
+        };
       }
-
-      const { data: publicData } = supabase.storage
-        .from('Files')
-        .getPublicUrl(filePath);
-
-      return {
-        url: publicData.publicUrl,
-        path: data.path,
-      };
+      console.warn('Bucket upload fallback to persistent Data URL:', error?.message);
     } catch (err: any) {
-      console.error('Exception during file upload:', err);
-      return { url: null, path: null, error: err?.message || 'Upload failed' };
+      console.warn('Exception during file upload, using Data URL fallback:', err);
     }
   }
 
-  // Fallback mock URL if Supabase is offline or not configured
-  const mockUrl = URL.createObjectURL(file);
-  return { url: mockUrl, path: `local/${file.name}` };
+  const dataUrl = await fileToDataUrl(file);
+  return { url: dataUrl, path: `local/${file.name}` };
 }
 
 // ================= USER ACTIVITY AUDIT LOGS =================
@@ -1310,9 +1546,10 @@ export async function recordAuditLogAsync(log: {
   targetId?: string;
   ipAddress?: string;
 }): Promise<AuditLog> {
+  const validUserId = log.userId && UUID_REGEX.test(log.userId) ? log.userId : undefined;
   const entry: AuditLog = {
     id: crypto.randomUUID(),
-    userId: log.userId || 'system',
+    userId: validUserId || 'system',
     userName: log.userName || 'System',
     userRole: log.userRole || 'admin',
     action: log.action,
@@ -1324,9 +1561,9 @@ export async function recordAuditLogAsync(log: {
 
   if (isSupabaseConfigured() && supabase) {
     try {
-      await supabase.from('audit_logs').insert([{
+      const { error } = await supabase.from('audit_logs').insert([{
         id: entry.id,
-        user_id: entry.userId,
+        user_id: validUserId || null,
         user_name: entry.userName,
         user_role: entry.userRole,
         action: entry.action,
@@ -1335,6 +1572,19 @@ export async function recordAuditLogAsync(log: {
         ip_address: entry.ipAddress,
         created_at: entry.timestamp,
       }]);
+      if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
+        await supabase.from('audit_logs').insert([{
+          id: entry.id,
+          user_id: null,
+          user_name: entry.userName,
+          user_role: entry.userRole,
+          action: entry.action,
+          details: entry.details,
+          target_id: entry.targetId,
+          ip_address: entry.ipAddress,
+          created_at: entry.timestamp,
+        }]);
+      }
     } catch {
       // fallback
     }

@@ -6,9 +6,10 @@ import type { Application, Franchise, Penalty, User, AuditLog } from '../../type
 import { 
   ShieldCheck, FileText, AlertTriangle, Clock, BarChart3, 
   Users, CheckCircle2, Receipt, ArrowRight, History, Search,
-  Filter, KeyRound, Wrench, CreditCard, Award
+  Filter, KeyRound, Wrench, CreditCard, Award, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 
 export function AdminDashboard() {
   const { } = useAuth();
@@ -22,6 +23,14 @@ export function AdminDashboard() {
   const [auditFilter, setAuditFilter] = useState<string>('all');
   const [auditSearch, setAuditSearch] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'audit' | 'transactions'>('audit');
+  const [isAuditFolded, setIsAuditFolded] = useState<boolean>(false);
+  const [isAppsQueueFolded, setIsAppsQueueFolded] = useState<boolean>(false);
+  const [isPenaltiesFolded, setIsPenaltiesFolded] = useState<boolean>(false);
+  const [appsPage, setAppsPage] = useState<number>(1);
+  const [penaltiesPage, setPenaltiesPage] = useState<number>(1);
+  const [auditPage, setAuditPage] = useState<number>(1);
+  const [txPage, setTxPage] = useState<number>(1);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     async function loadData() {
@@ -171,99 +180,139 @@ export function AdminDashboard() {
           
           {/* Applications Card */}
           <div className="glass-container" style={{ padding: '1.75rem', width: '100%', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isAppsQueueFolded ? 0 : '1.25rem', gap: '0.75rem', flexWrap: 'wrap' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff' }}>Applications for Final MTOP Approval</h3>
                 <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Queued after TODA & Treasurer approval</p>
               </div>
-              <span className="pill-badge pill-cyan">{pendingAdminReviews.length} Queue</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span className="pill-badge pill-cyan">{pendingAdminReviews.length} Queue</span>
+                <button
+                  type="button"
+                  onClick={() => setIsAppsQueueFolded(!isAppsQueueFolded)}
+                  className="btn-glass"
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem', color: '#38bdf8' }}
+                >
+                  {isAppsQueueFolded ? <><ChevronDown size={14} /> See More</> : <><ChevronUp size={14} /> See Less</>}
+                </button>
+              </div>
             </div>
 
-            <div style={{ overflowX: 'auto', width: '100%' }}>
-              <table className="glass-table" style={{ width: '100%', minWidth: '500px' }}>
-                <thead>
-                  <tr>
-                    <th>Applicant / Driver</th>
-                    <th>Plate / TODA</th>
-                    <th>TODA Approval</th>
-                    <th>Treasurer Fee</th>
-                    <th style={{ textAlign: 'right' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingAdminReviews.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}>
-                        No pending applications require approval at this time.
-                      </td>
-                    </tr>
-                  ) : (
-                    pendingAdminReviews.slice(0, 5).map(app => (
-                      <tr key={app.id}>
-                        <td style={{ fontWeight: 700, color: '#ffffff' }}>{app.driverName || app.applicantName}</td>
-                        <td>{app.plateNumber} ({app.todaName ? app.todaName.split(' ')[0] : 'TODA'})</td>
-                        <td>
-                          {app.todaApproval?.routeFeePaid || app.presidentEndorsed ? (
-                            <span className="pill-badge pill-purple">Endorsed</span>
-                          ) : (
-                            <span className="pill-badge pill-orange">Pending</span>
-                          )}
-                        </td>
-                        <td>
-                          {app.treasurerPayment?.paid ? (
-                            <span className="pill-badge pill-emerald">Paid</span>
-                          ) : (
-                            <span className="pill-badge pill-orange">Pending</span>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button
-                            onClick={() => navigate('/admin/applications')}
-                            className="btn-glass btn-primary-glass"
-                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                          >
-                            Review & Approve
-                          </button>
-                        </td>
+            {!isAppsQueueFolded && (
+              <>
+                <div style={{ overflowX: 'auto', width: '100%' }}>
+                  <table className="glass-table" style={{ width: '100%', minWidth: '500px' }}>
+                    <thead>
+                      <tr>
+                        <th>Applicant / Driver</th>
+                        <th>Plate / TODA</th>
+                        <th>TODA Approval</th>
+                        <th>Treasurer Fee</th>
+                        <th style={{ textAlign: 'right' }}>Action</th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {pendingAdminReviews.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}>
+                            No pending applications require approval at this time.
+                          </td>
+                        </tr>
+                      ) : (
+                        pendingAdminReviews.slice((appsPage - 1) * PAGE_SIZE, appsPage * PAGE_SIZE).map(app => (
+                          <tr key={app.id}>
+                            <td style={{ fontWeight: 700, color: '#ffffff' }}>{app.driverName || app.applicantName}</td>
+                            <td>{app.plateNumber} ({app.todaName ? app.todaName.split(' ')[0] : 'TODA'})</td>
+                            <td>
+                              {app.todaApproval?.routeFeePaid || app.presidentEndorsed ? (
+                                <span className="pill-badge pill-purple">Endorsed</span>
+                              ) : (
+                                <span className="pill-badge pill-orange">Pending</span>
+                              )}
+                            </td>
+                            <td>
+                              {app.treasurerPayment?.paid ? (
+                                <span className="pill-badge pill-emerald">Paid</span>
+                              ) : (
+                                <span className="pill-badge pill-orange">Pending</span>
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button
+                                onClick={() => navigate('/admin/applications')}
+                                className="btn-glass btn-primary-glass"
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                              >
+                                Review & Approve
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <PaginationBar
+                  currentPage={appsPage}
+                  totalItems={pendingAdminReviews.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setAppsPage}
+                />
+              </>
+            )}
           </div>
 
           {/* Penalty Quick Summary */}
           <div className="glass-container" style={{ padding: '1.75rem', width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isPenaltiesFolded ? 0 : '1.25rem', gap: '0.75rem', flexWrap: 'wrap' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff' }}>Overdue MTOP Penalties</h3>
                 <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Late renewal records (₱125.00 fixed)</p>
               </div>
-              <button onClick={() => navigate('/admin/penalties')} className="btn-glass" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
-                View All →
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button onClick={() => navigate('/admin/penalties')} className="btn-glass" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}>
+                  View All →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPenaltiesFolded(!isPenaltiesFolded)}
+                  className="btn-glass"
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem', color: '#38bdf8' }}
+                >
+                  {isPenaltiesFolded ? <><ChevronDown size={14} /> See More</> : <><ChevronUp size={14} /> See Less</>}
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              {penalties.length === 0 ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem' }}>
-                  No overdue penalties recorded.
-                </div>
-              ) : (
-                penalties.slice(0, 4).map(p => (
-                  <div key={p.id} className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <strong style={{ color: '#ffffff', display: 'block', fontSize: '0.88rem' }}>{p.driverName} ({p.plateNumber})</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#fb7185' }}>{p.violationType} • ₱{p.amount.toFixed(2)}</span>
+            {!isPenaltiesFolded && (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {penalties.length === 0 ? (
+                    <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.88rem' }}>
+                      No overdue penalties recorded.
                     </div>
-                    <span className={`pill-badge ${p.status === 'paid' ? 'pill-emerald' : 'pill-rose'}`}>
-                      {p.status.toUpperCase()}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
+                  ) : (
+                    penalties.slice((penaltiesPage - 1) * PAGE_SIZE, penaltiesPage * PAGE_SIZE).map(p => (
+                      <div key={p.id} className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong style={{ color: '#ffffff', display: 'block', fontSize: '0.88rem' }}>{p.driverName} ({p.plateNumber})</strong>
+                          <span style={{ fontSize: '0.75rem', color: '#fb7185' }}>{p.violationType} • ₱{p.amount.toFixed(2)}</span>
+                        </div>
+                        <span className={`pill-badge ${p.status === 'paid' ? 'pill-emerald' : 'pill-rose'}`}>
+                          {p.status.toUpperCase()}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <PaginationBar
+                  currentPage={penaltiesPage}
+                  totalItems={penalties.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setPenaltiesPage}
+                />
+              </>
+            )}
           </div>
 
         </div>
@@ -272,7 +321,7 @@ export function AdminDashboard() {
         <div className="glass-container" style={{ padding: '1.75rem', width: '100%', overflow: 'hidden' }}>
           
           {/* Section Header & View Switcher */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isAuditFolded ? 0 : '1.5rem', flexWrap: 'wrap', gap: '1rem', borderBottom: isAuditFolded ? 'none' : '1px solid rgba(255,255,255,0.08)', paddingBottom: isAuditFolded ? 0 : '1.25rem' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <History size={20} color="#38bdf8" />
@@ -288,118 +337,132 @@ export function AdminDashboard() {
               </p>
             </div>
 
-            {/* View Switcher Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.25)', padding: '0.3rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+              {/* View Switcher Tabs */}
+              <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.25)', padding: '0.3rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('audit'); setIsAuditFolded(false); }}
+                  style={{
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '7px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: activeTab === 'audit' ? '#0284c7' : 'transparent',
+                    color: activeTab === 'audit' ? '#ffffff' : '#94a3b8',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                >
+                  <History size={14} /> Activity Audit Trail ({auditLogs.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('transactions'); setIsAuditFolded(false); }}
+                  style={{
+                    padding: '0.45rem 0.95rem',
+                    borderRadius: '7px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: activeTab === 'transactions' ? '#059669' : 'transparent',
+                    color: activeTab === 'transactions' ? '#ffffff' : '#94a3b8',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                >
+                  <Receipt size={14} /> Payment Transactions
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setActiveTab('audit')}
-                style={{
-                  padding: '0.45rem 0.95rem',
-                  borderRadius: '7px',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: activeTab === 'audit' ? '#0284c7' : 'transparent',
-                  color: activeTab === 'audit' ? '#ffffff' : '#94a3b8',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                }}
+                onClick={() => setIsAuditFolded(!isAuditFolded)}
+                className="btn-glass"
+                style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#38bdf8' }}
               >
-                <History size={14} /> Activity Audit Trail ({auditLogs.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('transactions')}
-                style={{
-                  padding: '0.45rem 0.95rem',
-                  borderRadius: '7px',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: activeTab === 'transactions' ? '#059669' : 'transparent',
-                  color: activeTab === 'transactions' ? '#ffffff' : '#94a3b8',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                }}
-              >
-                <Receipt size={14} /> Payment Transactions
+                {isAuditFolded ? <><ChevronDown size={16} /> See More</> : <><ChevronUp size={16} /> See Less</>}
               </button>
             </div>
           </div>
 
           {/* TAB 1: SYSTEM ACTIVITY AUDIT LOGS (Module 10) */}
-          {activeTab === 'audit' && (
-            <div>
-              {/* Search & Filter Toolbar */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-                <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
-                  <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input
-                    type="text"
-                    className="glass-input"
-                    style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', width: '100%' }}
-                    placeholder="Search user, action, details, or ID..."
-                    value={auditSearch}
-                    onChange={e => setAuditSearch(e.target.value)}
-                  />
+          {!isAuditFolded && activeTab === 'audit' && (() => {
+            const filteredLogs = auditLogs
+              .filter(log => {
+                const matchesFilter = auditFilter === 'all' || 
+                  (auditFilter === 'login' && (log.action === 'USER_LOGIN' || log.action === 'USER_LOGOUT')) ||
+                  (auditFilter === 'documents' && (log.action.includes('DOCUMENT') || log.action.includes('APPLICATION'))) ||
+                  (auditFilter === 'stenciling' && log.action.includes('STENCILING')) ||
+                  (auditFilter === 'payment' && log.action.includes('PAYMENT')) ||
+                  (auditFilter === 'mtop' && log.action.includes('MTOP')) ||
+                  (auditFilter === 'account' && log.action.includes('ACCOUNT'));
+
+                const searchStr = `${log.userName} ${log.action} ${log.details} ${log.targetId || ''}`.toLowerCase();
+                const matchesSearch = !auditSearch || searchStr.includes(auditSearch.toLowerCase());
+                return matchesFilter && matchesSearch;
+              })
+              .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+
+            const visibleLogs = filteredLogs.slice((auditPage - 1) * PAGE_SIZE, auditPage * PAGE_SIZE);
+
+            return (
+              <div>
+                {/* Search & Filter Toolbar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
+                    <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      className="glass-input"
+                      style={{ paddingLeft: '2.5rem', fontSize: '0.85rem', width: '100%' }}
+                      placeholder="Search user, action, details, or ID..."
+                      value={auditSearch}
+                      onChange={e => { setAuditSearch(e.target.value); setAuditPage(1); }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <Filter size={15} color="#94a3b8" />
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Filter Event:</span>
+                    <select
+                      className="glass-input glass-select"
+                      style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', width: 'auto' }}
+                      value={auditFilter}
+                      onChange={e => { setAuditFilter(e.target.value); setAuditPage(1); }}
+                    >
+                      <option value="all">All System Events ({auditLogs.length})</option>
+                      <option value="login">User Authentication (Logins)</option>
+                      <option value="documents">Document Verification & Submissions</option>
+                      <option value="stenciling">Stenciling & Physical Inspections</option>
+                      <option value="payment">Fee & Payment Clearances</option>
+                      <option value="mtop">MTOP Franchise Approvals</option>
+                      <option value="account">Account Management & Security</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <Filter size={15} color="#94a3b8" />
-                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Filter Event:</span>
-                  <select
-                    className="glass-input glass-select"
-                    style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', width: 'auto' }}
-                    value={auditFilter}
-                    onChange={e => setAuditFilter(e.target.value)}
-                  >
-                    <option value="all">All System Events ({auditLogs.length})</option>
-                    <option value="login">User Authentication (Logins)</option>
-                    <option value="documents">Document Verification & Submissions</option>
-                    <option value="stenciling">Stenciling & Physical Inspections</option>
-                    <option value="payment">Fee & Payment Clearances</option>
-                    <option value="mtop">MTOP Franchise Approvals</option>
-                    <option value="account">Account Management & Security</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Audit Table */}
-              <div style={{ overflowX: 'auto', width: '100%' }}>
-                <table className="glass-table" style={{ width: '100%', minWidth: '780px' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '180px' }}>Timestamp</th>
-                      <th style={{ width: '190px' }}>User / Officer</th>
-                      <th style={{ width: '180px' }}>Action Type</th>
-                      <th>Activity Description & Details</th>
-                      <th style={{ textAlign: 'right', width: '120px' }}>Target Ref</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {auditLogs
-                      .filter(log => {
-                        const matchesFilter = auditFilter === 'all' || 
-                          (auditFilter === 'login' && (log.action === 'USER_LOGIN' || log.action === 'USER_LOGOUT')) ||
-                          (auditFilter === 'documents' && (log.action.includes('DOCUMENT') || log.action.includes('APPLICATION'))) ||
-                          (auditFilter === 'stenciling' && log.action.includes('STENCILING')) ||
-                          (auditFilter === 'payment' && log.action.includes('PAYMENT')) ||
-                          (auditFilter === 'mtop' && log.action.includes('MTOP')) ||
-                          (auditFilter === 'account' && log.action.includes('ACCOUNT'));
-
-                        const searchStr = `${log.userName} ${log.action} ${log.details} ${log.targetId || ''}`.toLowerCase();
-                        const matchesSearch = !auditSearch || searchStr.includes(auditSearch.toLowerCase());
-                        return matchesFilter && matchesSearch;
-                      })
-                      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
-                      .slice(0, 25)
-                      .map((log) => {
+                {/* Audit Table */}
+                <div style={{ overflowX: 'auto', width: '100%' }}>
+                  <table className="glass-table" style={{ width: '100%', minWidth: '780px' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '180px' }}>Timestamp</th>
+                        <th style={{ width: '190px' }}>User / Officer</th>
+                        <th style={{ width: '180px' }}>Action Type</th>
+                        <th>Activity Description & Details</th>
+                        <th style={{ textAlign: 'right', width: '120px' }}>Target Ref</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleLogs.map((log) => {
                         const isLogin = log.action === 'USER_LOGIN' || log.action === 'USER_LOGOUT';
                         const isDoc = log.action.includes('DOCUMENT') || log.action.includes('APPLICATION');
                         const isStenciling = log.action.includes('STENCILING');
@@ -465,47 +528,57 @@ export function AdminDashboard() {
                           </tr>
                         );
                       })}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
+
+                <PaginationBar
+                  currentPage={auditPage}
+                  totalItems={filteredLogs.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setAuditPage}
+                />
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* TAB 2: FINANCIAL TRANSACTIONS */}
-          {activeTab === 'transactions' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-                <button onClick={() => navigate('/admin/reports')} className="btn-glass" style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem' }}>
-                  Full Financial Ledger & Analytics <ArrowRight size={14} />
-                </button>
-              </div>
+          {!isAuditFolded && activeTab === 'transactions' && (() => {
+            const paidApps = applications
+              .filter(a => a.treasurerPayment?.paid)
+              .sort((a, b) => new Date(b.treasurerPayment?.paidAt || b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.treasurerPayment?.paidAt || a.updatedAt || a.submittedAt || 0).getTime());
+            const visiblePaidApps = paidApps.slice((txPage - 1) * PAGE_SIZE, txPage * PAGE_SIZE);
 
-              <div style={{ overflowX: 'auto', width: '100%' }}>
-                <table className="glass-table" style={{ width: '100%', minWidth: '700px' }}>
-                  <thead>
-                    <tr>
-                      <th>Transaction ID / OR</th>
-                      <th>Payer Name</th>
-                      <th>Fee Type</th>
-                      <th>Payment Method</th>
-                      <th>Amount</th>
-                      <th>Date</th>
-                      <th style={{ textAlign: 'right' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {applications.filter(a => a.treasurerPayment?.paid).length === 0 ? (
+            return (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                  <button onClick={() => navigate('/admin/reports')} className="btn-glass" style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem' }}>
+                    Full Financial Ledger & Analytics <ArrowRight size={14} />
+                  </button>
+                </div>
+
+                <div style={{ overflowX: 'auto', width: '100%' }}>
+                  <table className="glass-table" style={{ width: '100%', minWidth: '700px' }}>
+                    <thead>
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                          No transaction records found.
-                        </td>
+                        <th>Transaction ID / OR</th>
+                        <th>Payer Name</th>
+                        <th>Fee Type</th>
+                        <th>Payment Method</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th style={{ textAlign: 'right' }}>Status</th>
                       </tr>
-                    ) : (
-                      applications
-                        .filter(a => a.treasurerPayment?.paid)
-                        .sort((a, b) => new Date(b.treasurerPayment?.paidAt || b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.treasurerPayment?.paidAt || a.updatedAt || a.submittedAt || 0).getTime())
-                        .slice(0, 10)
-                        .map(a => (
+                    </thead>
+                    <tbody>
+                      {paidApps.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                            No transaction records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        visiblePaidApps.map(a => (
                           <tr key={a.id}>
                             <td style={{ fontFamily: 'monospace', color: '#38bdf8', fontWeight: 700 }}>
                               {a.treasurerPayment?.orNumber || a.id}
@@ -538,12 +611,20 @@ export function AdminDashboard() {
                             </td>
                           </tr>
                         ))
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <PaginationBar
+                  currentPage={txPage}
+                  totalItems={paidApps.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setTxPage}
+                />
               </div>
-            </div>
-          )}
+            );
+          })()}
 
         </div>
 

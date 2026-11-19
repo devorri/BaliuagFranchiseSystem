@@ -1,22 +1,52 @@
 import { useAuth } from '../../context/AuthContext';
-import { Bell } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, Smartphone } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import * as storage from '../../services/storageService';
+import * as supabaseService from '../../services/supabaseService';
+import type { SMSNotification } from '../../types';
+import { CLOCK_CHANGED_EVENT } from '../../services/clock';
 import { DateNavigator } from './DateNavigator';
 
 export function Header() {
   const { user } = useAuth();
   const [showNotifs, setShowNotifs] = useState(false);
+  const [notifications, setNotifications] = useState<SMSNotification[]>([]);
 
-  const notifications = user ? storage.getSMSNotifications(user.id).sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime()) : [];
+  const loadNotifications = async () => {
+    if (!user) return;
+    try {
+      const isAdminView = user.role === 'admin' || user.role === 'franchise_officer';
+      const list = await supabaseService.getSMSNotificationsAsync(isAdminView ? undefined : user.id);
+      list.sort((a, b) => new Date(b.sentAt || 0).getTime() - new Date(a.sentAt || 0).getTime());
+      setNotifications(list);
+    } catch {
+      const fallback = storage.getSMSNotifications(user.role === 'admin' ? undefined : user.id);
+      setNotifications(fallback);
+    }
+  };
+
+  useEffect(() => {
+    void loadNotifications();
+    const interval = setInterval(() => void loadNotifications(), 4000);
+    const onClockChange = () => void loadNotifications();
+    window.addEventListener(CLOCK_CHANGED_EVENT, onClockChange);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener(CLOCK_CHANGED_EVENT, onClockChange);
+    };
+  }, [user?.id, user?.role]);
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const getRoleBadge = () => {
     switch (user?.role) {
       case 'driver':
         return <span className="pill-badge pill-cyan">Tricycle Driver</span>;
+      case 'president':
       case 'toda_president':
         return <span className="pill-badge pill-purple">TODA President</span>;
+      case 'franchise_officer':
+        return <span className="pill-badge pill-cyan">Franchise Officer</span>;
       case 'admin':
         return <span className="pill-badge pill-orange">Municipal Admin</span>;
       case 'operator':
@@ -64,10 +94,13 @@ export function Header() {
         {/* Notifications Icon */}
         <div style={{ position: 'relative' }}>
           <button
-            onClick={() => setShowNotifs(!showNotifs)}
+            onClick={() => {
+              setShowNotifs(!showNotifs);
+              void loadNotifications();
+            }}
             className="btn-glass"
             style={{ padding: '0.5rem', borderRadius: '12px' }}
-            title="Notifications"
+            title="SMS & System Notifications"
           >
             <Bell size={20} color="#38bdf8" />
             {unreadCount > 0 && (
@@ -91,38 +124,51 @@ export function Header() {
             <div className="glass-panel" style={{
               position: 'absolute',
               right: 0,
-              top: '50px',
-              width: '340px',
+              top: '52px',
+              width: '390px',
               padding: '1.25rem',
-              zIndex: 100,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              zIndex: 999,
+              background: 'linear-gradient(165deg, rgba(8, 22, 15, 0.98) 0%, rgba(5, 14, 10, 0.99) 100%)',
+              border: '1px solid rgba(56, 189, 248, 0.38)',
+              borderRadius: '18px',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.12)',
+              backdropFilter: 'blur(28px)',
+              WebkitBackdropFilter: 'blur(28px)',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Notifications & SMS</h4>
-                <span className="pill-badge pill-cyan" style={{ fontSize: '0.7rem' }}>{notifications.length} alerts</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                <h4 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0, color: '#ffffff' }}>SMS & System Notifications</h4>
+                <span className="pill-badge pill-cyan" style={{ fontSize: '0.72rem' }}>{notifications.length} alerts</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '350px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                 {notifications.length === 0 ? (
-                  <p style={{ fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center', padding: '1rem 0' }}>
+                  <p style={{ fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center', padding: '1.25rem 0' }}>
                     No notifications available.
                   </p>
                 ) : (
                   notifications.map(n => (
                     <div key={n.id} style={{
-                      padding: '0.75rem',
+                      padding: '0.9rem 1rem',
                       borderRadius: '12px',
-                      background: n.read ? 'rgba(255,255,255,0.03)' : 'rgba(6,182,212,0.12)',
-                      border: '1px solid rgba(255,255,255,0.08)',
+                      background: n.type === 'expiration'
+                        ? 'rgba(52, 16, 20, 0.96)'
+                        : n.type === 'renewal_reminder'
+                        ? 'rgba(48, 32, 10, 0.96)'
+                        : 'rgba(13, 35, 26, 0.96)',
+                      border: `1px solid ${n.type === 'expiration' ? 'rgba(239, 68, 68, 0.5)' : n.type === 'renewal_reminder' ? 'rgba(245, 158, 11, 0.5)' : 'rgba(56, 189, 248, 0.35)'}`,
+                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
                     }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#ffffff', marginBottom: '0.2rem' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#ffffff', marginBottom: '0.3rem' }}>
                         {n.title}
                       </div>
-                      <p style={{ fontSize: '0.8rem', color: '#cbd5e1', lineHeight: '1.3' }}>
+                      <p style={{ fontSize: '0.82rem', color: '#e2e8f0', lineHeight: '1.45', margin: '0.25rem 0' }}>
                         {n.message}
                       </p>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.4rem', display: 'block' }}>
-                        {new Date(n.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', fontSize: '0.72rem', color: '#94a3b8' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#38bdf8', fontWeight: 600 }}>
+                          <Smartphone size={12} /> {n.recipientPhone || 'SMS Sent'}
+                        </span>
+                        <span style={{ color: '#cbd5e1' }}>{new Date(n.sentAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
                     </div>
                   ))
                 )}

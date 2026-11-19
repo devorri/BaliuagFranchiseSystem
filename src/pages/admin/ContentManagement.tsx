@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Megaphone, Info, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Megaphone, Info, Plus, Trash2, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 import * as supabaseService from '../../services/supabaseService';
 import type { Advertisement, InformationItem } from '../../types';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 
 export function ContentManagement() {
   const { showToast } = useToast();
@@ -11,6 +12,11 @@ export function ContentManagement() {
   // Data
   const [ads, setAds] = useState<Advertisement[]>([]);
   const [infoItems, setInfoItems] = useState<InformationItem[]>([]);
+  const [adsPage, setAdsPage] = useState(1);
+  const [infoPage, setInfoPage] = useState(1);
+  const [isAdsFolded, setIsAdsFolded] = useState(false);
+  const [isInfoFolded, setIsInfoFolded] = useState(false);
+  const PAGE_SIZE = 10;
 
   // Modals & Forms
   const [showAdModal, setShowAdModal] = useState(false);
@@ -222,165 +228,205 @@ export function ContentManagement() {
 
       {/* ================= TAB 1: ADVERTISEMENTS ================= */}
       {activeTab === 'ads' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="glass-container" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>Dynamic Advertisements</h3>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Appears on the live advertisement carousel and home page banners</p>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>Dynamic Advertisements ({ads.length})</h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Appears on the live advertisement carousel and home page banners (up to {PAGE_SIZE} per page)</p>
             </div>
-            <button onClick={openNewAdModal} className="btn-glass btn-emerald-glass" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Plus size={18} /> Add New Advertisement
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
-            {[...ads].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).map(ad => (
-              <div 
-                key={ad.id} 
-                className="glass-container" 
-                style={{ 
-                  padding: '1.5rem', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'space-between',
-                  opacity: ad.isActive ? 1 : 0.6,
-                  border: ad.isActive ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid rgba(255,255,255,0.05)'
-                }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <button onClick={openNewAdModal} className="btn-glass btn-emerald-glass" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Plus size={18} /> Add New Advertisement
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAdsFolded(!isAdsFolded)}
+                className="btn-glass"
+                style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', color: '#38bdf8' }}
               >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <span style={{
-                      textTransform: 'uppercase',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                      padding: '0.2rem 0.6rem',
-                      borderRadius: '20px',
-                      background: ad.category === 'announcement' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(168, 85, 247, 0.2)',
-                      color: ad.category === 'announcement' ? '#38bdf8' : '#c084fc',
-                    }}>
-                      {ad.category}
-                    </span>
-
-                    <button
-                      onClick={() => handleToggleAdStatus(ad)}
-                      className="btn-glass"
-                      style={{
-                        padding: '0.25rem 0.6rem',
-                        fontSize: '0.72rem',
-                        background: ad.isActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: ad.isActive ? '#4ade80' : '#f87171',
-                      }}
-                    >
-                      {ad.isActive ? '● Active' : '○ Inactive'}
-                    </button>
-                  </div>
-
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
-                    {ad.title}
-                  </h4>
-                  <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '1rem' }}>
-                    {ad.description}
-                  </p>
-                </div>
-
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                    Order: #{ad.displayOrder || 0}
-                  </span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => openEditAdModal(ad)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}>
-                      <Edit2 size={14} /> Edit
-                    </button>
-                    <button onClick={() => handleDeleteAd(ad.id)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-                      <Trash2 size={14} /> Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                {isAdsFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+              </button>
+            </div>
           </div>
+
+          {!isAdsFolded && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
+                {[...ads].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).slice((adsPage - 1) * PAGE_SIZE, adsPage * PAGE_SIZE).map(ad => (
+                  <div 
+                    key={ad.id} 
+                    className="glass-container" 
+                    style={{ 
+                      padding: '1.5rem', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'space-between',
+                      opacity: ad.isActive ? 1 : 0.6,
+                      border: ad.isActive ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid rgba(255,255,255,0.05)'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <span style={{
+                          textTransform: 'uppercase',
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '20px',
+                          background: ad.category === 'announcement' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(168, 85, 247, 0.2)',
+                          color: ad.category === 'announcement' ? '#38bdf8' : '#c084fc',
+                        }}>
+                          {ad.category}
+                        </span>
+
+                        <button
+                          onClick={() => handleToggleAdStatus(ad)}
+                          className="btn-glass"
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            fontSize: '0.72rem',
+                            background: ad.isActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                            color: ad.isActive ? '#4ade80' : '#f87171',
+                          }}
+                        >
+                          {ad.isActive ? '● Active' : '○ Inactive'}
+                        </button>
+                      </div>
+
+                      <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
+                        {ad.title}
+                      </h4>
+                      <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '1rem' }}>
+                        {ad.description}
+                      </p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                        Order: #{ad.displayOrder || 0}
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button onClick={() => openEditAdModal(ad)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}>
+                          <Edit2 size={14} /> Edit
+                        </button>
+                        <button onClick={() => handleDeleteAd(ad.id)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                          <Trash2 size={14} /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <PaginationBar
+                currentPage={adsPage}
+                totalItems={ads.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setAdsPage}
+              />
+            </>
+          )}
         </div>
       )}
 
       {/* ================= TAB 2: INFORMATION ITEMS ================= */}
       {activeTab === 'info' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="glass-container" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>Dynamic Information & Guidelines</h3>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Guidelines, registration steps, and fare matrices on the portal</p>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>Dynamic Information & Guidelines ({infoItems.length})</h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Guidelines, registration steps, and fare matrices on the portal (up to {PAGE_SIZE} per page)</p>
             </div>
-            <button onClick={openNewInfoModal} className="btn-glass btn-emerald-glass" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Plus size={18} /> Add New Information
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
-            {[...infoItems].sort((a, b) => new Date(b.updatedAt || b.publishedDate || 0).getTime() - new Date(a.updatedAt || a.publishedDate || 0).getTime()).map(item => (
-              <div 
-                key={item.id} 
-                className="glass-container" 
-                style={{ 
-                  padding: '1.5rem', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'space-between',
-                  opacity: item.isActive ? 1 : 0.6,
-                  border: item.isActive ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(255,255,255,0.05)'
-                }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <button onClick={openNewInfoModal} className="btn-glass btn-emerald-glass" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Plus size={18} /> Add New Information
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsInfoFolded(!isInfoFolded)}
+                className="btn-glass"
+                style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', color: '#38bdf8' }}
               >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <span style={{
-                      textTransform: 'uppercase',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                      padding: '0.2rem 0.6rem',
-                      borderRadius: '20px',
-                      background: 'rgba(52, 211, 153, 0.2)',
-                      color: '#34d399',
-                    }}>
-                      {item.category.replace('_', ' ')}
-                    </span>
-
-                    <button
-                      onClick={() => handleToggleInfoStatus(item)}
-                      className="btn-glass"
-                      style={{
-                        padding: '0.25rem 0.6rem',
-                        fontSize: '0.72rem',
-                        background: item.isActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: item.isActive ? '#4ade80' : '#f87171',
-                      }}
-                    >
-                      {item.isActive ? '● Active' : '○ Inactive'}
-                    </button>
-                  </div>
-
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
-                    {item.title}
-                  </h4>
-                  <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '1rem', whiteSpace: 'pre-line' }}>
-                    {item.content}
-                  </p>
-                </div>
-
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                    Published: {item.publishedDate}
-                  </span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => openEditInfoModal(item)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}>
-                      <Edit2 size={14} /> Edit
-                    </button>
-                    <button onClick={() => handleDeleteInfo(item.id)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-                      <Trash2 size={14} /> Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                {isInfoFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+              </button>
+            </div>
           </div>
+
+          {!isInfoFolded && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
+                {[...infoItems].sort((a, b) => new Date(b.updatedAt || b.publishedDate || 0).getTime() - new Date(a.updatedAt || a.publishedDate || 0).getTime()).slice((infoPage - 1) * PAGE_SIZE, infoPage * PAGE_SIZE).map(item => (
+                  <div 
+                    key={item.id} 
+                    className="glass-container" 
+                    style={{ 
+                      padding: '1.5rem', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'space-between',
+                      opacity: item.isActive ? 1 : 0.6,
+                      border: item.isActive ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid rgba(255,255,255,0.05)'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <span style={{
+                          textTransform: 'uppercase',
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '20px',
+                          background: 'rgba(52, 211, 153, 0.2)',
+                          color: '#34d399',
+                        }}>
+                          {item.category.replace('_', ' ')}
+                        </span>
+
+                        <button
+                          onClick={() => handleToggleInfoStatus(item)}
+                          className="btn-glass"
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            fontSize: '0.72rem',
+                            background: item.isActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                            color: item.isActive ? '#4ade80' : '#f87171',
+                          }}
+                        >
+                          {item.isActive ? '● Active' : '○ Inactive'}
+                        </button>
+                      </div>
+
+                      <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
+                        {item.title}
+                      </h4>
+                      <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '1rem', whiteSpace: 'pre-line' }}>
+                        {item.content}
+                      </p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                        Published: {item.publishedDate}
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button onClick={() => openEditInfoModal(item)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}>
+                          <Edit2 size={14} /> Edit
+                        </button>
+                        <button onClick={() => handleDeleteInfo(item.id)} className="btn-glass" style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                          <Trash2 size={14} /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <PaginationBar
+                currentPage={infoPage}
+                totalItems={infoItems.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setInfoPage}
+              />
+            </>
+          )}
         </div>
       )}
 

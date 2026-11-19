@@ -452,10 +452,10 @@ export function LandingPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
             {[
-              { step: '01', title: 'Submit Requirements', text: 'Upload OR/CR, Driver License, TODA Cert, and 2x2 Photo directly on the portal.', badge: 'Operator / Driver' },
+              { step: '01', title: 'Submit Requirements', text: 'Upload OR/CR, Driver License, Barangay Clearance, and 2x2 Photo directly to the Municipal Admin.', badge: 'Operator / Driver' },
               { step: '02', title: 'Inspection & Stenciling', text: 'Physical inspection of engine and chassis serial numbers to match registration records.', badge: 'Stenciling Office' },
-              { step: '03', title: 'Payment of Fees', text: 'Pay prescribed franchise fees at the City Treasurer’s Office or via instant GCash QR.', badge: 'City Treasurer' },
-              { step: '04', title: 'TODA Line Approval', text: 'TODA President verifies route eligibility and confirms association line endorsement.', badge: 'TODA President' },
+              { step: '03', title: 'Automatic Fee Payment', text: 'Once stenciled, pay prescribed fees via GCash QR Ph and your record automatically updates to Paid.', badge: 'City Treasurer' },
+              { step: '04', title: 'TODA Line Endorsement', text: 'TODA President directly endorses route line eligibility online (no requirement double-checking).', badge: 'TODA President' },
               { step: '05', title: 'Admin Review & QR Permit', text: 'Municipal Licensing Administrator finalizes review and issues the official QR MTOP permit.', badge: 'Municipal Admin' },
             ].map((item, idx) => (
               <div key={idx} className="glass-panel" style={{ padding: '1.5rem', position: 'relative' }}>

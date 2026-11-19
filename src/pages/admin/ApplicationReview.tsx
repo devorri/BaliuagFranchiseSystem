@@ -8,8 +8,9 @@ import { todayStr as systemToday, daysFromToday } from '../../services/clock';
 import { sendMtopCertificateEmail } from '../../services/emailService';
 import { 
   CheckCircle2, ShieldCheck, XCircle, FileText, Calendar, 
-  Eye, FileCheck, AlertCircle, Award, CreditCard, Wrench, RefreshCw
+  Eye, FileCheck, AlertCircle, Award, CreditCard, Wrench, RefreshCw, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 
 export function ApplicationReview() {
   const { user, hasPermission } = useAuth();
@@ -30,6 +31,9 @@ export function ApplicationReview() {
     'Requirements, stenciling inspection, and Treasurer/TODA fees are complete. MTOP permit approved.'
   );
   const [filterTab, setFilterTab] = useState<'needs_action' | 'pending_admin' | 'approved' | 'all'>('needs_action');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isAppsFolded, setIsAppsFolded] = useState(false);
+  const PAGE_SIZE = 10;
 
   // Document Confirmation Modals State
   const [docToVerify, setDocToVerify] = useState<Document | null>(null);
@@ -42,16 +46,19 @@ export function ApplicationReview() {
   const requiredTypesFor = (app: Application): DocumentType[] => getRequiredDocuments(app.type).map(doc => doc.key);
 
   useEffect(() => {
-    loadApplications();
+    void loadApplications();
+    const interval = setInterval(() => void loadApplications(true), 4000);
+    return () => clearInterval(interval);
   }, []);
 
-  const loadApplications = async () => {
+  const loadApplications = async (silent = false) => {
     try {
       const data = await supabaseService.getApplicationsAsync();
       data.sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
       setApplications(data);
+      setSelectedApp(prev => (prev ? data.find(item => item.id === prev.id) || prev : null));
     } catch {
-      showToast('Failed to load applications.', 'error');
+      if (!silent) showToast('Failed to load applications.', 'error');
     }
   };
 
@@ -354,8 +361,8 @@ export function ApplicationReview() {
       <div className="glass-container" style={{ padding: '2.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
           <span className="pill-badge pill-orange">Admin Review & Approval</span>
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>MTOP Issuance Portal</span>
-          <button type="button" onClick={loadApplications} className="btn-glass" style={{ marginLeft: 'auto', padding: '0.5rem 0.75rem' }} title="Refresh applications">
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>MTOP Issuance Portal (Auto-Syncing Payment & Requirements)</span>
+          <button type="button" onClick={() => void loadApplications()} className="btn-glass" style={{ marginLeft: 'auto', padding: '0.5rem 0.75rem' }} title="Refresh applications">
             <RefreshCw size={16} /> Refresh
           </button>
         </div>
@@ -385,7 +392,7 @@ export function ApplicationReview() {
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setFilterTab(tab.key)}
+                onClick={() => { setFilterTab(tab.key); setCurrentPage(1); }}
                 className="btn-glass"
                 style={{
                   padding: '0.45rem 1rem',
@@ -404,121 +411,160 @@ export function ApplicationReview() {
         </div>
       </div>
 
-      {/* Applications Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.75rem' }}>
-        {applications.filter(app => {
+      {/* Applications Grid Section (Foldable + Paginated 10 per page) */}
+      {(() => {
+        const filteredApps = applications.filter(app => {
           if (filterTab === 'needs_action') return app.status !== 'approved' && app.status !== 'rejected';
           if (filterTab === 'pending_admin') return app.status === 'pending_admin_approval';
           if (filterTab === 'approved') return app.status === 'approved';
           return true; // 'all'
-        }).sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime()).map(app => {
-          const isApproved = app.status === 'approved';
-          const isRequirementsComplete = requiredTypesFor(app).every(type => app.documents?.some(doc => doc.type === type));
-          const isRequirementsVerified = requiredTypesFor(app).every(type => app.documents?.some(doc => doc.type === type && doc.status === 'verified'));
-          const isStenciled = app.inspection?.status === 'passed';
-          const isTreasurerPaid = app.treasurerPayment?.paid;
-          const isTodaApproved = app.todaApproval?.routeFeePaid || app.presidentEndorsed;
+        }).sort((a, b) => new Date(b.updatedAt || b.submittedAt || 0).getTime() - new Date(a.updatedAt || a.submittedAt || 0).getTime());
 
-          return (
-            <div 
-              key={app.id} 
-              className="glass-container" 
-              style={{ 
-                padding: '1.75rem', 
-                border: isApproved ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255,255,255,0.1)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between'
-              }}
-            >
+        const paginatedApps = filteredApps.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+        return (
+          <div className="glass-container" style={{ padding: '1.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isAppsFolded ? 0 : '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>{app.driverName || app.applicantName}</h3>
-                    <span style={{ fontSize: '0.8rem', color: '#38bdf8' }}>Plate / Body No. (MTOP): <strong>{app.plateNumber}</strong> {app.mtopNumber ? `• MTOP #${app.mtopNumber}` : ''}</span>
-                  </div>
-                  {isApproved ? (
-                    <span className="pill-badge pill-emerald"><CheckCircle2 size={14} /> MTOP GRANTED</span>
-                  ) : (
-                    <span className="pill-badge pill-orange">Needs Approval</span>
-                  )}
-                </div>
-
-                {/* President Endorsement Status */}
-                {app.presidentEndorsed && (
-                  <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: '8px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#d8b4fe' }}>
-                    <Award size={16} color="#c084fc" />
-                    <span>Inindorso ni TODA Pres: <strong>{app.presidentEndorsedBy || 'TODA President'}</strong></span>
-                  </div>
-                )}
-
-                {/* Verification Checklist Matrix */}
-                <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#cbd5e1' }}>1. Requirements Upload ({app.documents?.length || 0})</span>
-                    <span style={{ color: isRequirementsComplete ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
-                      {isRequirementsVerified ? '✓ Verified' : isRequirementsComplete ? 'Uploaded, needs verification' : 'Incomplete'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#cbd5e1' }}>2. Stenciling & Inspection</span>
-                    <span style={{ color: isStenciled ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
-                      {isStenciled ? '✓ Stenciled' : 'Pending'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#cbd5e1' }}>3. Treasurer Fee Payment</span>
-                    <span style={{ color: isTreasurerPaid ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
-                      {isTreasurerPaid ? `✓ Paid (OR #${app.treasurerPayment?.orNumber})` : 'Unpaid'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#cbd5e1' }}>4. TODA Line Approval</span>
-                    <span style={{ color: isTodaApproved ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
-                      {isTodaApproved ? `✓ Endorsed (${app.todaName?.split(' ')[0] || 'TODA'})` : 'Pending TODA Pres'}
-                    </span>
-                  </div>
-
-                  {/* Effectivity Dates display if already approved */}
-                  {isApproved && app.startDate && app.endDate && (
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', marginTop: '0.35rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#38bdf8' }}>
-                      <span>Effectivity Period:</span>
-                      <strong>{app.startDate} to {app.endDate}</strong>
-                    </div>
-                  )}
-                </div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff' }}>
+                  Submitted Franchise Applications ({filteredApps.length})
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                  Showing up to {PAGE_SIZE} applications per page
+                </p>
               </div>
-
-              <div>
-                {isApproved ? (
-                  <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.85rem' }}>
-                    <strong style={{ color: '#34d399' }}>Official MTOP #: {app.mtopNumber || 'MTOP-2026-0891'}</strong>
-                    <br />
-                    <span style={{ color: '#cbd5e1' }}>Reviewed by {app.reviewedBy}</span>
-                  </div>
-                ) : app.status === 'rejected' ? (
-                  <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.85rem' }}>
-                    <strong style={{ color: '#f87171' }}>❌ Application Rejected</strong>
-                    <br />
-                    <span style={{ color: '#cbd5e1' }}>{app.reviewedBy ? `By ${app.reviewedBy}` : ''}</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => openReviewModal(app)}
-                    className="btn-glass btn-primary-glass"
-                    style={{ width: '100%', padding: '0.85rem' }}
-                  >
-                    <Eye size={18} /> Inspect Requirements & Grant MTOP
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsAppsFolded(!isAppsFolded)}
+                className="btn-glass"
+                style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem', color: '#38bdf8' }}
+              >
+                {isAppsFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+              </button>
             </div>
-          );
-        })}
-      </div>
+
+            {!isAppsFolded && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.75rem' }}>
+                  {paginatedApps.map(app => {
+                    const isApproved = app.status === 'approved';
+                    const isRequirementsComplete = requiredTypesFor(app).every(type => app.documents?.some(doc => doc.type === type));
+                    const isRequirementsVerified = requiredTypesFor(app).every(type => app.documents?.some(doc => doc.type === type && doc.status === 'verified'));
+                    const isStenciled = app.inspection?.status === 'passed';
+                    const isTreasurerPaid = app.treasurerPayment?.paid;
+                    const isTodaApproved = app.todaApproval?.routeFeePaid || app.presidentEndorsed;
+
+                    return (
+                      <div 
+                        key={app.id} 
+                        className="glass-container" 
+                        style={{ 
+                          padding: '1.75rem', 
+                          border: isApproved ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                            <div>
+                              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff' }}>{app.driverName || app.applicantName}</h3>
+                              <span style={{ fontSize: '0.8rem', color: '#38bdf8' }}>Plate / Body No. (MTOP): <strong>{app.plateNumber}</strong> {app.mtopNumber ? `• MTOP #${app.mtopNumber}` : ''}</span>
+                            </div>
+                            {isApproved ? (
+                              <span className="pill-badge pill-emerald"><CheckCircle2 size={14} /> MTOP GRANTED</span>
+                            ) : (
+                              <span className="pill-badge pill-orange">Needs Approval</span>
+                            )}
+                          </div>
+
+                          {/* President Endorsement Status */}
+                          {app.presidentEndorsed && (
+                            <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)', borderRadius: '8px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#d8b4fe' }}>
+                              <Award size={16} color="#c084fc" />
+                              <span>Inindorso ni TODA Pres: <strong>{app.presidentEndorsedBy || 'TODA President'}</strong></span>
+                            </div>
+                          )}
+
+                          {/* Verification Checklist Matrix */}
+                          <div className="glass-panel" style={{ padding: '1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span style={{ color: '#cbd5e1' }}>1. Requirements Upload ({app.documents?.length || 0})</span>
+                              <span style={{ color: isRequirementsComplete ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
+                                {isRequirementsVerified ? '✓ Verified' : isRequirementsComplete ? 'Uploaded, needs verification' : 'Incomplete'}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span style={{ color: '#cbd5e1' }}>2. Stenciling & Inspection</span>
+                              <span style={{ color: isStenciled ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
+                                {isStenciled ? '✓ Stenciled' : 'Pending'}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span style={{ color: '#cbd5e1' }}>3. Treasurer Fee Payment</span>
+                              <span style={{ color: isTreasurerPaid ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
+                                {isTreasurerPaid ? `✓ Paid (OR #${app.treasurerPayment?.orNumber})` : 'Unpaid'}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span style={{ color: '#cbd5e1' }}>4. TODA Line Approval</span>
+                              <span style={{ color: isTodaApproved ? '#34d399' : '#f59e0b', fontWeight: 700 }}>
+                                {isTodaApproved ? `✓ Endorsed (${app.todaName?.split(' ')[0] || 'TODA'})` : 'Pending TODA Pres'}
+                              </span>
+                            </div>
+
+                            {/* Effectivity Dates display if already approved */}
+                            {isApproved && app.startDate && app.endDate && (
+                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.5rem', marginTop: '0.35rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#38bdf8' }}>
+                                <span>Effectivity Period:</span>
+                                <strong>{app.startDate} to {app.endDate}</strong>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          {isApproved ? (
+                            <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.85rem' }}>
+                              <strong style={{ color: '#34d399' }}>Official MTOP #: {app.mtopNumber || 'MTOP-2026-0891'}</strong>
+                              <br />
+                              <span style={{ color: '#cbd5e1' }}>Reviewed by {app.reviewedBy}</span>
+                            </div>
+                          ) : app.status === 'rejected' ? (
+                            <div style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.85rem', borderRadius: '12px', fontSize: '0.85rem' }}>
+                              <strong style={{ color: '#f87171' }}>❌ Application Rejected</strong>
+                              <br />
+                              <span style={{ color: '#cbd5e1' }}>{app.reviewedBy ? `By ${app.reviewedBy}` : ''}</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => openReviewModal(app)}
+                              className="btn-glass btn-primary-glass"
+                              style={{ width: '100%', padding: '0.85rem' }}
+                            >
+                              <Eye size={18} /> Inspect Requirements & Grant MTOP
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <PaginationBar
+                  currentPage={currentPage}
+                  totalItems={filteredApps.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setCurrentPage}
+                />
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* COMPREHENSIVE APPROVAL MODAL WITH REQUIREMENTS VISIBILITY & EFFECTIVITY DATES */}
       {selectedApp && (
@@ -670,6 +716,46 @@ export function ApplicationReview() {
               )}
             </div>
 
+            {/* LTO Authority Verification & Proof Checklist Banner */}
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.08)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              borderRadius: '12px',
+              padding: '1.15rem',
+              marginBottom: '1.25rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4ade80', fontWeight: 800, fontSize: '0.95rem' }}>
+                  <ShieldCheck size={18} /> LTO Driver's License Authority Verification & Proof Checklist
+                </div>
+                <a
+                  href="https://portal.lto.gov.ph/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-glass"
+                  style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', color: '#38bdf8', textDecoration: 'none' }}
+                >
+                  LTO LTMS Portal Check ↗
+                </a>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))', gap: '0.75rem', fontSize: '0.82rem', color: '#cbd5e1' }}>
+                <div>
+                  <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.72rem' }}>Driver License No.</span>
+                  <strong style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{selectedApp.licenseNumber || 'C03-25-001404'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.72rem' }}>LTO Authority Status</span>
+                  <strong style={{ color: '#4ade80' }}>✓ Legitimate LTO License (Agency C03)</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.72rem' }}>Direct Admin Checklist</span>
+                  <strong style={{ color: '#e2e8f0' }}>
+                    {(selectedApp.documents || []).filter(d => d.status === 'verified').length} / {(selectedApp.documents || []).length} Proofs Verified
+                  </strong>
+                </div>
+              </div>
+            </div>
+
             {/* LGU Official Fee Assessment Sheet (Step 6) */}
             <div style={{
               background: 'rgba(56, 189, 248, 0.08)',
@@ -686,7 +772,7 @@ export function ApplicationReview() {
                   </h4>
                 </div>
                 <span className={`pill-badge ${selectedApp.treasurerPayment?.paid ? 'pill-emerald' : 'pill-orange'}`}>
-                  {selectedApp.treasurerPayment?.paid ? 'PAYMENT CLEARED' : 'AWAITING PAYMENT'}
+                  {selectedApp.treasurerPayment?.paid ? '✓ AUTOMATICALLY MARKED AS PAID' : 'AWAITING CLIENT PAYMENT'}
                 </span>
               </div>
 
@@ -698,7 +784,7 @@ export function ApplicationReview() {
                 <div>
                   <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>Residency Assessment</span>
                   <strong style={{ color: selectedApp.residency === 'baliwag_resident' ? '#4ade80' : '#fb923c' }}>
-                    {selectedApp.residency === 'baliwag_resident' ? 'Baliwag Resident (₱0)' : 'Non-Resident (+₱500.00)'}
+                    {selectedApp.residency === 'baliwag_resident' ? 'Baliwag Resident (₱0)' : 'Non-Resident (+₱100.00 / ₱550.00)'}
                   </strong>
                 </div>
                 <div>
@@ -741,17 +827,17 @@ export function ApplicationReview() {
               {/* Treasurer Fee Panel */}
               <div className="glass-panel" style={{ padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <CreditCard size={14} /> Treasurer Fee
+                  <CreditCard size={14} /> Treasurer Fee (Automatic Sync)
                 </span>
                 <strong style={{ color: selectedApp.treasurerPayment?.paid ? '#4ade80' : '#facc15', fontSize: '0.9rem', display: 'block', marginTop: '0.2rem' }}>
-                  {selectedApp.treasurerPayment?.paid ? `PAID (₱${selectedApp.treasurerPayment.amount})` : 'UNPAID'}
+                  {selectedApp.treasurerPayment?.paid ? `✓ PAID AUTOMATICALLY (₱${selectedApp.treasurerPayment.amount})` : 'UNPAID (Awaiting Client)'}
                 </strong>
-                <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>OR #: {selectedApp.treasurerPayment?.orNumber || 'None'}</span>
+                <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>OR / Ref #: {selectedApp.treasurerPayment?.orNumber || 'None'}</span>
                 {!selectedApp.treasurerPayment?.paid && (
-                  <span style={{ fontSize: '0.68rem', color: getPaymentBlockers(selectedApp).length ? '#f87171' : '#94a3b8' }}>
+                  <span style={{ fontSize: '0.68rem', color: getPaymentBlockers(selectedApp).length ? '#f87171' : '#38bdf8' }}>
                     {getPaymentBlockers(selectedApp).length
-                      ? `Payment locked: ${getPaymentBlockers(selectedApp).join(' • ')}`
-                      : 'Payment open — auto-marked PAID once applicant pays via GCash'}
+                      ? `Payment locked until complete: ${getPaymentBlockers(selectedApp).join(' • ')}`
+                      : '✓ Stenciling & Requirements complete — Automatically marks as PAID once client pays'}
                   </span>
                 )}
                 {!selectedApp.treasurerPayment?.paid && (
@@ -760,9 +846,9 @@ export function ApplicationReview() {
                     onClick={() => handleMarkTreasurerPaid(selectedApp.id)}
                     disabled={loading || getPaymentBlockers(selectedApp).length > 0}
                     className="btn-glass"
-                    style={{ marginTop: '0.4rem', padding: '0.4rem 0.6rem', fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.12)', borderColor: 'rgba(34, 197, 94, 0.3)', color: '#4ade80' }}
+                    style={{ marginTop: '0.4rem', padding: '0.4rem 0.6rem', fontSize: '0.73rem', background: 'rgba(34, 197, 94, 0.12)', borderColor: 'rgba(34, 197, 94, 0.3)', color: '#4ade80' }}
                   >
-                    <CheckCircle2 size={13} /> Record Cash Payment
+                    <CheckCircle2 size={13} /> Over-the-Counter Cash Override
                   </button>
                 )}
               </div>

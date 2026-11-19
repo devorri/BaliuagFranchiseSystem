@@ -4,8 +4,9 @@ import { belongsToToda } from '../../services/todaService';
 import { TodaMasterlistReport } from '../../components/reports/TodaMasterlistReport';
 import * as supabaseService from '../../services/supabaseService';
 import type { Application, Payment } from '../../types';
-import { Award, CheckCircle2, Clock, ShieldCheck, UploadCloud, Wallet } from 'lucide-react';
+import { Award, CheckCircle2, Clock, ShieldCheck, UploadCloud, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 
 export function TodaDashboard() {
   const { user, updateProfile } = useAuth();
@@ -14,6 +15,11 @@ export function TodaDashboard() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [qrUploading, setQrUploading] = useState(false);
   const [error, setError] = useState('');
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [approvalsPage, setApprovalsPage] = useState(1);
+  const [isPaymentsFolded, setIsPaymentsFolded] = useState(false);
+  const [isApprovalsFolded, setIsApprovalsFolded] = useState(false);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     void loadData();
@@ -145,81 +151,127 @@ export function TodaDashboard() {
       </div>
 
       <div className="glass-container" style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>TODA Payment Transactions</h3>
-          <button type="button" onClick={() => void loadData()} className="btn-glass" style={{ padding: '0.45rem 0.75rem' }}>Refresh</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isPaymentsFolded ? 0 : '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>TODA Payment Transactions ({payments.length})</h3>
+            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Showing up to {PAGE_SIZE} transactions per page</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button type="button" onClick={() => void loadData()} className="btn-glass" style={{ padding: '0.45rem 0.75rem' }}>Refresh</button>
+            <button
+              type="button"
+              onClick={() => setIsPaymentsFolded(!isPaymentsFolded)}
+              className="btn-glass"
+              style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', color: '#38bdf8' }}
+            >
+              {isPaymentsFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+            </button>
+          </div>
         </div>
         {error && <p role="alert" style={{ color: '#f87171', marginBottom: '0.75rem' }}>{error}</p>}
-        <div className="glass-table-wrapper">
-          <table className="glass-table">
-            <thead><tr><th>Payer / Driver</th><th>Plate</th><th>Reference</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
-            <tbody>
-              {payments.length === 0 ? <tr><td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.25rem' }}>No TODA payments submitted.</td></tr> : payments.map(payment => {
-                const app = applications.find(item => item.id === payment.applicationId);
-                return (
-                  <tr key={payment.id}>
-                    <td>{payment.payerName}</td><td>{app?.plateNumber || '—'}</td><td>{payment.referenceNumber}</td>
-                    <td>₱{payment.amount.toFixed(2)}</td>
-                    <td><span className={`pill-badge ${payment.status === 'completed' ? 'pill-approved' : payment.status === 'failed' ? 'pill-rejected' : 'pill-pending'}`}>{payment.status.toUpperCase()}</span></td>
-                    <td>{payment.status === 'pending' && <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      <button type="button" onClick={() => void handlePaymentStatus(payment.id, 'completed')} className="btn-glass btn-emerald-glass" style={{ padding: '0.35rem 0.55rem' }}>Confirm</button>
-                      <button type="button" onClick={() => void handlePaymentStatus(payment.id, 'failed')} className="btn-glass" style={{ padding: '0.35rem 0.55rem' }}>Reject</button>
-                    </div>}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {!isPaymentsFolded && (
+          <>
+            <div className="glass-table-wrapper">
+              <table className="glass-table">
+                <thead><tr><th>Payer / Driver</th><th>Plate</th><th>Reference</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                  {payments.length === 0 ? <tr><td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.25rem' }}>No TODA payments submitted.</td></tr> : payments.slice((paymentsPage - 1) * PAGE_SIZE, paymentsPage * PAGE_SIZE).map(payment => {
+                    const app = applications.find(item => item.id === payment.applicationId);
+                    return (
+                      <tr key={payment.id}>
+                        <td>{payment.payerName}</td><td>{app?.plateNumber || '—'}</td><td>{payment.referenceNumber}</td>
+                        <td>₱{payment.amount.toFixed(2)}</td>
+                        <td><span className={`pill-badge ${payment.status === 'completed' ? 'pill-approved' : payment.status === 'failed' ? 'pill-rejected' : 'pill-pending'}`}>{payment.status.toUpperCase()}</span></td>
+                        <td>{payment.status === 'pending' && <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button type="button" onClick={() => void handlePaymentStatus(payment.id, 'completed')} className="btn-glass btn-emerald-glass" style={{ padding: '0.35rem 0.55rem' }}>Confirm</button>
+                          <button type="button" onClick={() => void handlePaymentStatus(payment.id, 'failed')} className="btn-glass" style={{ padding: '0.35rem 0.55rem' }}>Reject</button>
+                        </div>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              currentPage={paymentsPage}
+              totalItems={payments.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPaymentsPage}
+            />
+          </>
+        )}
       </div>
 
       {/* Pending Applications Queue Card */}
       <div className="glass-container" style={{ padding: '1.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Applications Awaiting TODA Line Endorsement</h3>
-          <span className="pill-badge pill-purple">{pendingApprovals.length} Driver Applications</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isApprovalsFolded ? 0 : '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Applications Awaiting TODA Line Endorsement</h3>
+            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Showing up to {PAGE_SIZE} driver applications per page</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span className="pill-badge pill-purple">{pendingApprovals.length} Driver Applications</span>
+            <button
+              type="button"
+              onClick={() => setIsApprovalsFolded(!isApprovalsFolded)}
+              className="btn-glass"
+              style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', color: '#38bdf8' }}
+            >
+              {isApprovalsFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+            </button>
+          </div>
         </div>
 
-        <div className="glass-table-wrapper">
-          <table className="glass-table">
-            <thead>
-              <tr>
-                <th>Driver Name</th>
-                <th>Plate / Body No.</th>
-                <th>TODA Route</th>
-                <th>Requirements</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingApprovals.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
-                    No pending driver applications in queue for TODA line approval.
-                  </td>
-                </tr>
-              ) : (
-                pendingApprovals.map(app => (
-                  <tr key={app.id}>
-                    <td style={{ fontWeight: 700, color: '#ffffff' }}>{app.driverName || app.applicantName}</td>
-                    <td style={{ color: '#38bdf8', fontWeight: 600 }}>{app.plateNumber}</td>
-                    <td>{app.todaName}</td>
-                    <td>{(app.documents || []).length} documents</td>
-                    <td>
-                      <button
-                        onClick={() => navigate('/toda/approvals')}
-                        className="btn-glass btn-primary-glass"
-                        style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
-                      >
-                        Review & Approve →
-                      </button>
-                    </td>
+        {!isApprovalsFolded && (
+          <>
+            <div className="glass-table-wrapper">
+              <table className="glass-table">
+                <thead>
+                  <tr>
+                    <th>Driver Name</th>
+                    <th>Plate / Body No.</th>
+                    <th>TODA Route</th>
+                    <th>Requirement Checking</th>
+                    <th>Action</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {pendingApprovals.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '1.5rem' }}>
+                        No pending driver applications in queue for TODA line approval.
+                      </td>
+                    </tr>
+                  ) : (
+                    pendingApprovals.slice((approvalsPage - 1) * PAGE_SIZE, approvalsPage * PAGE_SIZE).map(app => (
+                      <tr key={app.id}>
+                        <td style={{ fontWeight: 700, color: '#ffffff' }}>{app.driverName || app.applicantName}</td>
+                        <td style={{ color: '#38bdf8', fontWeight: 600 }}>{app.plateNumber}</td>
+                        <td>{app.todaName}</td>
+                        <td style={{ color: '#4ade80', fontSize: '0.8rem' }}>Sent Directly to Municipal Admin</td>
+                        <td>
+                          <button
+                            onClick={() => navigate('/toda/approvals')}
+                            className="btn-glass btn-primary-glass"
+                            style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
+                          >
+                            Endorse Line →
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <PaginationBar
+              currentPage={approvalsPage}
+              totalItems={pendingApprovals.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={setApprovalsPage}
+            />
+          </>
+        )}
       </div>
 
       {/* Printable per-TODA report (locked to this President's TODA) */}

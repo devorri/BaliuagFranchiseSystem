@@ -5,7 +5,7 @@ import { belongsToToda } from '../../services/todaService';
 import type { Application } from '../../types';
 import { 
   CheckCircle2, RefreshCw, UserCheck, 
-  Search, ChevronLeft, ChevronRight,
+  Search, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Clock, Award
 } from 'lucide-react';
 
@@ -20,9 +20,10 @@ export function TodaApprovals() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'needs_approval' | 'endorsed'>('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Pagination states
+  // Pagination states (default 10 items per page)
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(8);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isQueueFolded, setIsQueueFolded] = useState(false);
 
   useEffect(() => {
     void loadApps();
@@ -229,34 +230,47 @@ export function TodaApprovals() {
 
       {/* Linear Applications Data Table View */}
       <div className="glass-container" style={{ padding: '1.75rem', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isQueueFolded ? 0 : '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-              Driver Applications Queue
+              Driver Applications Queue ({filteredApplications.length})
             </h3>
             <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
               Linear view of drivers registered under {user?.todaName || 'your TODA line'}
             </span>
           </div>
 
-          {filteredApplications.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#94a3b8' }}>
-              <span>Show</span>
-              <select
-                value={itemsPerPage}
-                onChange={e => setItemsPerPage(Number(e.target.value))}
-                className="glass-input"
-                style={{ padding: '0.25rem 0.6rem', fontSize: '0.82rem', width: 'auto', background: 'rgba(10, 24, 16, 0.8)' }}
-              >
-                <option value={5}>5</option>
-                <option value={8}>8</option>
-                <option value={15}>15</option>
-                <option value={25}>25</option>
-              </select>
-              <span>per page</span>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            {!isQueueFolded && filteredApplications.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#94a3b8' }}>
+                <span>Show</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={e => setItemsPerPage(Number(e.target.value))}
+                  className="glass-input"
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.82rem', width: 'auto', background: 'rgba(10, 24, 16, 0.8)' }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                </select>
+                <span>per page</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsQueueFolded(!isQueueFolded)}
+              className="btn-glass"
+              style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', color: '#38bdf8' }}
+            >
+              {isQueueFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
+            </button>
+          </div>
         </div>
+
+        {!isQueueFolded && (
+          <>
 
         {filteredApplications.length === 0 ? (
           <div style={{ padding: '3.5rem 1rem', textAlign: 'center' }}>
@@ -504,6 +518,8 @@ export function TodaApprovals() {
               </button>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
 

@@ -6,10 +6,11 @@ import type { Application, Document, Franchise, SMSNotification, User } from '..
 import { 
   ShieldCheck, RefreshCw, QrCode, Users, Clock, UserCheck, 
   CheckCircle2, AlertTriangle, FileText, Upload, Loader2, 
-  ExternalLink 
+  ExternalLink, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeDocumentWithOcr } from '../../services/ocrService';
+import { PaginationBar } from '../../components/ui/PaginationBar';
 
 export function OperatorDashboard() {
   const { user } = useAuth();
@@ -27,6 +28,14 @@ export function OperatorDashboard() {
   const [resubmittingDocId, setResubmittingDocId] = useState<string | null>(null);
   const [resubmitLoading, setResubmitLoading] = useState(false);
   const [resubmitMessage, setResubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [expandedDocs, setExpandedDocs] = useState<Record<string, boolean>>({});
+  const [isAppsSectionFolded, setIsAppsSectionFolded] = useState(false);
+  const [isFranchisesFolded, setIsFranchisesFolded] = useState(false);
+  const [isSmsFolded, setIsSmsFolded] = useState(false);
+  const [appsPage, setAppsPage] = useState(1);
+  const [franchisesPage, setFranchisesPage] = useState(1);
+  const [smsPage, setSmsPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     if (!user) return;
@@ -272,44 +281,57 @@ export function OperatorDashboard() {
 
       {/* Live Application Status & Tracker Section */}
       <div className="glass-container" style={{ padding: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isAppsSectionFolded ? 0 : '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-              Live Application Status & Document Tracker
+              Live Application Status & Document Tracker ({myApplications.length})
             </h2>
             <p style={{ color: '#94a3b8', fontSize: '0.88rem', margin: '0.25rem 0 0' }}>
               Monitor your application lifecycle stages and resubmit rejected documents directly.
             </p>
           </div>
-          <button
-            onClick={() => void loadDashboardData()}
-            className="btn-glass"
-            style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-          >
-            <RefreshCw size={14} /> Refresh Status
-          </button>
-        </div>
-
-        {myApplications.length === 0 ? (
-          <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center' }}>
-            <FileText size={42} color="#94a3b8" style={{ margin: '0 auto 1rem' }} />
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem' }}>
-              No Applications Submitted Yet
-            </h3>
-            <p style={{ color: '#94a3b8', maxWidth: '460px', margin: '0 auto 1.5rem', fontSize: '0.9rem' }}>
-              You haven't submitted any new franchise or renewal applications. Get started by clicking the button below.
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <button
-              onClick={() => navigate('/dashboard/requirements')}
-              className="btn-glass btn-emerald-glass"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.4rem' }}
+              onClick={() => void loadDashboardData()}
+              className="btn-glass"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
             >
-              <FileText size={16} /> Submit Franchise Application
+              <RefreshCw size={14} /> Refresh Status
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAppsSectionFolded(!isAppsSectionFolded)}
+              className="btn-glass"
+              style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', color: '#38bdf8' }}
+            >
+              {isAppsSectionFolded ? <><ChevronDown size={15} /> See More</> : <><ChevronUp size={15} /> See Less</>}
             </button>
           </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {myApplications.map(app => {
+        </div>
+
+        {!isAppsSectionFolded && (
+          <>
+            {myApplications.length === 0 ? (
+              <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+                <FileText size={42} color="#94a3b8" style={{ margin: '0 auto 1rem' }} />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem' }}>
+                  No Applications Submitted Yet
+                </h3>
+                <p style={{ color: '#94a3b8', maxWidth: '460px', margin: '0 auto 1.5rem', fontSize: '0.9rem' }}>
+                  You haven't submitted any new franchise or renewal applications. Get started by clicking the button below.
+                </p>
+                <button
+                  onClick={() => navigate('/dashboard/requirements')}
+                  className="btn-glass btn-emerald-glass"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.4rem' }}
+                >
+                  <FileText size={16} /> Submit Franchise Application
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {myApplications.slice((appsPage - 1) * PAGE_SIZE, appsPage * PAGE_SIZE).map(app => {
               const isApproved = app.status === 'approved';
               const requiresRevision = app.status === 'requires_revision' || (app.documents || []).some(d => d.status === 'rejected');
 
@@ -363,10 +385,10 @@ export function OperatorDashboard() {
                   <div style={{ marginBottom: '2rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
                       {[
-                        { num: 1, label: 'Submitted', done: step1Done },
-                        { num: 2, label: 'TODA Review', done: step2Done },
+                        { num: 1, label: 'Submitted to Admin', done: step1Done },
+                        { num: 2, label: 'TODA Endorsement', done: step2Done },
                         { num: 3, label: 'Stenciling', done: step3Done },
-                        { num: 4, label: 'Treasurer Fee', done: step4Done },
+                        { num: 4, label: 'Automatic Payment', done: step4Done },
                         { num: 5, label: 'MTOP Grant', done: step5Done },
                       ].map((step, idx) => (
                         <div key={idx} style={{ textAlign: 'center', position: 'relative' }}>
@@ -396,14 +418,27 @@ export function OperatorDashboard() {
                     </div>
                   </div>
 
-                  {/* Document Requirements Review Breakdown */}
-                  <div style={{ background: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px', padding: '1.25rem', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f8fafc', margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <FileText size={16} color="#38bdf8" />
-                      Document Verification Checklist & Re-upload
-                    </h4>
+                  {/* Document Requirements Review Breakdown (Foldable) */}
+                  <div style={{ background: 'rgba(255, 255, 255, 0.02)', borderRadius: '10px', padding: '1.15rem 1.25rem', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: (expandedDocs[app.id] ?? requiresRevision) ? '1rem' : 0 }}
+                      onClick={() => setExpandedDocs(prev => ({ ...prev, [app.id]: !(prev[app.id] ?? requiresRevision) }))}
+                    >
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#f8fafc', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <FileText size={16} color="#38bdf8" />
+                        Document Verification Checklist & Re-upload ({(app.documents || []).filter(d => d.status === 'verified').length}/{(app.documents || []).length} Verified)
+                      </h4>
+                      <button
+                        type="button"
+                        className="btn-glass"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                      >
+                        {(expandedDocs[app.id] ?? requiresRevision) ? <><ChevronUp size={15} /> See Less</> : <><ChevronDown size={15} /> See More</>}
+                      </button>
+                    </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {(expandedDocs[app.id] ?? requiresRevision) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                       {(app.documents || []).length === 0 ? (
                         <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>No documents attached.</p>
                       ) : (
@@ -511,12 +546,22 @@ export function OperatorDashboard() {
                           );
                         })
                       )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
-          </div>
+                </div>
+                <PaginationBar
+                  currentPage={appsPage}
+                  totalItems={myApplications.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setAppsPage}
+                />
+              </>
+            )}
+          </>
         )}
       </div>
 
@@ -525,123 +570,163 @@ export function OperatorDashboard() {
         
         {/* Franchise & Driver Records Card */}
         <div className="glass-container" style={{ padding: '1.75rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isFranchisesFolded ? 0 : '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>
               Registered Franchises & Assigned Drivers
             </h3>
-            <span className="pill-badge pill-blue">{franchises.length} Units</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className="pill-badge pill-blue">{franchises.length} Units</span>
+              <button
+                type="button"
+                onClick={() => setIsFranchisesFolded(!isFranchisesFolded)}
+                className="btn-glass"
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', color: '#38bdf8' }}
+              >
+                {isFranchisesFolded ? <><ChevronDown size={14} /> See More</> : <><ChevronUp size={14} /> See Less</>}
+              </button>
+            </div>
           </div>
 
-          {assignmentError && (
-            <p role="alert" style={{ color: '#f87171', marginBottom: '1rem', fontSize: '0.88rem' }}>
-              {assignmentError}
-            </p>
-          )}
+          {!isFranchisesFolded && (
+            <>
+              {assignmentError && (
+                <p role="alert" style={{ color: '#f87171', marginBottom: '1rem', fontSize: '0.88rem' }}>
+                  {assignmentError}
+                </p>
+              )}
 
-          <div className="glass-table-wrapper">
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>MTOP Body #</th>
-                  <th>Assigned Driver</th>
-                  <th>Assign Driver Account</th>
-                  <th>Plate #</th>
-                  <th>Expiration</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {franchises.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
-                      No registered tricycles under your account yet. Submit an application to add a unit.
-                    </td>
-                  </tr>
-                ) : (
-                  franchises.map(f => (
-                    <tr key={f.id}>
-                      <td style={{ fontWeight: 800, color: '#38bdf8' }}>{f.mtopNumber}</td>
-                      <td style={{ fontWeight: 700, color: '#f8fafc' }}>{f.driverName}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.4rem', minWidth: '240px' }}>
-                          <select
-                            className="glass-input glass-select"
-                            value={driverSelections[f.id] || ''}
-                            onChange={e => setDriverSelections(current => ({ ...current, [f.id]: e.target.value }))}
-                          >
-                            <option value="">Select driver</option>
-                            {drivers.map(driver => (
-                              <option key={driver.id} value={driver.id}>
-                                {driver.firstName} {driver.lastName}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => handleAssignDriver(f)}
-                            disabled={savingAssignment === f.id}
-                            className="btn-glass"
-                            title="Assign driver"
-                            style={{ padding: '0.45rem' }}
-                          >
-                            <UserCheck size={16} />
-                          </button>
-                        </div>
-                      </td>
-                      <td>{f.plateNumber}</td>
-                      <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
-                        {new Date(f.endDate || f.expiresAt).toLocaleDateString()}
-                        {(() => {
-                          const left = daysUntil(f.endDate || f.expiresAt);
-                          return (
-                            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: left < 0 ? '#f87171' : left <= 30 ? '#fbbf24' : '#4ade80' }}>
-                              {left < 0 ? `Expired ${Math.abs(left)} day(s) ago` : left === 0 ? 'Expires today' : `${left} day(s) left`}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      <td>
-                        <span className={`pill-badge ${f.status === 'active' ? 'pill-approved' : 'pill-rejected'}`}>
-                          {f.status.toUpperCase()}
-                        </span>
-                      </td>
+              <div className="glass-table-wrapper">
+                <table className="glass-table">
+                  <thead>
+                    <tr>
+                      <th>MTOP Body #</th>
+                      <th>Assigned Driver</th>
+                      <th>Assign Driver Account</th>
+                      <th>Plate #</th>
+                      <th>Expiration</th>
+                      <th>Status</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {franchises.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>
+                          No registered tricycles under your account yet. Submit an application to add a unit.
+                        </td>
+                      </tr>
+                    ) : (
+                      franchises.slice((franchisesPage - 1) * PAGE_SIZE, franchisesPage * PAGE_SIZE).map(f => (
+                        <tr key={f.id}>
+                          <td style={{ fontWeight: 800, color: '#38bdf8' }}>{f.mtopNumber}</td>
+                          <td style={{ fontWeight: 700, color: '#f8fafc' }}>{f.driverName}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.4rem', minWidth: '240px' }}>
+                              <select
+                                className="glass-input glass-select"
+                                value={driverSelections[f.id] || ''}
+                                onChange={e => setDriverSelections(current => ({ ...current, [f.id]: e.target.value }))}
+                              >
+                                <option value="">Select driver</option>
+                                {drivers.map(driver => (
+                                  <option key={driver.id} value={driver.id}>
+                                    {driver.firstName} {driver.lastName}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleAssignDriver(f)}
+                                disabled={savingAssignment === f.id}
+                                className="btn-glass"
+                                title="Assign driver"
+                                style={{ padding: '0.45rem' }}
+                              >
+                                <UserCheck size={16} />
+                              </button>
+                            </div>
+                          </td>
+                          <td>{f.plateNumber}</td>
+                          <td style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
+                            {new Date(f.endDate || f.expiresAt).toLocaleDateString()}
+                            {(() => {
+                              const left = daysUntil(f.endDate || f.expiresAt);
+                              return (
+                                <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: left < 0 ? '#f87171' : left <= 30 ? '#fbbf24' : '#4ade80' }}>
+                                  {left < 0 ? `Expired ${Math.abs(left)} day(s) ago` : left === 0 ? 'Expires today' : `${left} day(s) left`}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td>
+                            <span className={`pill-badge ${f.status === 'active' ? 'pill-approved' : 'pill-rejected'}`}>
+                              {f.status.toUpperCase()}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <PaginationBar
+                currentPage={franchisesPage}
+                totalItems={franchises.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setFranchisesPage}
+              />
+            </>
+          )}
         </div>
 
         {/* SMS Notifications Inbox Brief */}
         <div className="glass-container" style={{ padding: '1.75rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isSmsFolded ? 0 : '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>
-              SMS Notification Alerts
+              SMS Notification Alerts ({smsNotifs.length})
             </h3>
-            <button onClick={() => navigate('/dashboard/sms-notifications')} className="btn-glass" style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}>
-              View Inbox ({smsNotifs.length}) →
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button onClick={() => navigate('/dashboard/sms-notifications')} className="btn-glass" style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}>
+                View Inbox →
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSmsFolded(!isSmsFolded)}
+                className="btn-glass"
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', color: '#38bdf8' }}
+              >
+                {isSmsFolded ? <><ChevronDown size={14} /> See More</> : <><ChevronUp size={14} /> See Less</>}
+              </button>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {smsNotifs.length === 0 ? (
-              <p style={{ color: '#94a3b8', fontSize: '0.88rem', textAlign: 'center', padding: '2rem' }}>
-                No SMS notification alerts received at this time.
-              </p>
-            ) : (
-              smsNotifs.slice(0, 3).map(n => (
-                <div key={n.id} className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #38bdf8' }}>
-                  <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '0.9rem', marginBottom: '0.2rem' }}>
-                    {n.title}
-                  </div>
-                  <p style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.4', margin: 0 }}>
-                    {n.message}
+          {!isSmsFolded && (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {smsNotifs.length === 0 ? (
+                  <p style={{ color: '#94a3b8', fontSize: '0.88rem', textAlign: 'center', padding: '2rem' }}>
+                    No SMS notification alerts received at this time.
                   </p>
-                </div>
-              ))
-            )}
-          </div>
+                ) : (
+                  smsNotifs.slice((smsPage - 1) * PAGE_SIZE, smsPage * PAGE_SIZE).map(n => (
+                    <div key={n.id} className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #38bdf8' }}>
+                      <div style={{ fontWeight: 700, color: '#ffffff', fontSize: '0.9rem', marginBottom: '0.2rem' }}>
+                        {n.title}
+                      </div>
+                      <p style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: '1.4', margin: 0 }}>
+                        {n.message}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <PaginationBar
+                currentPage={smsPage}
+                totalItems={smsNotifs.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setSmsPage}
+              />
+            </>
+          )}
         </div>
 
       </div>
