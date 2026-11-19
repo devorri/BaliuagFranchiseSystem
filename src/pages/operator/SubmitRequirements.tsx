@@ -64,6 +64,13 @@ export function SubmitRequirements() {
         const registered = Object.keys(TODA_ROUTES).find(name => todaKey(name) === todaKey(user.todaName));
         if (registered) setForm(prev => ({ ...prev, todaName: registered }));
 
+        // Name comes straight from the registered account
+        const registeredName = [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+        if (registeredName && applicationType === 'new') {
+          setForm(prev => (prev.driverName ? prev : { ...prev, driverName: registeredName }));
+          setAutoFilledFields(prev => new Set(prev).add('driverName'));
+        }
+
         if (applicationType === 'renewal') {
           const owned = franchises.filter(f => f.operatorId === user.id);
           const target = owned.find(f => f.id === renewFranchiseId) || owned.find(f => canRenewFranchise(f));
@@ -93,6 +100,32 @@ export function SubmitRequirements() {
       .finally(() => { if (!cancelled) setCheckingExisting(false); });
     return () => { cancelled = true; };
   }, [user, applicationType, renewFranchiseId]);
+
+  // License / ID number: read from the Government ID / Driver's License uploaded during registration
+  useEffect(() => {
+    if (!user || applicationType !== 'new') return;
+    const regLicense = (user.documents || []).find(doc => doc.type === 'drivers_license' && doc.fileUrl && !doc.fileUrl.startsWith('blob:'));
+    const fileUrl = regLicense?.fileUrl;
+    if (!regLicense || !fileUrl) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(fileUrl);
+        if (!response.ok) return;
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) return;
+        const file = new File([blob], regLicense.fileName || 'registration-license', { type: blob.type });
+        const result = await analyzeDocumentWithOcr(file, 'drivers_license');
+        if (cancelled || !result.fields?.licenseNumber) return;
+        const licenseNumber = result.fields.licenseNumber;
+        setForm(prev => (prev.licenseNumber ? prev : { ...prev, licenseNumber }));
+        setAutoFilledFields(prev => new Set(prev).add('licenseNumber'));
+      } catch (err) {
+        console.warn('Could not read registration license:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, applicationType]);
 
   const addressFee = useMemo(() => feeForAddress(user?.address), [user?.address]);
   const routeArea = TODA_ROUTES[form.todaName] || renewFranchise?.routeArea || 'Standard Baliwag Municipal Route';
@@ -152,7 +185,7 @@ export function SubmitRequirements() {
               newlyFilled.add('vehicleMake');
               filledList.push(`Make: ${detected.vehicleMake}`);
             }
-            if (detected.driverName && !prev.driverName) {
+            if (detected.driverName && (type === 'drivers_license' || !prev.driverName)) {
               updated.driverName = detected.driverName;
               newlyFilled.add('driverName');
               filledList.push(`Driver: ${detected.driverName}`);
@@ -259,7 +292,8 @@ export function SubmitRequirements() {
 
     setError('');
     try {
-      await saveApplicationAsync(app, false);
+      // Must reach the shared database, otherwise the Admin will never see it
+      await saveApplicationAsync(app, true);
       void recordAuditLogAsync({
         userId: user.id,
         userName: `${user.firstName} ${user.lastName}`,
@@ -694,6 +728,12 @@ export function SubmitRequirements() {
                 {submitting ? <Loader2 size={20} className="spin-icon" /> : <FileUp size={20} />}
                 {submitting ? 'Submitting...' : 'Submit Complete Application to Municipal Admin'}
               </button>
+
+              {error && (
+                <div role="alert" style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', color: '#f87171', fontSize: '0.88rem', textAlign: 'center' }}>
+                  {error}
+                </div>
+              )}
 
               {!ready && !submitting && (
                 <p style={{ color: '#94a3b8', fontSize: '0.82rem', textAlign: 'center', margin: 0 }}>

@@ -55,6 +55,53 @@ const MOTORCYCLE_MAKES = [
   'HONDA', 'YAMAHA', 'KAWASAKI', 'SUZUKI', 'BAJAJ', 'TVS', 'RATO', 'SYM', 'KYMCO', 'HAOJUE', 'EURO'
 ];
 
+/** Words that appear in the card labels, never in an actual person's name */
+const NAME_LABEL_WORDS = /\b(LAST|FIRST|MIDDLE|NAME|NATIONALITY|SEX|DATE|BIRTH|ADDRESS|LICENSE|LICENCE|REPUBLIC|PHILIPPINES|DEPARTMENT|TRANSPORTATION|OFFICE|DRIVER|WEIGHT|HEIGHT|EXPIRATION|AGENCY|CODE|BLOOD|EYES|COLOR|RESTRICTION|CONDITIONS|SIGNATURE|ASSISTANT|SECRETARY|NON|PROFESSIONAL|STUDENT|PERMIT)\b/;
+
+function toTitle(value: string): string {
+  return value.toLowerCase().replace(/\b([a-z])/g, c => c.toUpperCase());
+}
+
+/**
+ * LTO license layout:
+ *   "Last Name, First Name, Middle Name"   <- label line
+ *   "DELA CRUZ, JUAN SANTOS"                <- actual name (next line)
+ * Returns "Juan Santos Dela Cruz".
+ */
+export function extractLicenseName(text: string): string | undefined {
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.toUpperCase().replace(/[^A-Z ,.\-Ñ]/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const isNameLine = (line: string) => {
+    const letters = line.replace(/[^A-ZÑ]/g, '');
+    if (letters.length < 5 || NAME_LABEL_WORDS.test(line)) return false;
+    return line.split(/[ ,]+/).filter(Boolean).length >= 2;
+  };
+
+  const format = (line: string) => {
+    const cleaned = line.replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleaned.includes(',')) {
+      const [last, ...rest] = cleaned.split(',').map(part => part.trim()).filter(Boolean);
+      return toTitle([...rest, last].join(' ').replace(/\s+/g, ' ').trim());
+    }
+    return toTitle(cleaned);
+  };
+
+  // 1) Line right after the "LAST NAME, FIRST NAME, MIDDLE NAME" label
+  const labelIndex = lines.findIndex(line => /LAST\s*NAME|FIRST\s*NAME/.test(line));
+  if (labelIndex >= 0) {
+    for (const line of lines.slice(labelIndex + 1, labelIndex + 4)) {
+      if (isNameLine(line)) return format(line);
+    }
+  }
+
+  // 2) Fallback: first "SURNAME, GIVEN NAMES" looking line anywhere
+  const commaLine = lines.find(line => /^[A-ZÑ .\-]{2,}, ?[A-ZÑ .\-]{2,}/.test(line) && isNameLine(line));
+  return commaLine ? format(commaLine) : undefined;
+}
+
 /**
  * Extracts structured data from recognized OCR text
  */
@@ -105,14 +152,12 @@ export function extractFieldsFromText(text: string, docType: DocumentType): Extr
 
   // 6. Driver Name / Registered Owner (if in OR/CR or License)
   if (docType === 'drivers_license') {
-    const nameMatch = upper.match(/(?:NAME|LAST\s*NAME|BEARER)[:.\s-]*([A-Z\s,]{4,30})/);
-    if (nameMatch && nameMatch[1]) {
-      fields.driverName = nameMatch[1].replace(/\n/g, ' ').trim();
-    }
+    const name = extractLicenseName(text);
+    if (name) fields.driverName = name;
   } else if (docType === 'or_cr') {
-    const ownerMatch = upper.match(/(?:OWNER|NAME)[:.\s-]*([A-Z\s,]{4,30})/);
-    if (ownerMatch && ownerMatch[1]) {
-      fields.driverName = ownerMatch[1].replace(/\n/g, ' ').trim();
+    const ownerMatch = upper.match(/(?:OWNER|NAME)[:.\s-]*([A-Z ,]{4,40})/);
+    if (ownerMatch && ownerMatch[1] && !NAME_LABEL_WORDS.test(ownerMatch[1])) {
+      fields.driverName = ownerMatch[1].trim();
     }
   }
 
